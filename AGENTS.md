@@ -1,3 +1,16 @@
+# eepy — notes for contributors and coding agents
+
+Android sleep coach (Expo SDK 58, React Native 0.88, TypeScript) that reads CMF Watch 3 Pro data from Health Connect.
+
+- `src/engine/` is pure TypeScript with no React/native imports — keep it that way so it stays unit-testable. Every model has tests in `src/engine/__tests__/`.
+- `src/integrations/healthConnect.ts` is the only file that touches the native Health Connect module; record mapping lives in the pure `healthConnectMapper.ts`.
+- `src/state/store.ts` is the single persisted zustand store; `useAnalysis()` runs the engine once and shares the result across screens.
+- Tests run in `America/Chicago` (see `jest.global-setup.js`) so date/DST logic is deterministic.
+- Android build: `compileSdkVersion` 37 / `targetSdkVersion` 36 / `minSdkVersion` 26, arm64 only (`app.json` → `expo-build-properties`). The APK is built by `.github/workflows/android-apk.yml`.
+- Health Connect and exact alarms need a real build (`npx expo run:android` or the CI APK) — not Expo Go.
+
+Before declaring a change done: `npm run typecheck` and `npm test`.
+
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
 ## Expo has changed — do not trust your training data
