@@ -180,6 +180,16 @@ describe('jet lag', () => {
     expect(p.strategy).toBe('advance');
     expect(p.daysToAdjust).toBe(4);
     expect(p.days[0].dayIndex).toBe(-2);
+    // Pre-flight days shift 1h earlier per day (home time).
+    expect(p.days[0].bedtimeMin).toBe(22 * 60);
+    expect(p.days[1].bedtimeMin).toBe(21 * 60);
+    // After arrival, sleep on local time at the usual clock times.
+    const day1 = p.days.find((d) => d.dayIndex === 1)!;
+    expect(day1.bedtimeMin).toBe(23 * 60);
+    expect(day1.wakeMin).toBe(7 * 60);
+    // Body still ~3h behind: CBTmin ≈ 08:00 local, so seek light after it, avoid it before.
+    expect(day1.seekLight).toEqual({ startMin: 8 * 60, endMin: 11 * 60 });
+    expect(day1.avoidLight).toEqual({ startMin: 5 * 60, endMin: 8 * 60 });
   });
 
   it('delays the long way round for very large eastward jumps', () => {

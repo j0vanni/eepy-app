@@ -94,8 +94,8 @@ export function planJetLag(input: JetLagInput): JetLagPlan {
     dayIndex: 0,
     label: 'Travel day',
     zone: 'destination',
-    bedtimeMin: normalizeMinutes(input.bedtimeMin + offsetH * 60),
-    wakeMin: normalizeMinutes(input.wakeMin + offsetH * 60),
+    bedtimeMin: input.bedtimeMin,
+    wakeMin: input.wakeMin,
     notes: [
       'Switch your watch and meals to destination time as soon as you board.',
       'Sleep on the plane only if it is night at your destination.',
@@ -113,8 +113,9 @@ export function planJetLag(input: JetLagInput): JetLagPlan {
       dayIndex: d,
       label: `Day ${d} after arrival`,
       zone: 'destination',
-      bedtimeMin: normalizeMinutes(input.bedtimeMin + offsetH * 60),
-      wakeMin: normalizeMinutes(input.wakeMin + offsetH * 60),
+      // Live on local time straight away; light timing does the shifting.
+      bedtimeMin: input.bedtimeMin,
+      wakeMin: input.wakeMin,
       seekLight: light.seek,
       avoidLight: light.avoid,
       notes:
