@@ -4,6 +4,7 @@ import { Platform, Text, View } from 'react-native';
 
 import { ageBaseline } from '@/engine/sleepNeed';
 import { formatClock, normalizeMinutes } from '@/engine/time';
+import { ensureNotificationPermission } from '@/state/notifications';
 import { useStore } from '@/state/store';
 import { Button, Card, Chip, Icon, Row, Screen, Stepper } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
@@ -30,6 +31,8 @@ export default function Onboarding() {
 
   const finish = (next: 'connect' | 'demo' | 'manual' | 'home') => {
     setProfile({ onboarded: true });
+    // Android 13+ needs a runtime prompt before wind-down / bedtime reminders can appear.
+    if (Platform.OS !== 'web') ensureNotificationPermission().catch(() => undefined);
     if (next === 'demo') loadDemo();
     router.replace('/');
     if (next === 'connect') router.push('/connect');
