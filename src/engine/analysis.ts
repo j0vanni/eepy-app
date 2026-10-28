@@ -1,0 +1,260 @@
+import { EnergyForecast, forecastEnergy, Interval } from './alertness';
+import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
+import { analyzeChronotype, ChronotypeResult } from './chronotype';
+import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
+import { generateInsights, Insight, NightRow } from './insights';
+import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
+import { analyzeRegularity, RegularityResult } from './regularity';
+import { planTonight, smartAlarm, TonightPlan, wakeTargetFor } from './schedule';
+import {
+  analyzeSessions,
+  buildNights,
+  Night,
+  personalCycleMin,
+  personalEfficiency,
+  personalLatencyMin,
+  SessionMetrics,
+} from './sessions';
+import { computeSleepDebt, debtOnDate, SleepDebtResult } from './sleepDebt';
+import { ageFromBirthYear, estimateSleepNeed, SleepNeedEstimate } from './sleepNeed';
+import { scoreSleep, SleepScore } from './sleepScore';
+import { addDays, atMinutes, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
+import { isSleepStage, SleepDataset } from './types';
+import { computeReadiness, Readiness } from './vitals';
+
+export interface Analysis {
+  now: number;
+  /** Calendar day the user is "living" (before 4am counts as the previous day). */
+  day: string;
+  age: number;
+  metrics: SessionMetrics[];
+  nights: Night[];
+  /** The most recent night that has a main sleep. */
+  lastNight?: Night;
+  /** Whether `lastNight` is the night that ended this morning. */
+  lastNightIsCurrent: boolean;
+  scores: Record<string, SleepScore>;
+  need: SleepNeedEstimate;
+  debt: SleepDebtResult;
+  chronotype: ChronotypeResult;
+  regularity: RegularityResult;
+  latencyMin: number;
+  cycleMin: number;
+  efficiency: number;
+  habitualMidSleepMin: number;
+  wakeTime: number;
+  tonight: TonightPlan;
+  alarm: ReturnType<typeof smartAlarm>;
+  energy: EnergyForecast;
+  caffeine: { nowMg: number; cutoff: CaffeineCutoff };
+  nap: NapRecommendation;
+  readiness?: Readiness;
+  insights: Insight[];
+  plan: PlanItem[];
+  tips: Tip[];
+}
+
+export interface AnalyzeOptions {
+  preferredOrigins?: string[];
+  upcoming?: UpcomingDemand;
+}
+
+function sleepIntervals(metrics: SessionMetrics[], since: number): Interval[] {
+  const out: Interval[] = [];
+  for (const m of metrics) {
+    if (m.end < since) continue;
+    for (const s of m.segments) if (isSleepStage(s.stage)) out.push({ start: s.start, end: s.end });
+  }
+  return out;
+}
+
+export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = {}): Analysis {
+  const { profile, dayLogs } = data;
+  const day = minutesOfDay(now) < 240 ? addDays(dateKey(now), -1) : dateKey(now);
+  const age = ageFromBirthYear(profile.birthYear, day);
+
+  const metrics = analyzeSessions(
+    data.sessions.filter((s) => s.start < now),
+    { preferredOrigins: opts.preferredOrigins },
+  );
+  const nights = buildNights(metrics).filter((n) => n.wakeDate <= dateKey(now));
+  const need = estimateSleepNeed({ nights, dayLogs, profile, asOfDate: day });
+  const debt = computeSleepDebt(nights, need.needMin, day);
+  const chronotype = analyzeChronotype({ nights, profile, dayLogs });
+  const latencyMin = personalLatencyMin(nights);
+  const cycleMin = personalCycleMin(nights);
+  const efficiency = personalEfficiency(nights);
+  const defaultWake = wakeTargetFor(profile, day).wakeMin;
+  const habitualMidSleepMin =
+    chronotype.habitual?.midSleepMin ?? normalizeMinutes(defaultWake - need.needMin / 2);
+
+  const scores: Record<string, SleepScore> = {};
+  for (const n of nights) {
+    if (n.main) scores[n.main.id] = scoreSleep(n.main, { needMin: need.needMin, age, habitualMidSleepMin });
+  }
+  const regularity = analyzeRegularity(metrics, nights, day, chronotype.habitual?.midSleepSdMin);
+
+  const tonight = planTonight({
+    profile,
+    today: day,
+    needMin: need.needMin,
+    debtMin: debt.debtMin,
+    payoffExtraMin: debt.payoff?.extraMinPerNight,
+    efficiency,
+    latencyMin,
+    habitualOnsetMin: chronotype.habitual?.onsetMin,
+  });
+  const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
+
+  // Today's wake-up. If last night hasn't synced yet, assume a habitual night so the model stays sane.
+  const currentNight = nights.find((n) => n.wakeDate === day && n.main);
+  const sleeps = sleepIntervals(metrics, now - 5 * 24 * HOUR);
+  let wakeTime: number;
+  let assumedLastNight = false;
+  if (currentNight?.main) {
+    wakeTime = currentNight.main.finalWake;
+  } else {
+    wakeTime = atMinutes(day, chronotype.habitual?.wakeMin ?? defaultWake);
+    if (wakeTime > now) wakeTime = Math.min(now, wakeTime);
+    sleeps.push({ start: wakeTime - need.needMin * MINUTE, end: wakeTime });
+    assumedLastNight = true;
+  }
+  const energy = forecastEnergy({
+    sleeps,
+    now,
+    wakeTime,
+    bedtime: tonight.bedtime,
+    nextWake: tonight.wake,
+    midSleepMin: habitualMidSleepMin,
+    debtMin: debt.debtMin,
+    assumedLastNight,
+  });
+
+  const doses = data.caffeine.filter((d) => d.time > now - 36 * HOUR && d.time <= now);
+  const cutoff = caffeineCutoff(doses, tonight.bedtime, profile.caffeineHalfLifeH, profile.caffeineBedtimeLimitMg);
+  const caffeine = { nowMg: caffeineAt(doses, now, profile.caffeineHalfLifeH), cutoff };
+
+  const log = dayLogs[day];
+  const recentSleepiness =
+    log?.sleepiness !== undefined && log.sleepinessAt !== undefined && now - log.sleepinessAt < 3 * HOUR ? log.sleepiness : undefined;
+  const napsTodayMin = (nights.find((n) => n.wakeDate === day)?.naps ?? [])
+    .filter((m) => m.end <= now)
+    .reduce((s, m) => s + m.totalSleepMin, 0);
+  const nap = recommendNap({
+    now,
+    wakeTime,
+    bedtime: tonight.bedtime,
+    nextWake: tonight.wake,
+    sleeps,
+    midSleepMin: habitualMidSleepMin,
+    needMin: need.needMin,
+    debtMin: debt.debtMin,
+    lastNightSleepMin: currentNight?.main?.totalSleepMin,
+    napsTodayMin,
+    latencyMin,
+    cycleMin,
+    caffeineCutoff: cutoff.cutoff,
+    insomniaMode: profile.insomniaMode,
+    sleepiness: recentSleepiness,
+    upcoming: opts.upcoming,
+    forecast: energy,
+  });
+
+  const lastNight = [...nights].reverse().find((n) => n.main);
+  const readiness = computeReadiness({
+    nights,
+    vitals: data.vitals,
+    daily: data.daily,
+    asOfDate: day,
+    lastSleepScore: currentNight?.main ? scores[currentNight.main.id]?.total : undefined,
+    debtMin: debt.debtMin,
+    regularityScore: regularity.consistencyScore,
+  });
+
+  const rows: NightRow[] = nights
+    .filter((n) => n.main)
+    .slice(-90)
+    .map((n) => ({ night: n, score: scores[n.main!.id]?.total, vitals: data.vitals[n.main!.id] }));
+  const insights = generateInsights({
+    rows,
+    nights,
+    dayLogs,
+    daily: data.daily,
+    caffeine: data.caffeine,
+    profile,
+    chronotype,
+    needMin: need.needMin,
+  });
+
+  const plan = buildDailyPlan({ wakeTime, energy, nap, caffeine: cutoff, tonight, alarm });
+  const tips = buildTips({ nights, debt, regularity, chronotype, caffeine: cutoff, profile, tonight, age });
+
+  return {
+    now,
+    day,
+    age,
+    metrics,
+    nights,
+    lastNight,
+    lastNightIsCurrent: !!currentNight,
+    scores,
+    need,
+    debt,
+    chronotype,
+    regularity,
+    latencyMin,
+    cycleMin,
+    efficiency,
+    habitualMidSleepMin,
+    wakeTime,
+    tonight,
+    alarm,
+    energy,
+    caffeine,
+    nap,
+    readiness,
+    insights,
+    plan,
+    tips,
+  };
+}
+
+export interface TrendRow {
+  date: string;
+  sleepMin?: number;
+  napMin: number;
+  score?: number;
+  debtMin: number;
+  onsetMin?: number;
+  wakeMin?: number;
+  deepPct?: number;
+  remPct?: number;
+  hrv?: number;
+  hrMin?: number;
+}
+
+/** Per-day series for the Trends screen (debt is recomputed as of each morning). */
+export function trendRows(a: Analysis, data: SleepDataset, days: number): TrendRow[] {
+  const byDate = new Map(a.nights.map((n) => [n.wakeDate, n]));
+  const rows: TrendRow[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDays(a.day, -i);
+    const n = byDate.get(date);
+    const m = n?.main;
+    const v = m ? data.vitals[m.id] : undefined;
+    rows.push({
+      date,
+      sleepMin: m ? n!.totalSleepMin : undefined,
+      napMin: n ? n.naps.reduce((s, x) => s + x.totalSleepMin, 0) : 0,
+      score: m ? a.scores[m.id]?.total : undefined,
+      debtMin: debtOnDate(a.nights, a.need.needMin, date),
+      onsetMin: m ? minutesOfDay(m.sleepOnset) : undefined,
+      wakeMin: m ? minutesOfDay(m.finalWake) : undefined,
+      deepPct: m?.stagePct?.deep,
+      remPct: m?.stagePct?.rem,
+      hrv: v?.hrvRmssd ?? data.daily[date]?.hrv,
+      hrMin: v?.hrMin,
+    });
+  }
+  return rows;
+}
