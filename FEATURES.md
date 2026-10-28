@@ -1,0 +1,211 @@
+# eepy — feature list
+
+A sleep coach for Android that turns the data your **CMF Watch 3 Pro** already collects into answers:
+*how much sleep do I need, how far behind am I, should I nap, when should I go to bed, and what is helping or hurting my sleep?*
+
+**Legend**
+
+| Mark | Meaning |
+| --- | --- |
+| ✅ | Built and covered by automated tests or verified in the UI |
+| 🧪 | Built, but needs checking on a real phone with a real CMF Watch (Health Connect specifics) |
+| 🗺️ | Planned — designed but not built yet |
+
+---
+
+## 1. Connecting the CMF Watch 3 Pro
+
+The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **CMF Watch** app, which can share data with **Google Health Connect**. eepy reads Health Connect, so no second Bluetooth pairing (which would fight the official app) is needed.
+
+| | Feature |
+| --- | --- |
+| 🧪 | **Health Connect integration** — reads sleep sessions *with stages* (awake, light, deep, REM, out-of-bed, awake-in-bed), heart rate, resting heart rate, HRV (RMSSD), blood oxygen (SpO₂), respiratory rate and steps |
+| ✅ | Step-by-step **Connect screen**: checks Health Connect is installed/up to date (links to the Play Store), explains how to switch on sharing in the CMF Watch app, requests permissions, runs the first import, with live status per step |
+| 🧪 | **History import**: 30 / 60 / 90 / 180 days on first sync (requests `READ_HEALTH_DATA_HISTORY` so data older than 30 days is readable) |
+| 🧪 | **Auto-sync** on app open and whenever the app returns to the foreground (throttled to every 15 min), plus pull-to-refresh and a manual "Sync now" / "Full re-sync" |
+| ✅ | **Paged reads** of every record type, so months of minute-level heart rate don't time out |
+| ✅ | **On-device condensing**: raw heart-rate / SpO₂ samples are reduced to per-night summaries (min/avg HR, 10-minute HR curve, HR nadir timing, HRV, SpO₂ avg/min/dips, breathing rate) and then discarded — the local database stays small |
+| ✅ | **Source selection**: lists every app writing sleep to Health Connect (CMF Watch, phone trackers, Google Fit, Samsung, Fitbit…), auto-picks the watch, lets you choose which to trust |
+| ✅ | **Duplicate handling**: when two apps recorded the same night, keeps the preferred / staged / manual one |
+| ✅ | **Fragment merging**: a night split by a short awakening (e.g. bathroom trip) becomes one sleep period |
+| ✅ | **Nap detection**: short daytime sessions are classified as naps (and Health Connect sessions titled "nap") |
+| ✅ | **Missing-night resilience**: if last night hasn't synced yet, eepy says so and assumes a typical night instead of thinking you've been awake for 30 hours |
+| ✅ | **Write-back**: manually logged sleep/naps can be saved to Health Connect so other apps see them |
+| 🗺️ | Background sync with `READ_HEALTH_DATA_IN_BACKGROUND` + Android WorkManager, so data is fresh before you open the app |
+| 🗺️ | Incremental sync with Health Connect's Changes API (change tokens) instead of re-reading a window |
+| 🗺️ | **Gadgetbridge import** (open-source, has experimental CMF Watch 3 Pro support): import its database export for people who don't want the official app |
+| 🗺️ | Generic CSV import (start, end, stage) for other trackers |
+| 🗺️ | iOS version reading Apple Health (the CMF/Nothing app syncs there on iPhone); the integration layer is already platform-agnostic |
+
+## 2. "How much sleep do I need?"
+
+| | Feature |
+| --- | --- |
+| ✅ | **Age-based starting point** from the National Sleep Foundation / AASM recommendations (e.g. 18–25: 7–9 h, 26–64: 7–9 h, 65+: 7–8 h) |
+| ✅ | **Learns your personal need** from *unrestricted nights* — mornings you woke without an alarm (you tap "woke naturally" in the Journal; free days that end well after your usual alarm count automatically) |
+| ✅ | **Rebound correction**: after a week of short nights you sleep longer than you need, so part of the sleep debt you carried into each unrestricted night is subtracted |
+| ✅ | **Energy dose–response**: if you rate daytime energy, a broken-stick regression finds the sleep duration beyond which more sleep stops making you feel better (bootstrapped for uncertainty) |
+| ✅ | **Bayesian combination** of all evidence (precision-weighted), solved self-consistently with the debt model (bisection — no oscillation) |
+| ✅ | Shows the estimate, a likely range, confidence (low/medium/high), each evidence source with its weight, and how many more natural nights would sharpen it |
+| ✅ | **Manual override** if you already know your number |
+| ✅ | Converts *sleep* need into *time in bed* using your own sleep efficiency and time-to-fall-asleep |
+
+## 3. Sleep debt
+
+| | Feature |
+| --- | --- |
+| ✅ | **14-night rolling debt**, recent nights weighted more (1.0 for last night down to 0.35 two weeks ago); naps count |
+| ✅ | **Honest about gaps**: nights with no data are skipped, not counted as zero sleep; coverage is reported |
+| ✅ | Surplus sleep repays debt, capped at 2 h per night (you can't "bank" unlimited sleep) |
+| ✅ | Categories: none / low / moderate / high / severe, plus the change over the past week |
+| ✅ | **Payback planner**: simulates future nights to find the smallest nightly extra (20–90 min) that clears the debt within a week, and builds it into tonight's bedtime |
+| ✅ | Debt trend chart |
+
+## 4. "Do I need a nap?" — the nap coach
+
+| | Feature |
+| --- | --- |
+| ✅ | **Nap need score (0–100)** from: sleep debt, last night's shortfall vs. your need, predicted energy now and at the afternoon dip, your current sleepiness (Karolinska Sleepiness Scale check-in), hours awake, anything demanding later (night shift, long drive, late night), naps already taken |
+| ✅ | **Verdict**: nap now / nap later (with the time) / optional / skip — with plain-language reasons |
+| ✅ | **Timing**: targets your personal circadian afternoon dip, never too soon after waking, and finishes early enough not to wreck bedtime |
+| ✅ | **Nap types**, each simulated: *power nap* (10–20 min of light sleep), *coffee nap* (caffeine right before a 20-min nap, only if before your caffeine cut-off), *full-cycle recovery nap* (one personal sleep cycle, only with big debt and enough time before bed), *pre-emptive nap* before a night shift or long drive |
+| ✅ | For every option: **predicted energy gain** over the following 3 h and **predicted bedtime delay** tonight (two-process model, measured against your normal bedtime sleep pressure — so a sleep-deprived person isn't wrongly told a nap will ruin the night) |
+| ✅ | **Nap timer with a real alarm** (Android alarm-clock scheduling, so it fires on time even in battery-saving Doze), live countdown, one-tap "I'm up — log nap" |
+| ✅ | Warns about the 30–60 min "sleep inertia" zone; drowsy-driving advice |
+| ✅ | **Insomnia mode** (CBT-I): discourages naps to build sleep pressure for the night |
+| 🗺️ | Detect an in-progress nap from the watch and nudge you if it runs into deep sleep |
+
+## 5. Energy & body-clock forecast
+
+| | Feature |
+| --- | --- |
+| ✅ | **Hour-by-hour energy curve** for today from a three-process model of alertness (sleep pressure + circadian rhythm with post-lunch dip + sleep inertia) driven by your actual recorded sleep, plus a chronic-debt penalty |
+| ✅ | Calibrated to the classic sleepiness profile: groggy on waking, late-morning peak, early-afternoon dip, evening "second wind", steep pre-bed decline |
+| ✅ | Highlights **peak focus windows**, the **afternoon dip**, a planned nap, and sleep periods; "now" marker with current energy |
+| ✅ | **Body-clock estimates**: dim-light melatonin onset (~2 h before habitual sleep), the evening wake-maintenance zone ("forbidden zone" for sleep), core-body-temperature minimum |
+
+## 6. Every night, analysed
+
+| | Feature |
+| --- | --- |
+| ✅ | **Sleep score (0–100)** with a transparent breakdown: duration vs. *your* need, efficiency, time to fall asleep, deep sleep (age-adjusted target), REM, restfulness (time awake, wake-ups), timing vs. your usual — duration caps the total so a 5-hour night can't score well |
+| ✅ | **Hypnogram** (stage-by-stage timeline) and stage totals/percentages |
+| ✅ | **Sleep-cycle detection** from REM periods: count, length of each cycle, deep/REM per cycle; your personal average cycle length feeds the planners |
+| ✅ | Latency, WASO (wake after sleep onset), number of awakenings, efficiency, mid-sleep |
+| ✅ | **Overnight physiology**: heart-rate curve, lowest HR and when it happened (late nadir flagged — often late meals/alcohol), HRV, SpO₂ average/minimum/dips per hour, breathing rate |
+| ✅ | Context: the evening's journal tags, your rating, natural vs. alarm wake-up, data source/device |
+
+## 7. Planning
+
+| | Feature |
+| --- | --- |
+| ✅ | **Tonight's plan**: wind-down start, lights-out, wake time (workday vs. free day), with the reasoning (need ÷ efficiency + latency + debt payback) |
+| ✅ | **Gradual-shift guard**: if the ideal bedtime is far earlier than your body clock allows (inside the wake-maintenance zone), it caps tonight and steps earlier 15–30 min per night |
+| ✅ | Free-day wake-up capped at +1 h by default to limit social jet lag (or set your own) |
+| ✅ | **Cycle-aware smart alarm**: picks the last predicted cycle boundary in the 30 minutes before your wake target, using your own cycle length and latency; optional alarm notification |
+| ✅ | **Bedtime calculator**: "I need to wake at…", "I'll go to bed at…", "If I sleep now…" — options on whole cycles, best fit for your need highlighted |
+| ✅ | **Schedule shifter**: move your wake time permanently, ≤20 min/day earlier or ≤30 min/day later, with daily light-seek / light-avoid windows |
+| ✅ | **Jet-lag planner**: time-zone offsets, optional 1–3 pre-flight days, advance vs. delay strategy (delays the long way round for >9 h eastward jumps), day-by-day sleep times and bright-light seek/avoid windows timed to your shifting body-temperature minimum |
+| ✅ | **Daily timeline** on the Today screen: wake, morning light, focus windows, dip, nap, caffeine cut-off, last hard workout, last big meal, wind-down, lights-out, alarm |
+| 🗺️ | Calendar integration: read tomorrow's first event and plan the alarm/bedtime around it |
+| 🗺️ | Rotating shift-work planner |
+
+## 8. Caffeine
+
+| | Feature |
+| --- | --- |
+| ✅ | One-tap logging with presets (espresso, coffee sizes, cold brew, teas, matcha, cola, energy drinks, pre-workout, dark chocolate), at any time of day |
+| ✅ | **Pharmacokinetic model** (absorption + elimination) with your half-life: fast ≈3 h, typical ≈5 h, slow ≈7 h |
+| ✅ | **Personal cut-off time**: latest moment a standard coffee keeps caffeine in the first 3 hours of sleep under your limit (default 50 mg, adjustable) |
+| ✅ | Live "mg in your system" and a curve through bedtime; warning if you're already over |
+| ✅ | Insight: what caffeine left at bedtime does to *your* sleep latency / deep sleep |
+
+## 9. Chronotype & regularity
+
+| | Feature |
+| --- | --- |
+| ✅ | **Chronotype from your data** (Munich ChronoType Questionnaire method): mid-sleep on free days corrected for oversleep (MSFsc) → early bird … night owl |
+| ✅ | **Social jet lag**: shift between workday and free-day sleep |
+| ✅ | **Chronotype quiz** (reduced Morningness–Eveningness Questionnaire) for when there's no data yet |
+| ✅ | **Sleep Regularity Index** (0–100), bedtime / wake-time spread, consistency score, and a sleep-timing chart |
+
+## 10. Recovery & physiology
+
+| | Feature |
+| --- | --- |
+| ✅ | **Readiness score** each morning from last night's score, sleep debt, HRV vs. your 30-day baseline (ln RMSSD z-score), resting/sleeping heart rate vs. baseline, and schedule consistency — with an explanation per factor |
+| ✅ | HRV trend with your normal band; sleeping-heart-rate trend |
+| ✅ | Flags frequent overnight SpO₂ dips (when the watch samples densely enough) and points to the apnoea screen |
+| 🗺️ | Illness early-warning (rising resting HR + falling HRV + higher breathing rate for 2+ nights) |
+
+## 11. Journal & insights
+
+| | Feature |
+| --- | --- |
+| ✅ | Morning check-in: sleep rating (1–5), woke naturally or by alarm |
+| ✅ | Daytime energy (1–5), Karolinska sleepiness (1–9), notes |
+| ✅ | 20 evening tags: alcohol, late caffeine, late meal, exercise, late workout, screens in bed, stress, reading, meditation, warm shower, morning sunlight, nap, melatonin, cannabis, nicotine, sick, travel, warm bedroom, noise, shared bed |
+| ✅ | Manual sleep / nap logging (bed time, wake time, time to fall asleep, rating) |
+| ✅ | **Personal insights** with statistics (Welch's t-test, effect size, "early / moderate / strong signal"): e.g. *"After drinking alcohol, your sleeping heart rate is 6 bpm higher (11 vs 52 nights)"* — for every tag across score, total sleep, deep %, REM %, latency, time awake, HRV and heart rate |
+| ✅ | Best-bedtime window (the 30-minute window where your scores are highest), off-schedule penalty, active vs. quiet days (steps), caffeine at bedtime, social jet lag, late heart-rate nadir, chronic short sleep |
+| ✅ | Prioritised **coaching tips** (debt payback, regularity, weekend lie-ins, long latency, low efficiency, caffeine, deep/REM, night-owl strategy, CBT-I, see a doctor) |
+
+## 12. Self-checks (screening, not diagnosis)
+
+| | Feature |
+| --- | --- |
+| ✅ | Daytime sleepiness (adapted Epworth Sleepiness Scale) |
+| ✅ | Insomnia check (adapted Insomnia Severity Index) → suggests CBT-I / insomnia mode |
+| ✅ | Sleep-apnoea risk (adapted STOP-Bang, including the high-risk rule) |
+| ✅ | Results feed the coaching tips (e.g. "talk to a doctor") |
+
+## 13. Reminders & alarms
+
+| | Feature |
+| --- | --- |
+| ✅ | Wind-down reminder, bedtime, caffeine cut-off, morning check-in — re-planned automatically from the latest analysis |
+| ✅ | Cycle-timed wake alarm and nap alarm on a high-priority "alarms" channel using exact alarm-clock delivery |
+
+## 14. Privacy & your data
+
+| | Feature |
+| --- | --- |
+| ✅ | **Everything stays on the phone** — no account, no server, no analytics |
+| ✅ | JSON **backup / restore** (share sheet / file picker) |
+| ✅ | Erase everything (Health Connect data untouched) |
+| ✅ | **Demo mode** with nine weeks of realistic simulated nights to explore every feature before connecting the watch |
+
+## 15. App & build
+
+| | Feature |
+| --- | --- |
+| ✅ | Android APK built by GitHub Actions on every push (typecheck + tests first), attached to a GitHub Release for easy download on the phone |
+| ✅ | Expo SDK 58 / React Native 0.88, TypeScript, new architecture, arm64 |
+| ✅ | 70+ unit tests over the sleep engine and the Health Connect mapping |
+| ✅ | Dark, night-friendly UI; works offline |
+| 🗺️ | Home-screen widget (tonight's bedtime, debt, nap verdict) |
+| 🗺️ | Wind-down audio: breathing exercises, white/brown noise, sleep stories |
+| 🗺️ | Smart-light integration (dim Hue/Matter lights at wind-down, wake-up light ramp before the alarm) |
+| 🗺️ | Structured CBT-I programme (sleep diary → supervised sleep-window titration) |
+| 🗺️ | Menstrual-cycle-aware insights (via Health Connect cycle data) |
+| 🗺️ | Weekly / monthly report export (PDF) to share with a doctor |
+| 🗺️ | Localisation, accessibility pass, light theme |
+
+---
+
+## Science behind it
+
+* Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation
+* Åkerstedt & Folkard (1997) — three-process model of alertness; Åkerstedt & Gillberg (1990) — Karolinska Sleepiness Scale
+* Hirshkowitz et al. (2015), National Sleep Foundation; Watson et al. (2015), AASM/SRS — sleep-duration recommendations
+* Van Dongen et al. (2003) — cumulative cost of chronic sleep restriction
+* Roenneberg, Wirz-Justice & Merrow (2003) — Munich ChronoType Questionnaire; Wittmann et al. (2006) — social jet lag
+* Phillips et al. (2017) — Sleep Regularity Index
+* Lavie (1986) — sleep "gates" and the evening forbidden zone
+* Brooks & Lack (2006) — optimal nap duration; Hayashi, Masuda & Hori (2003) — caffeine + short nap
+* Drake et al. (2013) — caffeine 0, 3 or 6 hours before bed
+* Khalsa et al. (2003) — human phase-response curve to light; Eastman & Burgess (2009) — avoiding jet lag
+* Adan & Almirall (1991) — reduced MEQ; Johns (1991) — ESS; Morin (1993) — ISI; Chung et al. (2008) — STOP-Bang
+* Plews et al. (2013) — day-to-day HRV interpretation with ln RMSSD
+
+eepy is a wellness tool, not a medical device. Wrist-based sleep staging is an estimate.

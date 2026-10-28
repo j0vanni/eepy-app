@@ -2,7 +2,7 @@
  * Pure mapping from Health Connect records (as returned by react-native-health-connect) to eepy's
  * model. Kept free of native imports so it can be unit tested.
  */
-import type { DailyStats, SleepSession, Stage, VitalSample } from '../engine/types';
+import type { DailyStats, SleepSession, Stage, StageSegment, VitalSample } from '../engine/types';
 import { dateKey } from '../engine/time';
 
 /** Health Connect SleepSessionRecord.STAGE_TYPE_* constants. */
@@ -55,6 +55,17 @@ export interface HCStepsRecord {
 
 const ms = (iso: string) => new Date(iso).getTime();
 
+/** Joins back-to-back segments of the same stage (some devices write one record per minute). */
+export function mergeRuns(stages: StageSegment[]): StageSegment[] {
+  const out: StageSegment[] = [];
+  for (const s of [...stages].sort((a, b) => a.start - b.start)) {
+    const last = out[out.length - 1];
+    if (last && last.stage === s.stage && s.start <= last.end) last.end = Math.max(last.end, s.end);
+    else out.push({ ...s });
+  }
+  return out;
+}
+
 export function mapSleepRecord(r: HCSleepRecord): SleepSession {
   const device = [r.metadata?.device?.manufacturer, r.metadata?.device?.model].filter(Boolean).join(' ') || undefined;
   const isNap = /\bnap\b/i.test(r.title ?? '');
@@ -65,7 +76,9 @@ export function mapSleepRecord(r: HCSleepRecord): SleepSession {
     device,
     start: ms(r.startTime),
     end: ms(r.endTime),
-    stages: (r.stages ?? []).map((s) => ({ stage: HC_STAGE[s.stage] ?? 'asleep', start: ms(s.startTime), end: ms(s.endTime) })),
+    stages: mergeRuns(
+      (r.stages ?? []).map((s) => ({ stage: HC_STAGE[s.stage] ?? 'asleep', start: ms(s.startTime), end: ms(s.endTime) })),
+    ),
     kind: isNap ? 'nap' : undefined,
     notes: r.notes,
     updatedAt: r.metadata?.lastModifiedTime ? ms(r.metadata.lastModifiedTime) : undefined,

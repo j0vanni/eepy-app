@@ -46,6 +46,18 @@ describe('Health Connect mapping', () => {
     expect(m.awakenings).toBe(1);
   });
 
+  it('merges minute-level stage records into runs', () => {
+    const minute = (i: number, stage: number) => ({
+      startTime: new Date(Date.parse('2026-10-21T05:00:00Z') + i * 60000).toISOString(),
+      endTime: new Date(Date.parse('2026-10-21T05:00:00Z') + (i + 1) * 60000).toISOString(),
+      stage,
+    });
+    const stages = [...Array.from({ length: 30 }, (_, i) => minute(i, 4)), ...Array.from({ length: 20 }, (_, i) => minute(30 + i, 5))];
+    const s = mapSleepRecord({ ...cmfNight, stages });
+    expect(s.stages).toHaveLength(2);
+    expect(s.stages.map((x) => x.stage)).toEqual(['light', 'deep']);
+  });
+
   it('flags naps from the record title', () => {
     expect(mapSleepRecord({ ...cmfNight, title: 'Afternoon nap' }).kind).toBe('nap');
   });

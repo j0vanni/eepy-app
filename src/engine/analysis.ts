@@ -54,6 +54,8 @@ export interface Analysis {
   tips: Tip[];
 }
 
+export const ANALYSIS_WINDOW_DAYS = 120;
+
 export interface AnalyzeOptions {
   preferredOrigins?: string[];
   upcoming?: UpcomingDemand;
@@ -73,8 +75,9 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   const day = minutesOfDay(now) < 240 ? addDays(dateKey(now), -1) : dateKey(now);
   const age = ageFromBirthYear(profile.birthYear, day);
 
+  // 120 days covers every model (insights use 90) and keeps the engine fast on-device.
   const metrics = analyzeSessions(
-    data.sessions.filter((s) => s.start < now),
+    data.sessions.filter((s) => s.start < now && s.end > now - ANALYSIS_WINDOW_DAYS * 24 * HOUR),
     { preferredOrigins: opts.preferredOrigins },
   );
   const nights = buildNights(metrics).filter((n) => n.wakeDate <= dateKey(now));

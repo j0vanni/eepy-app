@@ -15,6 +15,16 @@ export function useNow(intervalMs = MINUTE): number {
   return now;
 }
 
+// Every mounted screen asks for the analysis; share one result per input set instead of recomputing.
+let cache: { key: unknown[]; value: Analysis | undefined } | undefined;
+
+function sharedAnalysis(key: unknown[], compute: () => Analysis | undefined): Analysis | undefined {
+  if (cache && cache.key.length === key.length && cache.key.every((k, i) => k === key[i])) return cache.value;
+  const value = compute();
+  cache = { key, value };
+  return value;
+}
+
 /** Runs the full engine over the stored data; recomputed when data changes or every 5 minutes. */
 export function useAnalysis(): Analysis | undefined {
   const data = useStore(useShallow(selectDataset));
@@ -22,14 +32,19 @@ export function useAnalysis(): Analysis | undefined {
   const upcoming = useStore((s) => s.settings.upcoming);
   const now = useNow();
   const bucket = Math.floor(now / (5 * MINUTE));
-  return useMemo(() => {
-    if (data.sessions.length === 0) return undefined;
-    const t = Date.now();
-    return analyze(data, t, {
-      preferredOrigins,
-      upcoming: upcoming && upcoming.date === dateKey(t) ? upcoming.kind : undefined,
-    });
-    // `bucket` re-runs the analysis as time passes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, preferredOrigins, upcoming, bucket]);
+  return useMemo(
+    () =>
+      sharedAnalysis(
+        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, preferredOrigins, upcoming, bucket],
+        () => {
+          if (data.sessions.length === 0) return undefined;
+          const t = Date.now();
+          return analyze(data, t, {
+            preferredOrigins,
+            upcoming: upcoming && upcoming.date === dateKey(t) ? upcoming.kind : undefined,
+          });
+        },
+      ),
+    [data, preferredOrigins, upcoming, bucket],
+  );
 }
