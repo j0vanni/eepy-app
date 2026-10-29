@@ -20,6 +20,7 @@ import {
   Stage,
   StageSegment,
   VitalSample,
+  Workout,
 } from './types';
 import { summarizeNightVitals } from './vitals';
 import { computeSessionMetrics } from './sessions';
@@ -120,6 +121,7 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   const daily: Record<string, DailyStats> = {};
   const dayLogs: Record<string, DayLog> = {};
   const caffeine: CaffeineDose[] = [];
+  const workouts: Workout[] = [];
   let debt = 0;
 
   for (let i = days; i >= 0; i--) {
@@ -148,7 +150,13 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
     // Sleep timing.
     let onsetMin = weekendEve ? gaussian(rand, 24 * 60 + 40, 35) : gaussian(rand, 23 * 60 + 35, 28);
     if (i === 0) onsetMin = 24 * 60 + 55; // last night: a late one, so the nap logic has something to do
-    const latency = Math.max(3, gaussian(rand, 12, 4) + (fx.lateCaffeine ? 14 : 0) + (fx.screens ? 8 : 0) + (fx.stress ? 10 : 0) - (fx.exercise ? 3 : 0));
+    // Every other exercise day is a late workout (no extra rand() calls, so the rest of the demo is unchanged).
+    const lateWorkout = fx.exercise && i % 2 === 0;
+    const latency = Math.max(3, gaussian(rand, 12, 4) + (fx.lateCaffeine ? 14 : 0) + (fx.screens ? 8 : 0) + (fx.stress ? 10 : 0) - (fx.exercise ? 3 : 0) + (lateWorkout ? 9 : 0));
+    if (fx.exercise) {
+      const ws = atMinutes(eve, lateWorkout ? 21 * 60 : 18 * 60);
+      workouts.push({ id: `demo-w-${eve}`, start: ws, end: ws + (lateWorkout ? 60 : 50) * MINUTE, type: lateWorkout ? 56 : 70, origin: DEMO_ORIGIN });
+    }
     const onset = atMinutes(eve, onsetMin);
     let wake: number;
     if (workday) {
@@ -240,7 +248,7 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   const morningCoffee = atMinutes(today, 7 * 60 + 45);
   if (morningCoffee < now) caffeine.push({ id: `c-${today}-1`, time: morningCoffee, mg: 95, label: 'Coffee (8 oz / 240 ml)' });
 
-  const dataset: SleepDataset = { sessions, vitals, daily, dayLogs, caffeine, profile };
+  const dataset: SleepDataset = { sessions, vitals, daily, dayLogs, caffeine, profile, workouts };
   // Separate random stream so adding check-ins leaves every other demo value unchanged.
   dataset.checkins = demoCheckins(dataset, now, rng((opts.seed ?? 42) + 7919));
   return dataset;

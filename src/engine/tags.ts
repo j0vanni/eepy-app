@@ -15,6 +15,7 @@ export const TAGS: TagDef[] = [
   { id: 'late-exercise', label: 'Late workout', icon: 'weight-lifter', phrase: 'a late workout' },
   { id: 'screens', label: 'Screens in bed', icon: 'cellphone', phrase: 'screens in bed' },
   { id: 'stress', label: 'Stressful day', icon: 'head-flash', phrase: 'a stressful day' },
+  { id: 'wind-down', label: 'Wind-down routine', icon: 'weather-night', phrase: 'a wind-down routine' },
   { id: 'reading', label: 'Read before bed', icon: 'book-open-variant', phrase: 'reading before bed' },
   { id: 'meditation', label: 'Meditation', icon: 'meditation', phrase: 'meditating' },
   { id: 'hot-shower', label: 'Warm shower/bath', icon: 'shower', phrase: 'a warm shower or bath' },
