@@ -61,6 +61,10 @@
     "globalSetup": "./jest.global-setup.js",
     "testMatch": [
       "<rootDir>/src/**/__tests__/**/*.test.ts?(x)"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/.claude/",
+      "<rootDir>/dist/"
     ]
   }
 }

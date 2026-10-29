@@ -41,3 +41,6 @@ coverage/
 # generated native folders
 /ios
 /android
+
+# Parallel agent worktrees
+.claude/worktrees/
