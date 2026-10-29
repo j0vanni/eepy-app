@@ -8,7 +8,7 @@ A sleep coach for Android that works with the **CMF Watch 3 Pro**. It answers th
 - **When should I go to bed, stop caffeine, and set my alarm?** — tonight's plan, a cycle-timed alarm, a caffeine cut-off and an hour-by-hour energy forecast.
 - **What helps or hurts my sleep?** — personal, statistically tested insights from your journal tags.
 
-The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 🗺️) is in **[FEATURES.md](FEATURES.md)**.
+The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 🗺️) is in **[FEATURES.md](FEATURES.md)**. What's next is in **[PLAN.md](PLAN.md)**.
 
 | Today | Nap coach | Plan | Trends | Night | Journal |
 | --- | --- | --- | --- | --- | --- |
