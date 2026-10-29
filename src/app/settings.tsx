@@ -141,7 +141,7 @@ export default function SettingsScreen() {
 
       <Section title="Data sources">
         <Card>
-          <CardTitle icon="watch-variant" title="CMF Watch via Health Connect" />
+          <CardTitle icon="watch-variant" title="CMF Watch via Nothing X → Health Connect" />
           {Platform.OS !== 'android' ? <Note tone="info">Health Connect is Android-only. Use the APK on your phone to sync your watch.</Note> : null}
           {settings.dataMode === 'demo' ? <Note tone="info">You're in demo mode. Connecting your watch replaces the demo data.</Note> : null}
           <Text style={font.small}>

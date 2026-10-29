@@ -58,7 +58,7 @@ export default function Today() {
   if (!a) {
     return (
       <Screen title="eepy" subtitle={greeting(Date.now())} right={header}>
-        <Empty icon="watch-variant" title="Connect your CMF Watch" body="eepy reads the sleep stages, heart rate, HRV and blood oxygen your CMF Watch 3 Pro syncs to Health Connect.">
+        <Empty icon="watch-variant" title="Connect your CMF Watch" body="eepy reads the sleep stages, heart rate, HRV and blood oxygen your CMF Watch 3 Pro shares through Nothing X and Health Connect.">
           <View style={{ gap: space.sm, alignSelf: 'stretch' }}>
             <Button label="Connect watch" icon="link-variant" onPress={() => router.push('/connect')} />
             <Button label="Log a night manually" icon="pencil" kind="secondary" onPress={() => router.push('/log-sleep')} />
@@ -90,7 +90,7 @@ export default function Today() {
       {syncMsg ? <Note tone="info">{syncMsg}</Note> : settings.lastSyncError ? <Note tone="warn">{settings.lastSyncError}</Note> : null}
       {!a.lastNightIsCurrent ? (
         <Note tone="warn" icon="watch-import-variant">
-          Last night hasn't arrived yet. Open the CMF Watch app to sync your watch, then pull down here. Until then eepy assumes a typical night.
+          Last night hasn't arrived yet. Open Nothing X to sync your watch, then pull down here. Until then eepy assumes a typical night.
         </Note>
       ) : null}
 

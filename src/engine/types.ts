@@ -25,7 +25,7 @@ export type DataSource = 'health-connect' | 'healthkit' | 'manual' | 'demo' | 'i
 export interface SleepSession {
   id: string;
   source: DataSource;
-  /** App/package that wrote the record (e.g. the CMF Watch app's package name or bundle id). */
+  /** App/package that wrote the record (e.g. Nothing X's package name `com.nothing.smartcenter`). */
   origin?: string;
   device?: string;
   start: number;

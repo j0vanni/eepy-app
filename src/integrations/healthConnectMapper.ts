@@ -149,7 +149,9 @@ export interface OriginSummary {
 /** Friendly labels for apps commonly found writing sleep to Health Connect. */
 export function originLabel(origin: string): { label: string; likelyWatch: boolean } {
   const o = origin.toLowerCase();
-  if (o.includes('cmf') || o.includes('nothing')) return { label: 'CMF Watch (Nothing)', likelyWatch: true };
+  // Nothing X (com.nothing.smartcenter) is the companion app for the CMF Watch 3 Pro.
+  if (o === 'com.nothing.smartcenter') return { label: 'Nothing X (CMF Watch)', likelyWatch: true };
+  if (o.includes('cmf') || o.includes('nothing')) return { label: 'Nothing / CMF', likelyWatch: true };
   if (o.includes('gadgetbridge')) return { label: 'Gadgetbridge', likelyWatch: true };
   if (o.includes('google.android.apps.fitness')) return { label: 'Google Fit', likelyWatch: false };
   if (o.includes('samsung')) return { label: 'Samsung Health', likelyWatch: true };

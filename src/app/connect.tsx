@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
 
 import { getPermissionState, healthConnectStatus, HCStatus, openHealthSettings, PermissionState, requestHealthPermissions } from '@/integrations/healthConnect';
+import { summarizeOrigins } from '@/integrations/healthConnectMapper';
 import { useStore } from '@/state/store';
 import { runSync } from '@/state/sync';
 import { Button, Card, CardTitle, Icon, Note, Row, Screen, Section } from '@/ui/components';
@@ -35,6 +36,9 @@ export default function ConnectScreen() {
   const exitDemo = useStore((s) => s.exitDemo);
   const dataMode = useStore((s) => s.settings.dataMode);
   const lastSync = useStore((s) => s.settings.lastSync);
+  const sessions = useStore((s) => s.sessions);
+  const origins = useMemo(() => summarizeOrigins(sessions.filter((s) => s.source === 'health-connect')), [sessions]);
+  const watchSource = origins.find((o) => o.likelyWatch);
   const [status, setStatus] = useState<HCStatus>();
   const [perms, setPerms] = useState<PermissionState>();
   const [busy, setBusy] = useState(false);
@@ -72,7 +76,7 @@ export default function ConnectScreen() {
     return (
       <Screen>
         <Note tone="info">
-          Connecting the CMF Watch works in the Android app (APK). Health Connect — where the CMF Watch app stores your sleep — only exists on Android phones.
+          Connecting the CMF Watch works in the Android app (APK). Health Connect — where Nothing X stores your watch's sleep — only exists on Android phones.
         </Note>
       </Screen>
     );
@@ -82,8 +86,8 @@ export default function ConnectScreen() {
     <Screen>
       <Card>
         <Text style={font.body}>
-          Your CMF Watch 3 Pro talks Bluetooth to the <Text style={{ fontWeight: '700' }}>CMF Watch app</Text>, which can share sleep stages, heart rate, HRV, blood oxygen and
-          steps with <Text style={{ fontWeight: '700' }}>Health Connect</Text>. eepy reads them from there — no extra pairing needed.
+          Your CMF Watch 3 Pro talks Bluetooth to the <Text style={{ fontWeight: '700' }}>Nothing X</Text> app, which shares sleep stages, heart rate, HRV, blood oxygen and steps
+          with <Text style={{ fontWeight: '700' }}>Health Connect</Text>. eepy reads them from there — no extra pairing needed.
         </Text>
         <Row gap={space.sm} style={{ marginTop: space.md, justifyContent: 'center' }}>
           <Icon name="watch-variant" color={colors.accent} size={26} />
@@ -116,14 +120,30 @@ export default function ConnectScreen() {
         ) : null}
       </Step>
 
-      <Step n={2} title="Turn on Health Connect sync in the CMF Watch app">
-        <Text style={font.small}>
-          Open the CMF Watch app → your profile / "Me" tab → look for Health Connect (sometimes under "Connected apps" or "Third-party data") → switch it on and allow
-          Sleep, Heart rate, Heart rate variability, Oxygen saturation, Respiratory rate and Steps.
-        </Text>
-        <Text style={[font.tiny, { marginTop: space.sm }]}>
-          Menu names change between app versions. If you can't find it, Health Connect → App permissions → CMF Watch also lets you grant write access.
-        </Text>
+      <Step n={2} title="Nothing X shares your watch data" done={!!watchSource}>
+        {watchSource ? (
+          <Text style={font.small}>
+            Found {watchSource.sessions} sleep session{watchSource.sessions === 1 ? '' : 's'} from {watchSource.label}
+            {watchSource.staged ? ', with sleep stages' : ''}.
+          </Text>
+        ) : (
+          <>
+            {lastSync && dataMode === 'live' ? (
+              <Note tone="warn">
+                {origins.length
+                  ? `Synced, but no sleep from Nothing X yet — only from ${origins.map((o) => o.label).join(', ')}.`
+                  : 'Synced, but Health Connect has no sleep from Nothing X yet.'}
+              </Note>
+            ) : null}
+            <Text style={font.small}>
+              In Nothing X, open your CMF Watch 3 Pro and make sure Health Connect sharing is on for Sleep, Heart rate, Heart rate variability, Blood oxygen, Respiratory
+              rate and Steps. To double-check, Health Connect → App permissions → Nothing X should be allowed to write them.
+            </Text>
+            <Text style={[font.tiny, { marginTop: space.sm }]}>
+              Sleep reaches Health Connect only after Nothing X syncs with the watch: open Nothing X, let it finish syncing, then tap Sync now below.
+            </Text>
+          </>
+        )}
         <View style={{ marginTop: space.sm, alignItems: 'flex-start' }}>
           <Button small kind="secondary" icon="open-in-new" label="Open Health Connect" onPress={openHealthSettings} />
         </View>
@@ -163,10 +183,10 @@ export default function ConnectScreen() {
         <Card>
           <CardTitle icon="lifebuoy" title="Last night is missing?" />
           <Text style={font.small}>
-            • Open the CMF Watch app and pull down to sync the watch — sleep reaches Health Connect only after the watch syncs.{'\n'}• Exclude the CMF Watch app from battery
-            optimisation so it can sync in the background.{'\n'}• Sleep tracking must be enabled on the watch (it records automatically when worn).{'\n'}• Wear the watch snugly
-            — loose fit hurts heart-rate and stage accuracy.{'\n'}• Several apps writing sleep (e.g. a phone sleep tracker)? Pick the CMF Watch app under Settings → "Which
-            app's sleep to trust".
+            • Open Nothing X and let it sync the watch — sleep reaches Health Connect only after the watch syncs.{'\n'}• Exclude Nothing X from battery optimisation so it
+            can sync in the background.{'\n'}• Sleep tracking must be enabled on the watch (it records automatically when worn).{'\n'}• Wear the watch snugly
+            — loose fit hurts heart-rate and stage accuracy.{'\n'}• Several apps writing sleep (e.g. a phone sleep tracker)? Pick Nothing X under Settings → "Which app's sleep
+            to trust".
           </Text>
         </Card>
       </Section>

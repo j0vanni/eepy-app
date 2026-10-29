@@ -1,6 +1,6 @@
 /**
- * Health Connect bridge (Android). The CMF Watch app syncs sleep stages, heart rate, HRV, SpO2 and
- * steps from the CMF Watch 3 Pro into Health Connect; eepy reads them from there.
+ * Health Connect bridge (Android). Nothing X (the companion app for the CMF Watch 3 Pro) writes sleep
+ * stages, heart rate, HRV, SpO2 and steps into Health Connect; eepy reads them from there.
  */
 import { Platform } from 'react-native';
 import {

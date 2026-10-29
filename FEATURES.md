@@ -15,17 +15,17 @@ A sleep coach for Android that turns the data your **CMF Watch 3 Pro** already c
 
 ## 1. Connecting the CMF Watch 3 Pro
 
-The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **CMF Watch** app, which can share data with **Google Health Connect**. eepy reads Health Connect, so no second Bluetooth pairing (which would fight the official app) is needed.
+The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **Nothing X** app, which shares data with **Google Health Connect**. eepy reads Health Connect, so no second Bluetooth pairing (which would fight the official app) is needed.
 
 | | Feature |
 | --- | --- |
 | 🧪 | **Health Connect integration** — reads sleep sessions *with stages* (awake, light, deep, REM, out-of-bed, awake-in-bed), heart rate, resting heart rate, HRV (RMSSD), blood oxygen (SpO₂), respiratory rate and steps |
-| ✅ | Step-by-step **Connect screen**: checks Health Connect is installed/up to date (links to the Play Store), explains how to switch on sharing in the CMF Watch app, requests permissions, runs the first import, with live status per step |
+| ✅ | Step-by-step **Connect screen**: checks Health Connect is installed/up to date (links to the Play Store), confirms Nothing X is actually sharing (ticks itself off once Nothing X sleep appears, otherwise lists which apps *are* writing sleep), requests permissions, runs the first import, with live status per step |
 | 🧪 | **History import**: 30 / 60 / 90 / 180 days on first sync (requests `READ_HEALTH_DATA_HISTORY` so data older than 30 days is readable) |
 | 🧪 | **Auto-sync** on app open and whenever the app returns to the foreground (throttled to every 15 min), plus pull-to-refresh and a manual "Sync now" / "Full re-sync" |
 | ✅ | **Paged reads** of every record type, so months of minute-level heart rate don't time out |
 | ✅ | **On-device condensing**: raw heart-rate / SpO₂ samples are reduced to per-night summaries (min/avg HR, 10-minute HR curve, HR nadir timing, HRV, SpO₂ avg/min/dips, breathing rate) and then discarded — the local database stays small |
-| ✅ | **Source selection**: lists every app writing sleep to Health Connect (CMF Watch, phone trackers, Google Fit, Samsung, Fitbit…), auto-picks the watch, lets you choose which to trust |
+| ✅ | **Source selection**: lists every app writing sleep to Health Connect (Nothing X, phone trackers, Google Fit, Samsung, Fitbit…), auto-picks the watch, lets you choose which to trust |
 | ✅ | **Duplicate handling**: when two apps recorded the same night, keeps the preferred / staged / manual one |
 | ✅ | **Fragment merging**: a night split by a short awakening (e.g. bathroom trip) becomes one sleep period |
 | ✅ | **Nap detection**: short daytime sessions are classified as naps (and Health Connect sessions titled "nap") |
@@ -35,7 +35,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | 🗺️ | Incremental sync with Health Connect's Changes API (change tokens) instead of re-reading a window |
 | 🗺️ | **Gadgetbridge import** (open-source, has experimental CMF Watch 3 Pro support): import its database export for people who don't want the official app |
 | 🗺️ | Generic CSV import (start, end, stage) for other trackers |
-| 🗺️ | iOS version reading Apple Health (the CMF/Nothing app syncs there on iPhone); the integration layer is already platform-agnostic |
+| 🗺️ | iOS version reading Apple Health (Nothing X syncs there on iPhone); the integration layer is already platform-agnostic |
 
 ## 2. "How much sleep do I need?"
 

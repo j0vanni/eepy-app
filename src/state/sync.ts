@@ -53,7 +53,7 @@ async function doSync({ full }: { full?: boolean }): Promise<SyncOutcome> {
       ok: true,
       message: result.counts.sessions
         ? `Synced ${result.counts.sessions} sleep sessions and ${result.counts.heartRate.toLocaleString()} heart-rate readings.`
-        : 'Connected, but no sleep found yet. Open the CMF Watch app and make sure Health Connect sync is on.',
+        : 'Connected, but no sleep found yet. Open Nothing X, let it sync your watch, and check its Health Connect sharing is on.',
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

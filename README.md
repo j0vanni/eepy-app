@@ -27,17 +27,17 @@ Every push to the repository builds a fresh APK (`.github/workflows/android-apk.
 
 ## Connecting your CMF Watch 3 Pro
 
-The watch has no public SDK, and pairing it directly would fight the official app over Bluetooth. Instead:
+The watch has no public SDK, and pairing it directly would fight Nothing X over Bluetooth. Instead:
 
 ```
-CMF Watch 3 Pro ──Bluetooth──▶ CMF Watch app ──▶ Health Connect ──▶ eepy
+CMF Watch 3 Pro ──Bluetooth──▶ Nothing X ──▶ Health Connect ──▶ eepy
 ```
 
 1. **Health Connect** — built into Android 14+; on Android 9–13 install it from the Play Store.
-2. **CMF Watch app** → profile/"Me" → Health Connect (sometimes under *Connected apps* / *Third-party data*) → turn it on and allow Sleep, Heart rate, Heart rate variability, Oxygen saturation, Respiratory rate, Steps.
+2. **Nothing X** (the companion app for the CMF Watch 3 Pro) → your watch → turn on Health Connect sharing for Sleep, Heart rate, Heart rate variability, Blood oxygen, Respiratory rate and Steps. You can double-check under Health Connect → App permissions → Nothing X.
 3. **eepy** → Connect screen → *Grant permissions* → *Sync now*. eepy imports your history and re-syncs whenever you open it.
 
-If last night is missing, open the CMF Watch app and pull down to sync the watch first, and exclude the CMF Watch app from battery optimisation.
+eepy's Connect screen ticks off the Nothing X step by itself once it finds sleep from Nothing X (`com.nothing.smartcenter`) in Health Connect. If last night is missing, open Nothing X and let it sync the watch first, and exclude Nothing X from battery optimisation.
 
 ## How it works
 

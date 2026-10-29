@@ -29,7 +29,7 @@ const cmfNight = {
     { startTime: '2026-10-21T06:10:00.000Z', endTime: '2026-10-21T12:00:00.000Z', stage: 4 },
     { startTime: '2026-10-21T12:00:00.000Z', endTime: '2026-10-21T12:05:00.000Z', stage: 3 },
   ],
-  metadata: { id: 'abc', dataOrigin: 'com.nothing.cmf.watch', device: { manufacturer: 'Nothing', model: 'CMF Watch 3 Pro' } },
+  metadata: { id: 'abc', dataOrigin: 'com.nothing.smartcenter', device: { manufacturer: 'Nothing', model: 'CMF Watch 3 Pro' } },
 };
 
 describe('Health Connect mapping', () => {
@@ -37,7 +37,7 @@ describe('Health Connect mapping', () => {
     const s = mapSleepRecord(cmfNight);
     expect(s.id).toBe('hc:abc');
     expect(s.source).toBe('health-connect');
-    expect(s.origin).toBe('com.nothing.cmf.watch');
+    expect(s.origin).toBe('com.nothing.smartcenter');
     expect(s.device).toBe('Nothing CMF Watch 3 Pro');
     expect(s.stages.map((x) => x.stage)).toEqual(['awake', 'light', 'deep', 'rem', 'awake', 'light', 'outOfBed']);
     const m = computeSessionMetrics(s)!;
@@ -80,10 +80,10 @@ describe('Health Connect mapping', () => {
   });
 
   it('labels and ranks data origins, preferring the watch', () => {
-    expect(originLabel('com.nothing.cmf.watch').likelyWatch).toBe(true);
+    expect(originLabel('com.nothing.smartcenter')).toEqual({ label: 'Nothing X (CMF Watch)', likelyWatch: true });
     const sessions = [mapSleepRecord(cmfNight), mapSleepRecord({ ...cmfNight, stages: [], metadata: { id: 'p', dataOrigin: 'com.google.android.apps.fitness' } })];
     const origins = summarizeOrigins(sessions);
-    expect(origins[0].origin).toBe('com.nothing.cmf.watch');
+    expect(origins[0].origin).toBe('com.nothing.smartcenter');
     expect(origins[0].staged).toBe(true);
     expect(origins[1].staged).toBe(false);
   });
