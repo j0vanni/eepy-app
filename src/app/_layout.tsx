@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 
 import { registerBackgroundSync } from '@/background/task';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
+import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { useAutoSync } from '@/state/sync';
@@ -22,6 +23,7 @@ const theme = {
 /** App-wide side effects: sync, notification planning, notification responses, background task. */
 function Background() {
   useAutoSync();
+  useLearning();
   const analysis = useAnalysis();
   const settings = useStore((s) => s.settings);
   const goals = useStore((s) => s.goals);

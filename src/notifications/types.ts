@@ -1,7 +1,7 @@
 import type { Analysis } from '../engine/analysis';
 import type { AppState } from '../state/store';
 
-export type ChannelId = 'reminders' | 'alarms' | 'pings' | 'reports' | 'live';
+export type ChannelId = 'reminders' | 'alarms' | 'wake' | 'pings' | 'reports' | 'live';
 
 export interface PlannedNotification {
   /** Stable id, unique within the feature. The scheduler namespaces it. */
@@ -18,6 +18,8 @@ export interface PlannedNotification {
   data?: Record<string, unknown>;
   /** Exact alarm-clock delivery (rings in Doze). */
   alarm?: boolean;
+  /** Custom sound file bundled via the expo-notifications plugin (e.g. 'wake.wav'). */
+  sound?: string;
   /** Pinned until dismissed by the app. */
   sticky?: boolean;
 }

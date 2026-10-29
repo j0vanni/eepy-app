@@ -65,6 +65,9 @@
     "modulePathIgnorePatterns": [
       "<rootDir>/.claude/",
       "<rootDir>/dist/"
+    ],
+    "setupFiles": [
+      "./jest.setup.js"
     ]
   }
 }

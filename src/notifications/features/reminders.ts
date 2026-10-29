@@ -11,7 +11,7 @@
 import type { Href } from 'expo-router';
 
 import type { Analysis } from '../../engine/analysis';
-import { dateKey, formatDuration, formatTime, HOUR, MINUTE } from '../../engine/time';
+import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
@@ -113,9 +113,12 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
     }
   }
   if (prefs.morningCheckIn) {
+    // On free days the natural-wake prompt already lands ~45 min after waking; ask about the night later.
+    const freeDay = !state.profile.workdays.includes(weekdayOfKey(t.wakeDate));
+    const checkinDelay = freeDay && prefs.naturalWakePrompt ? 120 : 45;
     out.push({
       id: 'checkin',
-      at: t.wake + 45 * MINUTE,
+      at: t.wake + checkinDelay * MINUTE,
       channel: 'reminders',
       title: 'How did you sleep?',
       body: 'Rate last night and log anything from yesterday — it sharpens your sleep-need estimate.',
@@ -141,7 +144,8 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
     planned.push({
       id: 'wake',
       at: a.alarm.alarm,
-      channel: 'alarms',
+      channel: 'wake',
+      sound: 'wake.wav',
       alarm: true,
       title: 'Good morning ☀️',
       body: a.alarm.onBoundary ? 'Woken at the end of a sleep cycle.' : 'Time to get up.',

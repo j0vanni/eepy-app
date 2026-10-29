@@ -19,6 +19,7 @@ import { MINUTE } from '../engine/time';
 import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
 import { getFirstEventTomorrowDetails } from '../state/calendar';
+import { refitCalibration } from '../state/learning';
 import { selectDataset, useStore } from '../state/store';
 import { runSync } from '../state/sync';
 
@@ -113,6 +114,8 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
 
       // 2. Re-plan notifications from whatever data we have (even if the sync failed, so the
       //    missing-night nudge and tonight's reminders stay right).
+      // Check-ins that were waiting for last night's data can count now.
+      refitCalibration(useStore.getState());
       const state = useStore.getState();
       if (state.sessions.length > 0) {
         const firstEvent = state.settings.calendar.enabled

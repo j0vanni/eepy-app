@@ -48,7 +48,7 @@ describe('reminders (non-adaptive)', () => {
 
   it('adds the cycle-timed wake alarm when enabled', () => {
     const planned = planReminders(scenario(at(WORKDAY, 8.5), { prefs: { smartAlarm: true } }));
-    expect(byId(planned, 'wake')).toMatchObject({ channel: 'alarms', alarm: true });
+    expect(byId(planned, 'wake')).toMatchObject({ channel: 'wake', sound: 'wake.wav', alarm: true });
   });
 });
 

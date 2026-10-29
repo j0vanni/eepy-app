@@ -20,7 +20,7 @@ function toRequest(id: string, p: PlannedNotification, feature: string): Notific
       data: { ...p.data, feature },
       categoryIdentifier: p.categoryId,
       sticky: p.sticky,
-      sound: p.alarm ? 'default' : undefined,
+      sound: p.sound ?? (p.alarm ? 'default' : undefined),
       priority: p.alarm ? 'max' : 'default',
     },
     trigger: p.immediate

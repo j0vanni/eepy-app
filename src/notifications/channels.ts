@@ -21,6 +21,14 @@ export function configureNotifications(): Promise<void> {
         sound: 'default',
         bypassDnd: true,
       });
+      await Notifications.setNotificationChannelAsync('wake', {
+        name: 'Gentle wake alarm',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: 'wake.wav',
+        vibrationPattern: [0, 400, 600, 400],
+        bypassDnd: true,
+        audioAttributes: { usage: Notifications.AndroidAudioUsage.ALARM, contentType: Notifications.AndroidAudioContentType.SONIFICATION },
+      });
       await Notifications.setNotificationChannelAsync('pings', { name: 'Alertness check-ins', importance: Notifications.AndroidImportance.DEFAULT });
       await Notifications.setNotificationChannelAsync('reports', { name: 'Sleep reports', importance: Notifications.AndroidImportance.DEFAULT });
       await Notifications.setNotificationChannelAsync('live', { name: 'Live countdowns', importance: Notifications.AndroidImportance.LOW });
