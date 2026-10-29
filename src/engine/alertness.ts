@@ -21,6 +21,11 @@ export interface CircadianParams {
   ampScale: number;
   /** Multiplier on the post-lunch dip (12h harmonic). */
   dipScale: number;
+  /**
+   * Personal KSS offset (positive = rates themselves sleepier than the population model at every hour).
+   * Optional so existing `{ phaseShiftMin, ampScale, dipScale }` literals keep working; missing = 0.
+   */
+  kssOffset?: number;
 }
 
 export const DEFAULT_CIRCADIAN: CircadianParams = { phaseShiftMin: 0, ampScale: 1, dipScale: 1 };
@@ -69,7 +74,8 @@ export function circadian(t: number, midSleepMin: number, params: CircadianParam
   const dip = mid + TPM.dipOffsetH;
   return (
     TPM.circAmp * params.ampScale * Math.cos((2 * Math.PI * (h - acro)) / 24) -
-    TPM.dipAmp * params.dipScale * Math.cos((2 * Math.PI * (h - dip)) / 12)
+    TPM.dipAmp * params.dipScale * Math.cos((2 * Math.PI * (h - dip)) / 12) -
+    (params.kssOffset ?? 0) / KSS_PER_ALERTNESS
   );
 }
 
@@ -82,8 +88,11 @@ export function inertiaAmplitude(boutMin: number): number {
   return 2.4; // main sleep
 }
 
+/** KSS points per alertness unit (the slope of the KSS mapping below). */
+export const KSS_PER_ALERTNESS = 0.6;
+
 export function kssFromAlertness(a: number): number {
-  return clamp(10.6 - 0.6 * a, 1, 9);
+  return clamp(10.6 - KSS_PER_ALERTNESS * a, 1, 9);
 }
 
 export function energyFromKss(kss: number): number {
