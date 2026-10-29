@@ -18,7 +18,7 @@ import { analyze } from '../engine/analysis';
 import { MINUTE } from '../engine/time';
 import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
-import { getFirstEventTomorrow } from '../state/calendar';
+import { getFirstEventTomorrowDetails } from '../state/calendar';
 import { selectDataset, useStore } from '../state/store';
 import { runSync } from '../state/sync';
 
@@ -115,11 +115,14 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
       //    missing-night nudge and tonight's reminders stay right).
       const state = useStore.getState();
       if (state.sessions.length > 0) {
-        let firstEventTomorrow: number | undefined;
-        if (state.settings.calendar.enabled) {
-          firstEventTomorrow = await getFirstEventTomorrow(state.settings.calendar, now).catch(() => undefined);
-        }
-        const analysis = analyze(selectDataset(state), now, analyzeOptionsFor(state, { now, firstEventTomorrow }));
+        const firstEvent = state.settings.calendar.enabled
+          ? await getFirstEventTomorrowDetails(state.settings.calendar, now).catch(() => undefined)
+          : undefined;
+        const analysis = analyze(
+          selectDataset(state),
+          now,
+          analyzeOptionsFor(state, { now, firstEventTomorrow: firstEvent?.start, firstEventTitle: firstEvent?.title }),
+        );
         await replanNotifications(analysis, useStore.getState(), { background: true, now });
       }
     }

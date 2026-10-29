@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Analysis, analyze } from '../engine/analysis';
 import { MINUTE } from '../engine/time';
 import { analyzeOptionsFor } from './analysisOptions';
-import { useFirstEventTomorrow } from './calendar';
+import { useFirstEventTomorrowDetails } from './calendar';
 import { selectDataset, useStore } from './store';
 
 /** Current time, refreshed on an interval so time-dependent advice stays fresh. */
@@ -33,20 +33,23 @@ export function useAnalysis(): Analysis | undefined {
   const settings = useStore((s) => s.settings);
   const calibration = useStore((s) => s.calibration);
   const cbti = useStore((s) => s.cbti);
-  const firstEvent = useFirstEventTomorrow(settings.calendar);
+  const firstEventInfo = useFirstEventTomorrowDetails(settings.calendar);
+  const firstEvent = firstEventInfo?.start;
+  const firstEventTitle = firstEventInfo?.title;
+  const prepMin = settings.calendar.prepMin;
   const now = useNow();
   const bucket = Math.floor(now / (5 * MINUTE));
   return useMemo(
     () =>
       sharedAnalysis(
-        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, data.checkins, data.workouts, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, bucket],
+        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, data.checkins, data.workouts, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
         () => {
           if (data.sessions.length === 0) return undefined;
           const t = Date.now();
-          return analyze(data, t, analyzeOptionsFor(useStore.getState(), { now: t, firstEventTomorrow: firstEvent }));
+          return analyze(data, t, analyzeOptionsFor(useStore.getState(), { now: t, firstEventTomorrow: firstEvent, firstEventTitle }));
         },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, bucket],
+    [data, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
   );
 }

@@ -72,6 +72,10 @@ export interface AnalyzeOptions {
   circadian?: CircadianParams;
   /** Start of tomorrow's first calendar event (epoch ms). */
   firstEventTomorrow?: number;
+  /** Title of that event, for the plan's rationale. */
+  firstEventTitle?: string;
+  /** Minutes the user needs between waking and the first event (calendar settings). */
+  firstEventPrepMin?: number;
   /** Active CBT-I programme, which prescribes the sleep window. */
   cbti?: CbtiProgram;
 }
@@ -122,6 +126,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     latencyMin,
     habitualOnsetMin: chronotype.habitual?.onsetMin,
     firstEventStart: opts.firstEventTomorrow,
+    firstEventTitle: opts.firstEventTitle,
+    firstEventPrepMin: opts.firstEventPrepMin,
     sleepWindow: currentCbtiWindow(opts.cbti, nights, day),
   });
   const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
