@@ -153,7 +153,8 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
   const { granted, sleep } = await getPermissionState();
   if (!sleep) throw new Error('eepy does not have permission to read sleep from Health Connect yet.');
 
-  const sleepRecords = await safeRead<HCSleepRecord>('SleepSession', from - 12 * HOUR, to, granted);
+  // Sleep is the one read that must not fail soft: an empty result replaces the stored window.
+  const sleepRecords = await readAll<HCSleepRecord>('SleepSession', from - 12 * HOUR, to);
   const sessions = sleepRecords.map(mapSleepRecord).filter((s) => s.end > s.start);
 
   // Vitals: read once over the whole window (paged), then slice per night in memory.

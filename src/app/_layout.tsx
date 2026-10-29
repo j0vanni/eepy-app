@@ -47,7 +47,7 @@ function Background() {
 
   useEffect(() => {
     if (analysis) replanNotifications(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.notifications, goals, experiments, checkins]);
+  }, [analysis, settings.notifications, settings.napTimer, goals, experiments, checkins]);
   return null;
 }
 

@@ -24,7 +24,7 @@ function toRequest(id: string, p: PlannedNotification, feature: string): Notific
       priority: p.alarm ? 'max' : 'default',
     },
     trigger: p.immediate
-      ? null
+      ? { channelId: p.channel }
       : { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: p.channel, delivery: p.alarm ? 'alarmClock' : 'bestEffort' },
   };
 }
@@ -76,6 +76,8 @@ export async function handleNotificationResponse(r: Notifications.NotificationRe
     data,
   };
   await feature.onResponse(response, state);
+  // So a remount in the same process doesn't replay the tap.
+  Notifications.clearLastNotificationResponse();
 }
 
 /** Dismisses a delivered (e.g. sticky) planner notification. */
