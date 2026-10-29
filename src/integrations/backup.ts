@@ -62,7 +62,7 @@ export async function exportBackup(data: SleepDataset): Promise<void> {
   const file = new File(Paths.cache, name);
   if (file.exists) file.delete();
   file.create();
-  file.write(json);
+  await file.write(json);
   await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Save your eepy backup' });
 }
 
