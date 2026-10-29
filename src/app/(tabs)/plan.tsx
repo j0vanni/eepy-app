@@ -7,6 +7,7 @@ import { bedtimesForWake, shiftSchedule, wakesForBedtime } from '@/engine/schedu
 import { addDays, atMinutes, formatClock, formatDuration, formatTime, HOUR, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
+import { PlanCalendarLines } from '@/ui/cards/CalendarNote';
 import { LineChart } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Icon, ListRow, Note, Row, Screen, Section, Segmented, Stat, Stepper } from '@/ui/components';
 import { dayLabel } from '@/ui/format';
@@ -68,15 +69,22 @@ export default function PlanScreen() {
         <Row>
           <Stat label="Wind down" value={formatTime(a.tonight.windDownStart)} />
           <Stat label="Lights out" value={formatTime(a.tonight.bedtime)} color={colors.accent} />
-          <Stat label="Wake" value={formatTime(a.tonight.wake)} />
+          <Stat label="Wake" value={formatTime(a.tonight.wake)} sub={a.tonight.calendar?.drove ? `usually ${formatTime(a.tonight.calendar.usualWake)}` : undefined} />
         </Row>
         <Text style={[font.small, { marginTop: space.md }]}>Time in bed: {formatDuration(a.tonight.inBedMin)}</Text>
-        {a.tonight.rationale.map((r) => (
-          <Row key={r} gap={space.sm} style={{ alignItems: 'flex-start', marginTop: 6 }}>
-            <Icon name="circle-small" color={colors.accent} />
-            <Text style={[font.small, { flex: 1 }]}>{r}</Text>
-          </Row>
-        ))}
+        <Text style={font.small}>
+          Last big meal by {formatTime(a.tonight.lastMeal)} · hard exercise done by {formatTime(a.tonight.lastExercise)}
+        </Text>
+        {a.tonight.rationale.map((r) => {
+          const fromCalendar = !!a.tonight.calendar?.reasons.includes(r);
+          return (
+            <Row key={r} gap={space.sm} style={{ alignItems: 'flex-start', marginTop: 6 }}>
+              <Icon name={fromCalendar ? 'calendar-clock' : 'circle-small'} color={colors.accent} size={fromCalendar ? 17 : 20} />
+              <Text style={[font.small, { flex: 1 }, fromCalendar ? { color: colors.text } : null]}>{r}</Text>
+            </Row>
+          );
+        })}
+        <PlanCalendarLines analysis={a} />
       </Card>
 
       <Card>

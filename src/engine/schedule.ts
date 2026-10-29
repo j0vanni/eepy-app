@@ -1,3 +1,4 @@
+import { MORNING_STARTS_MIN, shortTitle } from './calendarEvents';
 import { addDays, atMinutes, clamp, clockDiff, formatDuration, formatTime, HOUR, MINUTE, minutesOfDay, normalizeMinutes, weekdayOfKey } from './time';
 import type { Profile } from './types';
 
@@ -67,6 +68,26 @@ export interface TonightPlan {
   /** Bedtime was held back because it was much earlier than the body clock allows. */
   gradual: boolean;
   rationale: string[];
+  /** How tomorrow's first calendar event shaped the plan (only when an event was passed in). */
+  calendar?: CalendarAdjustment;
+}
+
+export interface CalendarAdjustment {
+  eventStart: number;
+  eventTitle?: string;
+  /** Minutes the user wants between waking and the event. */
+  prepMin: number;
+  /** Wake target and bedtime the plan would have used without the event. */
+  usualWake: number;
+  usualBedtime: number;
+  /** The event moved the wake-up (and with it the bedtime) earlier. */
+  drove: boolean;
+  /** The final wake-up still leaves `prepMin` before the event (false when e.g. a CBT-I window wins). */
+  fits: boolean;
+  /** Expected sleep falls short of the need by this many minutes (0 = covered). */
+  shortByMin: number;
+  /** Rationale lines that exist because of the event. */
+  reasons: string[];
 }
 
 export interface PlanInput {
@@ -81,6 +102,10 @@ export interface PlanInput {
   habitualOnsetMin?: number;
   /** Start of tomorrow's first calendar event (epoch ms), if calendar access is on. */
   firstEventStart?: number;
+  /** Title of that event, for the rationale. */
+  firstEventTitle?: string;
+  /** Minutes needed between waking and the first event (default 60). */
+  firstEventPrepMin?: number;
   /** A prescribed sleep window (e.g. from the CBT-I programme) that overrides the computed one. */
   sleepWindow?: { bedMin: number; wakeMin: number; reason: string };
 }
@@ -92,11 +117,39 @@ export function wakeTargetFor(profile: Profile, dateKey: string): { wakeMin: num
   return { wakeMin: profile.freeWakeMin ?? profile.workWakeMin + 60, isWorkday };
 }
 
+/** Default minutes between waking and tomorrow's first event. */
+export const DEFAULT_EVENT_PREP_MIN = 60;
+
+/**
+ * Latest wake-up (rounded down to 5 min) that leaves `prepMin` before an event, or undefined when
+ * the event isn't a morning-or-later event on `wakeDate` (events before 03:00 belong to tonight).
+ */
+export function wakeForEvent(eventStart: number, prepMin: number, wakeDate: string): number | undefined {
+  if (!Number.isFinite(eventStart)) return undefined;
+  if (eventStart < atMinutes(wakeDate, MORNING_STARTS_MIN) || eventStart >= atMinutes(addDays(wakeDate, 1), 0)) return undefined;
+  const step = 5 * MINUTE;
+  return Math.floor((eventStart - prepMin * MINUTE) / step) * step;
+}
+
+/** "an hour", "2 hours", "45 min", "1h 30m". */
+function prepPhrase(min: number): string {
+  if (min === 60) return 'an hour';
+  if (min > 0 && min % 60 === 0) return `${min / 60} hours`;
+  if (min < 60) return `${min} min`;
+  return formatDuration(min);
+}
+
 export function planTonight(input: PlanInput): TonightPlan {
   const { profile, needMin, debtMin, efficiency, latencyMin } = input;
   const wakeDate = addDays(input.today, 1);
   const { wakeMin, isWorkday } = wakeTargetFor(profile, wakeDate);
-  const wake = atMinutes(wakeDate, wakeMin);
+  const usualWake = atMinutes(wakeDate, wakeMin);
+  // Tomorrow's first event can only bring the wake-up earlier, never later (free days keep their rule).
+  const eventStart = input.firstEventStart;
+  const prepMin = Math.round(clamp(input.firstEventPrepMin ?? DEFAULT_EVENT_PREP_MIN, 0, 6 * 60));
+  const eventWake = eventStart !== undefined ? wakeForEvent(eventStart, prepMin, wakeDate) : undefined;
+  const calendarDrove = eventWake !== undefined && eventWake < usualWake;
+  const wake = calendarDrove ? eventWake : usualWake;
   const rationale: string[] = [];
 
   const eff = clamp(efficiency, 0.8, 0.97);
@@ -107,6 +160,7 @@ export function planTonight(input: PlanInput): TonightPlan {
   }
   const inBedMin = Math.round(needMin / eff + latencyMin + extra);
   let bedtime = wake - inBedMin * MINUTE;
+  const needBedtime = bedtime;
   rationale.unshift(
     `${formatDuration(needMin)} sleep need, plus ${Math.round(inBedMin - needMin - latencyMin - extra)} min of normal night-time waking and ${Math.round(latencyMin)} min to fall asleep.`,
   );
@@ -123,11 +177,62 @@ export function planTonight(input: PlanInput): TonightPlan {
       if (held < wake - 4 * HOUR) {
         bedtime = held;
         gradual = true;
-        rationale.push(
-          `That's ${formatDuration(earlierBy)} earlier than your body clock is used to, so aim for ${formatTime(bedtime)} tonight and move earlier by 15–30 min each night.`,
-        );
+        // A one-off early event isn't a schedule change, so the calendar lines below explain this instead.
+        if (!calendarDrove) {
+          rationale.push(
+            `That's ${formatDuration(earlierBy)} earlier than your body clock is used to, so aim for ${formatTime(bedtime)} tonight and move earlier by 15–30 min each night.`,
+          );
+        }
       }
     }
+  }
+
+  let calendar: CalendarAdjustment | undefined;
+  const title = shortTitle(input.firstEventTitle);
+  const what = eventStart !== undefined ? `First event at ${formatTime(eventStart)}${title ? ` (“${title}”)` : ''}` : '';
+  if (eventStart !== undefined && eventWake !== undefined) {
+    const usual = planTonight({ ...input, firstEventStart: undefined, sleepWindow: undefined });
+    const reasons: string[] = [];
+    let shortByMin = 0;
+    if (calendarDrove) {
+      if (profile.insomniaMode) {
+        // CBT-I: going to bed early to make up for an early start mostly means lying awake.
+        bedtime = Math.max(bedtime, usual.bedtime);
+      } else if (input.habitualOnsetMin === undefined && bedtime < usual.bedtime - 90 * MINUTE) {
+        // No body-clock data yet: don't plan lights-out more than 90 min before the usual bedtime.
+        bedtime = usual.bedtime - 90 * MINUTE;
+        gradual = true;
+      }
+      reasons.push(`${what} — waking ${formatTime(wake)} to have ${prepPhrase(prepMin)} before it.`);
+      const expectedSleep = Math.max(0, (wake - bedtime) / MINUTE - latencyMin) * eff;
+      const shortBy = Math.round(needMin - expectedSleep);
+      const earlier = Math.round((usual.bedtime - bedtime) / MINUTE);
+      const moved = earlier >= 10 ? ` (${formatDuration(earlier)} earlier than usual)` : '';
+      if (shortBy > 10) {
+        shortByMin = shortBy;
+        const why = profile.insomniaMode
+          ? `Keeping your usual ${formatTime(bedtime)} lights-out — going to bed early to make up for it tends to mean lying awake.`
+          : earlier < 10
+            ? `Lights out stays at ${formatTime(bedtime)} — much earlier and your body clock is unlikely to let you fall asleep.`
+            : `Your full need would mean lights out at ${formatTime(needBedtime)}, too early for your body clock to fall asleep, so aim for ${formatTime(bedtime)}${moved}.`;
+        reasons.push(`${why} That's about ${formatDuration(expectedSleep)} of sleep, ${formatDuration(shortBy)} short of your need — one short night is fine; get daylight soon after you wake.`);
+      } else {
+        reasons.push(`Lights out at ${formatTime(bedtime)}${moved} still covers your sleep need.`);
+      }
+      rationale.unshift(reasons[0]);
+      rationale.push(reasons[1]);
+    }
+    calendar = {
+      eventStart,
+      eventTitle: title,
+      prepMin,
+      usualWake,
+      usualBedtime: usual.bedtime,
+      drove: calendarDrove,
+      fits: true,
+      shortByMin,
+      reasons,
+    };
   }
 
   let finalWake = wake;
@@ -138,6 +243,26 @@ export function planTonight(input: PlanInput): TonightPlan {
     bedtime = atMinutes(bedDate, input.sleepWindow.bedMin);
     gradual = false;
     rationale.splice(0, rationale.length, input.sleepWindow.reason);
+  }
+
+  if (calendar) {
+    const fits = finalWake + calendar.prepMin * MINUTE <= calendar.eventStart + MINUTE;
+    if (input.sleepWindow) {
+      // The prescribed window decided the wake-up; only warn if it leaves too little time.
+      const reasons: string[] = [];
+      if (!fits) {
+        const gap = Math.round((calendar.eventStart - finalWake) / MINUTE);
+        reasons.push(
+          gap > 0
+            ? `Heads-up: ${what} is only ${formatDuration(gap)} after this wake-up.`
+            : `Heads-up: ${what} is before this wake-up — set a separate alarm.`,
+        );
+        rationale.push(reasons[0]);
+      }
+      calendar = { ...calendar, drove: false, shortByMin: 0, reasons, fits };
+    } else {
+      calendar.fits = fits;
+    }
   }
 
   return {
@@ -152,6 +277,7 @@ export function planTonight(input: PlanInput): TonightPlan {
     extraForDebtMin: extra,
     gradual,
     rationale,
+    ...(calendar ? { calendar } : {}),
   };
 }
 
