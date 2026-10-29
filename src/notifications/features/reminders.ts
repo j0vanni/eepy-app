@@ -13,6 +13,7 @@ import type { Href } from 'expo-router';
 import type { Analysis } from '../../engine/analysis';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
+import { hasFullScreenAlarm, wakeAlarmContent } from '../fullScreenAlarm';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
@@ -140,16 +141,10 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
   }
 
   const planned = day.adaptive ? capPerDay(out, DAILY_REMINDER_CAP) : out;
-  if (prefs.smartAlarm) {
-    planned.push({
-      id: 'wake',
-      at: a.alarm.alarm,
-      channel: 'wake',
-      sound: 'wake.wav',
-      alarm: true,
-      title: 'Good morning ☀️',
-      body: a.alarm.onBoundary ? 'Woken at the end of a sleep cycle.' : 'Time to get up.',
-    });
+  // Builds with the native full-screen alarm ring it from there instead (see syncWakeAlarm).
+  if (prefs.smartAlarm && !hasFullScreenAlarm()) {
+    const wake = wakeAlarmContent(a);
+    planned.push({ id: 'wake', at: wake.at, channel: 'wake', sound: 'wake.wav', alarm: true, title: wake.title, body: wake.body });
   }
   return planned;
 }

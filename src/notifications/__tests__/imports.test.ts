@@ -7,6 +7,7 @@ jest.mock('@react-native-async-storage/async-storage', () => require('@react-nat
 const ENTRY_POINTS = [
   '../alarms',
   '../napTimer',
+  '../fullScreenAlarm',
   '../channels',
   '../scheduler',
   '../features/reminders',

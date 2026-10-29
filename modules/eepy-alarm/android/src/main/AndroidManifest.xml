@@ -1,0 +1,33 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android 14+: the user can turn this off per app (eepy shows it in Settings → Notifications). -->
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <!-- AlarmManager forgets alarms on reboot; AlarmBootReceiver puts the pending ones back. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <application>
+    <receiver
+      android:name="expo.modules.eepyalarm.AlarmReceiver"
+      android:exported="false" />
+
+    <receiver
+      android:name="expo.modules.eepyalarm.AlarmBootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+
+    <activity
+      android:name="expo.modules.eepyalarm.AlarmActivity"
+      android:exported="false"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:excludeFromRecents="true"
+      android:launchMode="singleInstance"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+  </application>
+</manifest>

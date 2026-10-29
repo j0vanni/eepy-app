@@ -3,22 +3,32 @@ import { Platform } from 'react-native';
 
 import { formatTime, MINUTE } from '../engine/time';
 import { configureNotifications, ensureNotificationPermission } from './channels';
+import { cancelFullScreenAlarm, NAP_ALARM_ID, NAP_ALARM_LINK, scheduleFullScreenAlarm } from './fullScreenAlarm';
 import { NAP_ALARM_CATEGORY, NAP_NOTIFICATION_ID, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, NapState } from './napTimer';
 
 /** Taps and buttons on nap notifications are routed by the reminders feature. */
 const NAP_DATA = { feature: 'reminders', kind: NAP_TIMER_KIND };
 
-/** One-off nap alarm (exact alarm-clock delivery). Returns the notification id to cancel it later. */
+/**
+ * One-off nap alarm (exact alarm-clock delivery). Returns the id to cancel it later (stopNapTimer
+ * clears both kinds). Uses the native full-screen lock-screen alarm when this build has it, else
+ * an expo-notifications alarm — never both.
+ */
 export async function scheduleNapAlarm(minutes: number, label: string, opts: { at?: number; start?: number } = {}): Promise<string | undefined> {
   if (Platform.OS === 'web') return undefined;
   await configureNotifications();
   if (!(await ensureNotificationPermission())) return undefined;
+  const at = opts.at ?? Date.now() + minutes * MINUTE;
+  const title = 'Nap over — time to get up';
+  const body = `${label} finished. Get some light and move around to shake off grogginess.`;
+  // The pinned "Napping" card stays up until the nap is stopped ("I'm up" opens the Nap screen).
+  if (await scheduleFullScreenAlarm(NAP_ALARM_ID, at, title, body, NAP_ALARM_LINK)) return NAP_NOTIFICATION_ID;
   return Notifications.scheduleNotificationAsync({
     // Shares the pinned card's identifier, so the alarm replaces the card when it rings.
     identifier: NAP_NOTIFICATION_ID,
     content: {
-      title: 'Nap over — time to get up',
-      body: `${label} finished. Get some light and move around to shake off grogginess.`,
+      title,
+      body,
       sound: 'default',
       priority: 'max',
       categoryIdentifier: NAP_ALARM_CATEGORY,
@@ -26,7 +36,7 @@ export async function scheduleNapAlarm(minutes: number, label: string, opts: { a
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: opts.at ?? Date.now() + minutes * MINUTE,
+      date: at,
       channelId: 'alarms',
       delivery: 'alarmClock',
     },
@@ -64,7 +74,9 @@ export async function startNapTimer(state: NapState, option: { alarmAfterMin: nu
   state.setSettings({ napTimer: { ...timer, notificationId } });
 }
 
+/** Cancels a scheduled notification and the native full-screen alarm with the same id, if any. */
 export async function cancelNotification(id?: string): Promise<void> {
   if (!id || Platform.OS === 'web') return;
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
+  await cancelFullScreenAlarm(id);
 }
