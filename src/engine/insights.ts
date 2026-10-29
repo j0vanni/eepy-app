@@ -4,7 +4,7 @@ import type { Night } from './sessions';
 import { mean, median, pearson, welchTTest } from './stats';
 import { TAG_BY_ID } from './tags';
 import { addDays, clockDiff, DAY, formatClock, formatDuration, minutesOfDay, normalizeMinutes } from './time';
-import type { CaffeineDose, DailyStats, DayLog, NightVitals, Profile } from './types';
+import type { CaffeineDose, DailyStats, DayLog, NightVitals, Profile, Workout } from './types';
 
 export interface Insight {
   id: string;
@@ -308,6 +308,8 @@ export function generateInsights(input: {
   profile: Profile;
   chronotype: ChronotypeResult;
   needMin: number;
+  /** Watch-recorded workouts (used by workout-timing insights). */
+  workouts?: Workout[];
 }): Insight[] {
   const list: (Insight | undefined)[] = [
     durationInsight(input.nights, input.needMin),

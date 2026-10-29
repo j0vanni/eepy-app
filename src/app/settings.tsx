@@ -1,34 +1,27 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Switch, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 
 import { HALF_LIFE_OPTIONS } from '@/engine/caffeine';
 import { QUIZZES, scoreQuiz } from '@/engine/screening';
 import { formatClock, formatDuration, normalizeMinutes } from '@/engine/time';
 import { exportBackup, pickBackup } from '@/integrations/backup';
 import { summarizeOrigins } from '@/integrations/healthConnectMapper';
-import { ensureNotificationPermission } from '@/state/notifications';
-import { NotificationPrefs, selectDataset, useStore } from '@/state/store';
+import { selectDataset, useStore } from '@/state/store';
 import { runSync } from '@/state/sync';
 import { Button, Card, CardTitle, Chip, ListRow, Note, Row, Screen, Section, Segmented, Stepper } from '@/ui/components';
 import { confirm, notify } from '@/ui/confirm';
 import { relativeTime } from '@/ui/format';
+import { CalendarSection } from '@/ui/settings/CalendarSection';
+import { LearningSection } from '@/ui/settings/LearningSection';
+import { NotificationsSection } from '@/ui/settings/NotificationsSection';
+import { ProgramsSection } from '@/ui/settings/ProgramsSection';
+import { Toggle } from '@/ui/settings/Toggle';
+import { WindDownSection } from '@/ui/settings/WindDownSection';
 import { colors, font, space } from '@/ui/theme';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-function Toggle({ label, sub, value, onChange }: { label: string; sub?: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <Row style={{ paddingVertical: space.sm }}>
-      <View style={{ flex: 1, paddingRight: space.md }}>
-        <Text style={font.body}>{label}</Text>
-        {sub ? <Text style={font.small}>{sub}</Text> : null}
-      </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.accent, false: colors.border }} thumbColor={colors.text} />
-    </Row>
-  );
-}
 
 export default function SettingsScreen() {
   const profile = useStore((s) => s.profile);
@@ -36,21 +29,12 @@ export default function SettingsScreen() {
   const sessions = useStore((s) => s.sessions);
   const setProfile = useStore((s) => s.setProfile);
   const setSettings = useStore((s) => s.setSettings);
-  const setNotificationPrefs = useStore((s) => s.setNotificationPrefs);
   const loadDemo = useStore((s) => s.loadDemo);
   const resetAll = useStore((s) => s.resetAll);
   const importData = useStore((s) => s.importData);
   const [busy, setBusy] = useState(false);
   const origins = useMemo(() => summarizeOrigins(sessions.filter((s) => s.source === 'health-connect')), [sessions]);
   const year = new Date().getFullYear();
-
-  const setNotif = async (key: keyof NotificationPrefs, value: boolean) => {
-    if (value && !(await ensureNotificationPermission())) {
-      notify('Notifications are off', 'Allow notifications for eepy in Android settings to get reminders and alarms.');
-      return;
-    }
-    setNotificationPrefs({ [key]: value });
-  };
 
   const sync = async (full: boolean) => {
     setBusy(true);
@@ -186,15 +170,15 @@ export default function SettingsScreen() {
         ) : null}
       </Section>
 
-      <Section title="Notifications">
-        <Card>
-          <Toggle label="Wind-down reminder" sub={`${profile.windDownMin} min before lights out`} value={settings.notifications.windDown} onChange={(v) => setNotif('windDown', v)} />
-          <Toggle label="Bedtime" value={settings.notifications.bedtime} onChange={(v) => setNotif('bedtime', v)} />
-          <Toggle label="Caffeine cut-off" value={settings.notifications.caffeine} onChange={(v) => setNotif('caffeine', v)} />
-          <Toggle label="Morning check-in" value={settings.notifications.morningCheckIn} onChange={(v) => setNotif('morningCheckIn', v)} />
-          <Toggle label="Wake alarm (cycle-timed)" sub="Rings at the end of a predicted sleep cycle before your wake time" value={settings.notifications.smartAlarm} onChange={(v) => setNotif('smartAlarm', v)} />
-        </Card>
-      </Section>
+      <NotificationsSection />
+
+      <LearningSection />
+
+      <CalendarSection />
+
+      <WindDownSection />
+
+      <ProgramsSection />
 
       <Section title="Self-checks">
         <Card>

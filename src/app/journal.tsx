@@ -36,7 +36,7 @@ export default function JournalScreen() {
   };
 
   return (
-    <Screen title="Journal" subtitle="A few taps a day make every estimate personal">
+    <Screen subtitle="A few taps a day make every estimate personal">
       <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
         <Pressable onPress={() => changeDate(addDays(date, -1))} hitSlop={10} accessibilityLabel="Previous day">
           <Icon name="chevron-left" size={28} color={colors.text} />

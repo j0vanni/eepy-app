@@ -1,4 +1,4 @@
-import { bedtimeDelayMin, EnergyForecast, Interval, simulateAlertness } from './alertness';
+import { bedtimeDelayMin, CircadianParams, EnergyForecast, Interval, simulateAlertness } from './alertness';
 import { mean } from './stats';
 import { clamp, formatDuration, formatTime, HOUR, MINUTE } from './time';
 
@@ -53,10 +53,11 @@ export interface NapInput {
   sleepiness?: number;
   upcoming?: UpcomingDemand;
   forecast: EnergyForecast;
+  circadian?: CircadianParams;
 }
 
 function avgEnergy(sleeps: Interval[], from: number, to: number, input: NapInput): number {
-  const pts = simulateAlertness(sleeps, from, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin, stepMin: 10 });
+  const pts = simulateAlertness(sleeps, from, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin, stepMin: 10, circadian: input.circadian });
   return mean(pts.filter((p) => !p.asleep).map((p) => p.energy));
 }
 

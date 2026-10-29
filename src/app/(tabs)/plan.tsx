@@ -186,6 +186,7 @@ export default function PlanScreen() {
 
       <Section title="Travel">
         <Card>
+          <ListRow icon="tune-variant" title="What if?" sub="Try a bedtime, nap or coffee and see how tomorrow changes" onPress={() => router.push('/simulate')} />
           <ListRow icon="airplane-clock" title="Jet lag planner" sub="Day-by-day sleep and light plan for crossing time zones" onPress={() => router.push('/jetlag')} />
         </Card>
       </Section>

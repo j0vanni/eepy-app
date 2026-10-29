@@ -9,8 +9,8 @@ const TABS = [
   { name: 'index', title: 'Today', icon: 'weather-night' },
   { name: 'nap', title: 'Nap', icon: 'sleep' },
   { name: 'plan', title: 'Plan', icon: 'calendar-clock' },
+  { name: 'coach', title: 'Coach', icon: 'account-heart-outline' },
   { name: 'trends', title: 'Trends', icon: 'chart-timeline-variant' },
-  { name: 'journal', title: 'Journal', icon: 'notebook-outline' },
 ];
 
 export default function TabLayout() {

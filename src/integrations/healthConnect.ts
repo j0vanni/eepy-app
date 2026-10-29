@@ -17,17 +17,19 @@ import type { Permission, RecordType } from 'react-native-health-connect';
 
 import { computeSessionMetrics } from '../engine/sessions';
 import { DAY, HOUR } from '../engine/time';
-import type { DailyStats, NightVitals, SleepSession, VitalSample } from '../engine/types';
+import type { DailyStats, NightVitals, SleepSession, VitalSample, Workout } from '../engine/types';
 import { summarizeNightVitals } from '../engine/vitals';
 import {
   buildDailyStats,
   flattenHeartRate,
   HCHeartRateRecord,
+  HCExerciseRecord,
   HCInstantRecord,
   HCSleepRecord,
   HCStepsRecord,
   instantSamples,
   mapSleepRecord,
+  mapWorkout,
   stepsPerDay,
   toHealthConnectSleep,
 } from './healthConnectMapper';
@@ -42,6 +44,7 @@ const READ_TYPES: RecordType[] = [
   'OxygenSaturation',
   'RespiratoryRate',
   'Steps',
+  'ExerciseSession',
 ];
 
 export const HC_PERMISSIONS: Permission[] = [
@@ -73,24 +76,32 @@ export interface PermissionState {
   sleep: boolean;
   heartRate: boolean;
   all: boolean;
+  /** Health Connect allows reads while eepy is in the background. */
+  background: boolean;
   granted: string[];
 }
 
 export async function getPermissionState(): Promise<PermissionState> {
-  if (!(await ensureInit())) return { sleep: false, heartRate: false, all: false, granted: [] };
+  if (!(await ensureInit())) return { sleep: false, heartRate: false, all: false, background: false, granted: [] };
   const granted = (await getGrantedPermissions()).map((p) => `${p.accessType}:${p.recordType}`);
   const has = (t: string) => granted.includes(`read:${t}`);
   return {
     sleep: has('SleepSession'),
     heartRate: has('HeartRate'),
     all: READ_TYPES.every(has),
+    background: has('BackgroundAccessPermission'),
     granted,
   };
 }
 
 export async function requestHealthPermissions(): Promise<PermissionState> {
   await ensureInit();
-  await requestPermission([...HC_PERMISSIONS, { accessType: 'read', recordType: 'ReadHealthDataHistory' }]);
+  await requestPermission([
+    ...HC_PERMISSIONS,
+    { accessType: 'read', recordType: 'ReadHealthDataHistory' },
+    // Lets the background task sync while eepy is closed (Android 15+ / recent Health Connect).
+    { accessType: 'read', recordType: 'BackgroundAccessPermission' },
+  ]);
   return getPermissionState();
 }
 
@@ -129,7 +140,8 @@ export interface SyncResult {
   sessions: SleepSession[];
   vitals: Record<string, NightVitals>;
   daily: Record<string, DailyStats>;
-  counts: { sessions: number; heartRate: number; hrv: number; spo2: number; steps: number };
+  workouts: Workout[];
+  counts: { sessions: number; heartRate: number; hrv: number; spo2: number; steps: number; workouts: number };
 }
 
 /**
@@ -146,13 +158,14 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
 
   // Vitals: read once over the whole window (paged), then slice per night in memory.
   const vitalsFrom = from - 12 * HOUR;
-  const [hrRecs, hrvRecs, spo2Recs, respRecs, rhrRecs, stepRecs] = await Promise.all([
+  const [hrRecs, hrvRecs, spo2Recs, respRecs, rhrRecs, stepRecs, exerciseRecs] = await Promise.all([
     safeRead<HCHeartRateRecord>('HeartRate', vitalsFrom, to, granted),
     safeRead<HCInstantRecord>('HeartRateVariabilityRmssd', vitalsFrom, to, granted),
     safeRead<HCInstantRecord>('OxygenSaturation', vitalsFrom, to, granted),
     safeRead<HCInstantRecord>('RespiratoryRate', vitalsFrom, to, granted),
     safeRead<HCInstantRecord>('RestingHeartRate', from - DAY, to, granted),
     safeRead<HCStepsRecord>('Steps', from - DAY, to, granted),
+    safeRead<HCExerciseRecord>('ExerciseSession', from - 12 * HOUR, to, granted),
   ]);
   const hr = flattenHeartRate(hrRecs);
   const hrv: VitalSample[] = instantSamples(hrvRecs, 'heartRateVariabilityMillis');
@@ -172,7 +185,15 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
     sessions,
     vitals,
     daily: buildDailyStats(stepsPerDay(stepRecs), rhr, hrv),
-    counts: { sessions: sessions.length, heartRate: hr.length, hrv: hrv.length, spo2: spo2.length, steps: stepRecs.length },
+    workouts: exerciseRecs.map(mapWorkout).filter((w) => w.end > w.start),
+    counts: {
+      sessions: sessions.length,
+      heartRate: hr.length,
+      hrv: hrv.length,
+      spo2: spo2.length,
+      steps: stepRecs.length,
+      workouts: exerciseRecs.length,
+    },
   };
 }
 

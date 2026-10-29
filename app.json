@@ -30,6 +30,8 @@
         "android.permission.health.READ_RESPIRATORY_RATE",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_HEALTH_DATA_HISTORY",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
+        "android.permission.health.READ_EXERCISE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_EXACT_ALARM",
         "android.permission.SCHEDULE_EXACT_ALARM",
@@ -70,6 +72,27 @@
         "expo-notifications",
         {
           "color": "#9B8CFF"
+        }
+      ],
+      "expo-background-task",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "eepy reads tomorrow's first event to plan your alarm and bedtime."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": true,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": false
         }
       ]
     ],

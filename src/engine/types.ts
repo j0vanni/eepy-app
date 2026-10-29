@@ -70,6 +70,25 @@ export interface DailyStats {
   hrv?: number;
 }
 
+/** A workout recorded by the watch (Health Connect ExerciseSession). */
+export interface Workout {
+  id: string;
+  start: number;
+  end: number;
+  /** Health Connect ExerciseType code. */
+  type: number;
+  title?: string;
+  origin?: string;
+}
+
+/** A momentary alertness rating (Karolinska Sleepiness Scale, 1–9) from a ping or quick check-in. */
+export interface AlertnessCheckIn {
+  id: string;
+  time: number;
+  kss: number;
+  source: 'ping' | 'manual';
+}
+
 export interface CaffeineDose {
   id: string;
   time: number;
@@ -150,4 +169,7 @@ export interface SleepDataset {
   dayLogs: Record<string, DayLog>;
   caffeine: CaffeineDose[];
   profile: Profile;
+  /** Momentary sleepiness ratings used to personalise the energy forecast. */
+  checkins?: AlertnessCheckIn[];
+  workouts?: Workout[];
 }

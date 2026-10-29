@@ -79,6 +79,10 @@ export interface PlanInput {
   efficiency: number;
   latencyMin: number;
   habitualOnsetMin?: number;
+  /** Start of tomorrow's first calendar event (epoch ms), if calendar access is on. */
+  firstEventStart?: number;
+  /** A prescribed sleep window (e.g. from the CBT-I programme) that overrides the computed one. */
+  sleepWindow?: { bedMin: number; wakeMin: number; reason: string };
 }
 
 export function wakeTargetFor(profile: Profile, dateKey: string): { wakeMin: number; isWorkday: boolean } {
@@ -126,15 +130,25 @@ export function planTonight(input: PlanInput): TonightPlan {
     }
   }
 
+  let finalWake = wake;
+  if (input.sleepWindow) {
+    // A prescribed window (CBT-I) wins over everything computed above.
+    finalWake = atMinutes(wakeDate, input.sleepWindow.wakeMin);
+    const bedDate = input.sleepWindow.bedMin >= 12 * 60 ? input.today : wakeDate;
+    bedtime = atMinutes(bedDate, input.sleepWindow.bedMin);
+    gradual = false;
+    rationale.splice(0, rationale.length, input.sleepWindow.reason);
+  }
+
   return {
     wakeDate,
     isWorkday,
-    wake,
+    wake: finalWake,
     bedtime,
     windDownStart: bedtime - profile.windDownMin * MINUTE,
     lastMeal: bedtime - 3 * HOUR,
     lastExercise: bedtime - 2 * HOUR,
-    inBedMin: Math.round((wake - bedtime) / MINUTE),
+    inBedMin: Math.round((finalWake - bedtime) / MINUTE),
     extraForDebtMin: extra,
     gradual,
     rationale,

@@ -1,10 +1,12 @@
+import * as Notifications from 'expo-notifications';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
-import { configureNotifications, scheduleDailyReminders } from '@/state/notifications';
+import { registerBackgroundSync } from '@/background/task';
+import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { useAutoSync } from '@/state/sync';
@@ -17,16 +19,35 @@ const theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
+/** App-wide side effects: sync, notification planning, notification responses, background task. */
 function Background() {
   useAutoSync();
   const analysis = useAnalysis();
-  const prefs = useStore((s) => s.settings.notifications);
+  const settings = useStore((s) => s.settings);
+  const goals = useStore((s) => s.goals);
+  const experiments = useStore((s) => s.experiments);
+  const checkins = useStore((s) => s.checkins);
+
   useEffect(() => {
-    if (Platform.OS !== 'web') configureNotifications().catch(() => undefined);
+    if (Platform.OS === 'web') return;
+    configureNotifications().catch(() => undefined);
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => {
+      handleNotificationResponse(r, useStore.getState()).catch(() => undefined);
+    });
+    // A notification tapped while the app was closed.
+    Notifications.getLastNotificationResponseAsync()
+      .then((r) => r && handleNotificationResponse(r, useStore.getState()))
+      .catch(() => undefined);
+    return () => sub.remove();
   }, []);
+
   useEffect(() => {
-    if (analysis) scheduleDailyReminders(analysis, prefs).catch(() => undefined);
-  }, [analysis, prefs]);
+    if (Platform.OS !== 'web') registerBackgroundSync(settings.background.enabled).catch(() => undefined);
+  }, [settings.background.enabled]);
+
+  useEffect(() => {
+    if (analysis) replanNotifications(analysis, useStore.getState()).catch(() => undefined);
+  }, [analysis, settings.notifications, goals, experiments, checkins]);
   return null;
 }
 
@@ -57,6 +78,17 @@ export default function RootLayout() {
         <Stack.Screen name="jetlag" options={{ title: 'Jet lag planner' }} />
         <Stack.Screen name="log-sleep" options={{ title: 'Log sleep', presentation: 'modal' }} />
         <Stack.Screen name="need" options={{ title: 'Your sleep need' }} />
+        <Stack.Screen name="journal" options={{ title: 'Journal' }} />
+        <Stack.Screen name="checkin" options={{ title: 'Quick check-in', presentation: 'modal' }} />
+        <Stack.Screen name="simulate" options={{ title: 'What if?' }} />
+        <Stack.Screen name="learning" options={{ title: 'Your body clock' }} />
+        <Stack.Screen name="experiments/index" options={{ title: 'Experiments' }} />
+        <Stack.Screen name="experiments/[id]" options={{ title: 'Experiment' }} />
+        <Stack.Screen name="goals" options={{ title: 'Goals' }} />
+        <Stack.Screen name="review" options={{ title: 'Weekly review' }} />
+        <Stack.Screen name="winddown" options={{ title: 'Wind down' }} />
+        <Stack.Screen name="cbti" options={{ title: 'Insomnia programme' }} />
+        <Stack.Screen name="export" options={{ title: 'Reports & export' }} />
       </Stack>
     </ThemeProvider>
   );

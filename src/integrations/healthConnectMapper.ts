@@ -2,7 +2,7 @@
  * Pure mapping from Health Connect records (as returned by react-native-health-connect) to eepy's
  * model. Kept free of native imports so it can be unit tested.
  */
-import type { DailyStats, SleepSession, Stage, StageSegment, VitalSample } from '../engine/types';
+import type { DailyStats, SleepSession, Stage, StageSegment, VitalSample, Workout } from '../engine/types';
 import { dateKey } from '../engine/time';
 
 /** Health Connect SleepSessionRecord.STAGE_TYPE_* constants. */
@@ -44,6 +44,25 @@ export interface HCInstantRecord {
   time: string;
   metadata?: HCMetadata;
   [key: string]: unknown;
+}
+
+export interface HCExerciseRecord {
+  startTime: string;
+  endTime: string;
+  exerciseType: number;
+  title?: string;
+  metadata?: HCMetadata;
+}
+
+export function mapWorkout(r: HCExerciseRecord): Workout {
+  return {
+    id: `hc:${r.metadata?.id ?? `${r.startTime}-${r.endTime}`}`,
+    start: ms(r.startTime),
+    end: ms(r.endTime),
+    type: r.exerciseType,
+    title: r.title,
+    origin: r.metadata?.dataOrigin,
+  };
 }
 
 export interface HCStepsRecord {

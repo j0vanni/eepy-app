@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { Analysis, analyze } from '../engine/analysis';
-import { dateKey, MINUTE } from '../engine/time';
+import { MINUTE } from '../engine/time';
+import { analyzeOptionsFor } from './analysisOptions';
+import { useFirstEventTomorrow } from './calendar';
 import { selectDataset, useStore } from './store';
 
 /** Current time, refreshed on an interval so time-dependent advice stays fresh. */
@@ -25,26 +27,26 @@ function sharedAnalysis(key: unknown[], compute: () => Analysis | undefined): An
   return value;
 }
 
-/** Runs the full engine over the stored data; recomputed when data changes or every 5 minutes. */
+/** Runs the full engine over the stored data; recomputed when inputs change or every 5 minutes. */
 export function useAnalysis(): Analysis | undefined {
   const data = useStore(useShallow(selectDataset));
-  const preferredOrigins = useStore((s) => s.settings.preferredOrigins);
-  const upcoming = useStore((s) => s.settings.upcoming);
+  const settings = useStore((s) => s.settings);
+  const calibration = useStore((s) => s.calibration);
+  const cbti = useStore((s) => s.cbti);
+  const firstEvent = useFirstEventTomorrow(settings.calendar);
   const now = useNow();
   const bucket = Math.floor(now / (5 * MINUTE));
   return useMemo(
     () =>
       sharedAnalysis(
-        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, preferredOrigins, upcoming, bucket],
+        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, data.checkins, data.workouts, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, bucket],
         () => {
           if (data.sessions.length === 0) return undefined;
           const t = Date.now();
-          return analyze(data, t, {
-            preferredOrigins,
-            upcoming: upcoming && upcoming.date === dateKey(t) ? upcoming.kind : undefined,
-          });
+          return analyze(data, t, analyzeOptionsFor(useStore.getState(), { now: t, firstEventTomorrow: firstEvent }));
         },
       ),
-    [data, preferredOrigins, upcoming, bucket],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, settings.preferredOrigins, settings.upcoming, calibration, cbti, firstEvent, bucket],
   );
 }

@@ -1,5 +1,6 @@
-import { EnergyForecast, forecastEnergy, Interval } from './alertness';
+import { CircadianParams, EnergyForecast, forecastEnergy, Interval, sleepPressureAt } from './alertness';
 import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
+import { CbtiProgram, currentCbtiWindow } from './cbti';
 import { analyzeChronotype, ChronotypeResult } from './chronotype';
 import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
 import { generateInsights, Insight, NightRow } from './insights';
@@ -20,6 +21,7 @@ import { ageFromBirthYear, estimateSleepNeed, SleepNeedEstimate } from './sleepN
 import { scoreSleep, SleepScore } from './sleepScore';
 import { addDays, atMinutes, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
 import { isSleepStage, SleepDataset } from './types';
+import { detectRecoveryAlert, RecoveryAlert } from './recovery';
 import { computeReadiness, Readiness } from './vitals';
 
 export interface Analysis {
@@ -52,6 +54,13 @@ export interface Analysis {
   insights: Insight[];
   plan: PlanItem[];
   tips: Tip[];
+  /** Homeostatic sleep pressure (0–1, two-process model) now and at tonight's planned bedtime. */
+  sleepPressure: { now: number; atBedtime: number };
+  recoveryAlert?: RecoveryAlert;
+  /** Every asleep interval used by the models (recent days, plus an assumed night if last night is missing). */
+  sleeps: Interval[];
+  /** The personal circadian adjustment in effect (learned from check-ins), if any. */
+  circadian?: CircadianParams;
 }
 
 export const ANALYSIS_WINDOW_DAYS = 120;
@@ -59,6 +68,12 @@ export const ANALYSIS_WINDOW_DAYS = 120;
 export interface AnalyzeOptions {
   preferredOrigins?: string[];
   upcoming?: UpcomingDemand;
+  /** Learned personal circadian parameters (calibration.ts). */
+  circadian?: CircadianParams;
+  /** Start of tomorrow's first calendar event (epoch ms). */
+  firstEventTomorrow?: number;
+  /** Active CBT-I programme, which prescribes the sleep window. */
+  cbti?: CbtiProgram;
 }
 
 function sleepIntervals(metrics: SessionMetrics[], since: number): Interval[] {
@@ -106,6 +121,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     efficiency,
     latencyMin,
     habitualOnsetMin: chronotype.habitual?.onsetMin,
+    firstEventStart: opts.firstEventTomorrow,
+    sleepWindow: currentCbtiWindow(opts.cbti, nights, day),
   });
   const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
 
@@ -131,15 +148,20 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     midSleepMin: habitualMidSleepMin,
     debtMin: debt.debtMin,
     assumedLastNight,
+    circadian: opts.circadian,
   });
 
   const doses = data.caffeine.filter((d) => d.time > now - 36 * HOUR && d.time <= now);
   const cutoff = caffeineCutoff(doses, tonight.bedtime, profile.caffeineHalfLifeH, profile.caffeineBedtimeLimitMg);
   const caffeine = { nowMg: caffeineAt(doses, now, profile.caffeineHalfLifeH), cutoff };
 
+  // Most recent sleepiness rating from the last 3 hours: a check-in/ping or the journal.
   const log = dayLogs[day];
-  const recentSleepiness =
-    log?.sleepiness !== undefined && log.sleepinessAt !== undefined && now - log.sleepinessAt < 3 * HOUR ? log.sleepiness : undefined;
+  const ratings = [
+    ...(data.checkins ?? []).map((c) => ({ time: c.time, kss: c.kss })),
+    ...(log?.sleepiness !== undefined && log.sleepinessAt !== undefined ? [{ time: log.sleepinessAt, kss: log.sleepiness }] : []),
+  ].filter((r) => r.time <= now && now - r.time < 3 * HOUR);
+  const recentSleepiness = ratings.length ? ratings.reduce((a, b) => (b.time > a.time ? b : a)).kss : undefined;
   const napsTodayMin = (nights.find((n) => n.wakeDate === day)?.naps ?? [])
     .filter((m) => m.end <= now)
     .reduce((s, m) => s + m.totalSleepMin, 0);
@@ -161,6 +183,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     sleepiness: recentSleepiness,
     upcoming: opts.upcoming,
     forecast: energy,
+    circadian: opts.circadian,
   });
 
   const lastNight = [...nights].reverse().find((n) => n.main);
@@ -187,6 +210,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     profile,
     chronotype,
     needMin: need.needMin,
+    workouts: data.workouts ?? [],
   });
 
   const plan = buildDailyPlan({ wakeTime, energy, nap, caffeine: cutoff, tonight, alarm });
@@ -219,6 +243,10 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     insights,
     plan,
     tips,
+    sleepPressure: { now: sleepPressureAt(sleeps, now), atBedtime: sleepPressureAt(sleeps, tonight.bedtime) },
+    recoveryAlert: detectRecoveryAlert({ nights, vitals: data.vitals, daily: data.daily, asOfDate: day }),
+    sleeps,
+    circadian: opts.circadian,
   };
 }
 

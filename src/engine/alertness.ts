@@ -10,6 +10,21 @@
  */
 import { clamp, HOUR, MINUTE, minutesOfDay } from './time';
 
+/**
+ * Personal adjustments to the circadian component, learned from sleepiness check-ins
+ * (see calibration.ts). Defaults leave the population model unchanged.
+ */
+export interface CircadianParams {
+  /** Shift of the whole rhythm in minutes (positive = later). */
+  phaseShiftMin: number;
+  /** Multiplier on the 24h circadian amplitude. */
+  ampScale: number;
+  /** Multiplier on the post-lunch dip (12h harmonic). */
+  dipScale: number;
+}
+
+export const DEFAULT_CIRCADIAN: CircadianParams = { phaseShiftMin: 0, ampScale: 1, dipScale: 1 };
+
 export interface Interval {
   start: number;
   end: number;
@@ -47,13 +62,14 @@ export interface AlertnessPoint {
 }
 
 /** Circadian component for a clock time, given the person's habitual mid-sleep (minutes after midnight). */
-export function circadian(t: number, midSleepMin: number): number {
+export function circadian(t: number, midSleepMin: number, params: CircadianParams = DEFAULT_CIRCADIAN): number {
   const h = minutesOfDay(t) / 60;
-  const mid = midSleepMin / 60;
+  const mid = (midSleepMin + params.phaseShiftMin) / 60;
   const acro = mid + TPM.acrophaseOffsetH;
   const dip = mid + TPM.dipOffsetH;
   return (
-    TPM.circAmp * Math.cos((2 * Math.PI * (h - acro)) / 24) - TPM.dipAmp * Math.cos((2 * Math.PI * (h - dip)) / 12)
+    TPM.circAmp * params.ampScale * Math.cos((2 * Math.PI * (h - acro)) / 24) -
+    TPM.dipAmp * params.dipScale * Math.cos((2 * Math.PI * (h - dip)) / 12)
   );
 }
 
@@ -88,6 +104,7 @@ function mergeIntervals(list: Interval[]): Interval[] {
 export interface SimulateOptions {
   midSleepMin: number;
   debtMin?: number;
+  circadian?: CircadianParams;
   stepMin?: number;
   /** Hours simulated before `from` so S converges from its unknown starting value. */
   burnInH?: number;
@@ -124,7 +141,7 @@ export function simulateAlertness(sleeps: Interval[], from: number, to: number, 
     else S = TPM.la + (S - TPM.la) * Math.exp(-TPM.wakeRate * dtH);
 
     if (t < from) continue;
-    const C = circadian(t, opts.midSleepMin);
+    const C = circadian(t, opts.midSleepMin, opts.circadian);
     const W = asleep ? 0 : -inertiaAmplitude(lastBoutMin) * Math.exp((-TPM.inertiaRate * (t - lastWake)) / HOUR);
     const alertness = S + C + W - (asleep ? 0 : debtPenalty);
     const kss = kssFromAlertness(alertness);
@@ -155,6 +172,7 @@ export interface ForecastInput {
   midSleepMin: number;
   debtMin: number;
   assumedLastNight?: boolean;
+  circadian?: CircadianParams;
 }
 
 export function forecastEnergy(input: ForecastInput): EnergyForecast {
@@ -162,7 +180,7 @@ export function forecastEnergy(input: ForecastInput): EnergyForecast {
   const sleeps = [...input.sleeps];
   if (bedtime > now) sleeps.push({ start: bedtime, end: nextWake });
   const to = bedtime + 90 * MINUTE;
-  const points = simulateAlertness(sleeps, wakeTime, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin });
+  const points = simulateAlertness(sleeps, wakeTime, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin, circadian: input.circadian });
 
   const awake = points.filter((p) => !p.asleep && p.t <= bedtime);
   const settled = awake.filter((p) => p.t >= wakeTime + 60 * MINUTE);
