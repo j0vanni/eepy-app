@@ -71,7 +71,10 @@
       [
         "expo-notifications",
         {
-          "color": "#9B8CFF"
+          "color": "#9B8CFF",
+          "sounds": [
+            "./assets/audio/wake.wav"
+          ]
         }
       ],
       "expo-background-task",

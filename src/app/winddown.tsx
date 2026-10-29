@@ -1,10 +1,38 @@
-// OWNER: wind-down audio workstream. Placeholder until implemented.
-import { Empty, Screen } from '@/ui/components';
+import { Text, View } from 'react-native';
 
-export default function Placeholder() {
+import { BreathingCard } from '@/audio/ui/Breathing';
+import { LightCheckCard } from '@/audio/ui/LightCheck';
+import { SoundsCard } from '@/audio/ui/SoundControls';
+import { Checklist, CountdownHero } from '@/audio/ui/WindDownParts';
+import { lightContextAt } from '@/audio/light';
+import { dateKey } from '@/engine/time';
+import { useAnalysis, useNow } from '@/state/useAnalysis';
+import { Screen } from '@/ui/components';
+import { font, space } from '@/ui/theme';
+
+/** Wind-down routine: countdown to lights-out, checklist, breathing, sleep sounds and a light check. */
+export default function WindDownScreen() {
+  const analysis = useAnalysis();
+  const now = useNow(30_000);
+  const nightKey = analysis?.tonight.wakeDate ?? dateKey(now);
+  const lightContext = lightContextAt(now, {
+    wakeTime: analysis?.wakeTime,
+    windDownStart: analysis?.tonight.windDownStart,
+    bedtime: analysis?.tonight.bedtime,
+  });
+
   return (
     <Screen>
-      <Empty icon="weather-night" title="Wind down" body="Breathing, sounds and a light check." />
+      <CountdownHero analysis={analysis} now={now} />
+      <Checklist key={nightKey} nightKey={nightKey} />
+      <BreathingCard />
+      <SoundsCard />
+      <LightCheckCard context={lightContext} />
+      <View style={{ marginTop: space.sm, paddingHorizontal: space.sm }}>
+        <Text style={[font.tiny, { textAlign: 'center' }]}>
+          Same time, same steps, every night — the routine itself becomes a cue for sleep.
+        </Text>
+      </View>
     </Screen>
   );
 }
