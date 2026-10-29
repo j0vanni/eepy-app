@@ -1,6 +1,6 @@
 # eepy — plan: more dynamic, more features
 
-> **Status (v0.2):** Phases 1–4 are built except home-screen widgets (dropped), the full-screen lock-screen alarm (2.6), morning-light logging (4.2) and Gadgetbridge import (4.6). See FEATURES.md §16.
+> **Status (v0.2):** Phases 1–4 are built except home-screen widgets (dropped), morning-light logging (4.2) and Gadgetbridge import (4.6). See FEATURES.md §16.
 
 "More dynamic" can mean three different things. This plan covers all three, ordered so each phase ships as its own APK:
 

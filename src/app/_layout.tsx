@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { registerBackgroundSync } from '@/background/task';
+import { syncWakeAlarm } from '@/notifications/fullScreenAlarm';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
 import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
@@ -48,7 +49,10 @@ function Background() {
   }, [settings.background.enabled]);
 
   useEffect(() => {
-    if (analysis) replanNotifications(analysis, useStore.getState()).catch(() => undefined);
+    if (!analysis) return;
+    replanNotifications(analysis, useStore.getState()).catch(() => undefined);
+    // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
+    syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
   }, [analysis, settings.notifications, settings.napTimer, goals, experiments, checkins]);
   return null;
 }

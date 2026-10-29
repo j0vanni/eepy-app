@@ -207,6 +207,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Touchable charts** (drag to read values, haptic ticks; tap a night on Trends), animations, floating quick check-in (sleepiness, energy, coffee, tags) |
 | ✅ | **Workout-timing insights** from Health Connect exercise sessions (if Nothing X writes them) |
 | ✅ | **Coach tab** hub for all of the above |
+| 🧪 | **Full-screen alarm** for naps and the cycle-timed wake-up: rings over the lock screen at alarm volume with Snooze (9 min) / I'm up, survives reboots, falls back to a ringing heads-up when the phone is in use (Android 14+ asks you to allow full-screen alarms) |
 
 ---
 
