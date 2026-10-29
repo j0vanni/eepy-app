@@ -16,7 +16,7 @@
 import { AudioPlayer, AudioStatus, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
 
-import { effectiveVolume, FADE_IN_MS, isTimerFading, sleepTimerGain, SWITCH_FADE_MS, voiceFinished, VoiceEnvelope } from './envelope';
+import { effectiveVolume, FADE_IN_MS, isTimerFading, SWITCH_FADE_MS, voiceFinished, VoiceEnvelope } from './envelope';
 import { SoundId, soundInfo } from './sounds';
 
 const MINUTE = 60_000;
@@ -229,12 +229,6 @@ export class SoundController {
     const fading = this.state.status === 'playing' && isTimerFading(timer.startedAt, endsAt, now);
     if (fading !== this.state.fading) this.setState({ fading });
   };
-
-  /** Current sleep-timer gain (for UI meters). */
-  timerGain(now = Date.now()): number {
-    const { startedAt, endsAt } = this.state;
-    return startedAt === undefined ? 1 : sleepTimerGain(startedAt, endsAt, now);
-  }
 
   // --- internals ---
 

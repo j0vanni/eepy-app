@@ -20,13 +20,13 @@ export function WindDownCard({ analysis }: { analysis: Analysis }) {
   if (!showWindDownCard(now, t) && !sound.playing) return null;
 
   const s = windDownStatus(now, t);
-  const title = s.phase === 'before' ? `Wind-down starts ${formatTime(t.windDownStart)}` : `Wind down now · lights out ${formatTime(t.bedtime)}`;
+  const title = s.phase === 'before' ? `Wind-down starts ${formatTime(t.windDownStart)}` : s.phase === 'during' ? 'Wind down now' : 'Past lights-out';
   const sub =
     s.phase === 'before'
       ? `in ${formatDuration(s.minToWindDown)} · open your routine`
       : s.phase === 'during'
-        ? `${formatDuration(s.minToBedtime)} to go · open your routine`
-        : 'Past lights-out · open your routine';
+        ? `Lights out ${formatTime(t.bedtime)}, in ${formatDuration(s.minToBedtime)} · open your routine`
+        : 'Open your routine';
   const name = soundInfo(sound.settings.sound).label;
 
   return (

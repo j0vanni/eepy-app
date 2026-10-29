@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { formatDuration, formatTime } from '@/engine/time';
-import { Card, CardTitle, Icon, Meter, Note, Ring } from '@/ui/components';
+import { Card, CardTitle, Icon, Note, Ring } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 import { CARD_LEAD_MS, WIND_DOWN_CHECKLIST, windDownStatus } from '../windDown';
@@ -47,9 +47,6 @@ export function CountdownHero({ analysis, now }: { analysis: Analysis | undefine
             Lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
           </Text>
         </Row>
-        <View style={{ marginTop: space.md }}>
-          <Meter value={s.progress} max={1} color={colors.accent} height={4} />
-        </View>
       </Card>
     );
   }
