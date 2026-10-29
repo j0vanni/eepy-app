@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { NapOption, UpcomingDemand } from '@/engine/nap';
-import { dateKey, formatTime, MINUTE } from '@/engine/time';
-import { cancelNotification, scheduleNapAlarm } from '@/state/notifications';
+import { dateKey, formatTime } from '@/engine/time';
+import { startNapTimer } from '@/notifications/alarms';
+import { stopNapTimer } from '@/notifications/napTimer';
 import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Card, CardTitle, Chip, Empty, Icon, Meter, Note, Ring, Row, Screen, Section } from '@/ui/components';
@@ -36,7 +37,6 @@ export default function NapScreen() {
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
   const logDay = useStore((s) => s.logDay);
-  const addManualSession = useStore((s) => s.addManualSession);
   const sleepiness = useStore((s) => s.dayLogs[dateKey(Date.now())]);
   const [showScience, setShowScience] = useState(false);
 
@@ -53,30 +53,9 @@ export default function NapScreen() {
   const upcoming = settings.upcoming?.date === today ? settings.upcoming.kind : undefined;
   const recentKss = sleepiness?.sleepinessAt && now - sleepiness.sleepinessAt < 3 * 3600_000 ? sleepiness.sleepiness : undefined;
 
-  const start = async (o: NapOption) => {
-    const id = await scheduleNapAlarm(o.alarmAfterMin, o.label);
-    setSettings({ napTimer: { start: Date.now(), alarmAt: Date.now() + o.alarmAfterMin * MINUTE, label: o.label, notificationId: id } });
-  };
-  const stop = async (log: boolean) => {
-    if (!timer) return;
-    await cancelNotification(timer.notificationId);
-    if (log) {
-      const end = Math.min(Date.now(), timer.alarmAt);
-      const sleepStart = Math.min(end - MINUTE, timer.start + 7 * MINUTE);
-      addManualSession({
-        id: `nap-${timer.start}`,
-        source: 'manual',
-        start: timer.start,
-        end,
-        kind: 'nap',
-        stages: [
-          { stage: 'awake', start: timer.start, end: sleepStart },
-          { stage: 'light', start: sleepStart, end },
-        ],
-      });
-    }
-    setSettings({ napTimer: undefined });
-  };
+  // Alarm + a pinned "Napping · alarm at …" card; both are cleared when the nap is stopped.
+  const start = (o: NapOption) => startNapTimer(useStore.getState(), o);
+  const stop = (log: boolean) => stopNapTimer(useStore.getState(), log);
 
   const verdictColor = VERDICT_COLOR[a.nap.verdict];
   return (
