@@ -101,7 +101,7 @@ export function eveningConflicts(events: CalendarEvent[], plan: EveningPlan, now
     .filter((e) => isTimedCommitment(e) && e.end > Math.max(now, plan.windDownStart) && e.start < plan.wake - HOUR)
     .sort((a, b) => a.end - b.end);
   for (const event of relevant) {
-    const name = `"${shortTitle(event.title) ?? 'Event'}"`;
+    const name = `“${shortTitle(event.title) ?? 'Event'}”`;
     const left = Math.round((plan.bedtime - event.end) / MINUTE);
     const lateMeal = MEAL_RE.test(event.title) && event.end > plan.lastMeal;
     const lateWorkout = WORKOUT_RE.test(event.title) && event.end > plan.bedtime - 2 * HOUR;

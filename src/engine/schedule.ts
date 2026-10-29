@@ -189,7 +189,7 @@ export function planTonight(input: PlanInput): TonightPlan {
 
   let calendar: CalendarAdjustment | undefined;
   const title = shortTitle(input.firstEventTitle);
-  const what = eventStart !== undefined ? `First event at ${formatTime(eventStart)}${title ? ` ("${title}")` : ''}` : '';
+  const what = eventStart !== undefined ? `First event at ${formatTime(eventStart)}${title ? ` (“${title}”)` : ''}` : '';
   if (eventStart !== undefined && eventWake !== undefined) {
     const usual = planTonight({ ...input, firstEventStart: undefined, sleepWindow: undefined });
     const reasons: string[] = [];
@@ -212,7 +212,9 @@ export function planTonight(input: PlanInput): TonightPlan {
         shortByMin = shortBy;
         const why = profile.insomniaMode
           ? `Keeping your usual ${formatTime(bedtime)} lights-out — going to bed early to make up for it tends to mean lying awake.`
-          : `Your full need would mean lights out at ${formatTime(needBedtime)}, too early for your body clock to fall asleep, so aim for ${formatTime(bedtime)}${moved}.`;
+          : earlier < 10
+            ? `Lights out stays at ${formatTime(bedtime)} — much earlier and your body clock is unlikely to let you fall asleep.`
+            : `Your full need would mean lights out at ${formatTime(needBedtime)}, too early for your body clock to fall asleep, so aim for ${formatTime(bedtime)}${moved}.`;
         reasons.push(`${why} That's about ${formatDuration(expectedSleep)} of sleep, ${formatDuration(shortBy)} short of your need — one short night is fine; get daylight soon after you wake.`);
       } else {
         reasons.push(`Lights out at ${formatTime(bedtime)}${moved} still covers your sleep need.`);

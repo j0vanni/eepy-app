@@ -58,7 +58,7 @@ describe('planTonight with a calendar event', () => {
   it('rounds the wake down to 5 minutes and names the event', () => {
     const plan = planTonight(base({ firstEventStart: at(WORK_MORNING, 7, 37), firstEventTitle: '  Team   stand-up ' }));
     expect(formatTime(plan.wake)).toBe('06:35');
-    expect(plan.rationale[0]).toBe('First event at 07:37 ("Team stand-up") — waking 06:35 to have an hour before it.');
+    expect(plan.rationale[0]).toBe('First event at 07:37 (“Team stand-up”) — waking 06:35 to have an hour before it.');
     expect(plan.calendar!.eventTitle).toBe('Team stand-up');
   });
 
@@ -84,18 +84,27 @@ describe('planTonight with a calendar event', () => {
   });
 
   it('says so when the body clock limits how early bedtime can move', () => {
-    // Habitually asleep around 23:30; a 06:00 event means waking 05:00.
-    const plan = planTonight(base({ habitualOnsetMin: 23 * 60 + 30, firstEventStart: at(WORK_MORNING, 6) }));
+    // Habitually asleep around 22:30 (usual lights-out 22:03); a 06:00 event means waking 05:00.
+    const usual = planTonight(base({ habitualOnsetMin: 22 * 60 + 30 }));
+    expect(usual.gradual).toBe(false);
+    const plan = planTonight(base({ habitualOnsetMin: 22 * 60 + 30, firstEventStart: at(WORK_MORNING, 6) }));
     expect(formatTime(plan.wake)).toBe('05:00');
-    expect(formatTime(plan.bedtime)).toBe('22:45');
+    expect(formatTime(plan.bedtime)).toBe('21:45');
     expect(plan.gradual).toBe(true);
     expect(plan.calendar!.shortByMin).toBeGreaterThan(60);
     const last = plan.rationale[plan.rationale.length - 1];
-    expect(last).toMatch(/too early for your body clock/);
-    expect(last).toMatch(/aim for 22:45/);
+    expect(last).toMatch(/lights out at 20:03, too early for your body clock to fall asleep, so aim for 21:45 \(18m earlier than usual\)/);
     expect(last).toMatch(/short of your need/);
     // The "move earlier each night" advice is for permanent shifts, not a one-off event.
     expect(plan.rationale.join(' ')).not.toMatch(/each night/);
+  });
+
+  it('keeps lights-out where it is when the usual bedtime is already as early as the body clock allows', () => {
+    const usual = planTonight(base({ habitualOnsetMin: 23 * 60 + 30 }));
+    expect(formatTime(usual.bedtime)).toBe('22:45');
+    const plan = planTonight(base({ habitualOnsetMin: 23 * 60 + 30, firstEventStart: at(WORK_MORNING, 6) }));
+    expect(plan.bedtime).toBe(usual.bedtime);
+    expect(plan.rationale[plan.rationale.length - 1]).toMatch(/^Lights out stays at 22:45 — .*short of your need/);
   });
 
   it('without body-clock data, keeps lights-out within 90 min of the usual bedtime', () => {
@@ -188,7 +197,7 @@ describe('tonight’s late events', () => {
     expect(c.kind).toBe('short-wind-down');
     expect(c.windDownLeftMin).toBe(45);
     expect(c.lateMeal).toBe(true);
-    expect(c.headline).toBe('"Dinner with Sam" ends 22:30 — your wind-down will be short (45 min instead of 60)');
+    expect(c.headline).toBe('“Dinner with Sam” ends 22:30 — your wind-down will be short (45 min instead of 60)');
     expect(c.advice).toMatch(/keep lights-out at 23:15/);
     expect(c.advice).toMatch(/go easy on alcohol/);
   });
@@ -196,7 +205,7 @@ describe('tonight’s late events', () => {
   it('flags events running past bedtime and suggests keeping the wake time', () => {
     const [c] = eveningConflicts([ev({ title: 'Concert', start: at(WORK_EVENING, 21), end: at(WORK_MORNING, 0, 30) })], plan, now);
     expect(c.kind).toBe('past-bedtime');
-    expect(c.headline).toBe('"Concert" runs until 00:30 — past your 23:15 lights-out');
+    expect(c.headline).toBe('“Concert” runs until 00:30 — past your 23:15 lights-out');
     expect(c.advice).toMatch(/Keep tomorrow's 07:00 wake-up/);
     expect(c.advice).toMatch(/6h 10m in bed/);
     expect(c.lateMeal).toBe(false);
