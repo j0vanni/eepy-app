@@ -28,6 +28,8 @@ export interface Tip {
   /** Higher shows first. */
   priority: number;
   icon: string;
+  /** An experiment template (experiments.ts) that tests this advice. */
+  experimentId?: string;
 }
 
 export function buildDailyPlan(input: {
@@ -140,6 +142,7 @@ export function buildTips(input: {
     tips.push({
       id: 'debt',
       icon: 'bed-clock',
+      experimentId: 'earlier-bedtime',
       priority: debt.category === 'moderate' ? 70 : 95,
       title: `Pay back ${formatDuration(debt.debtMin)} of sleep debt`,
       detail: debt.payoff
@@ -151,6 +154,7 @@ export function buildTips(input: {
     tips.push({
       id: 'regularity',
       icon: 'calendar-clock',
+      experimentId: 'consistent-wake',
       priority: 85,
       title: 'Make your schedule more regular',
       detail: 'Irregular sleep timing is linked to worse mood, metabolism and grades/work performance — independent of duration. Start by fixing your wake time 7 days a week.',
@@ -160,6 +164,7 @@ export function buildTips(input: {
     tips.push({
       id: 'sjl',
       icon: 'airplane-clock',
+      experimentId: 'consistent-wake',
       priority: 75,
       title: 'Shrink weekend lie-ins',
       detail: `Your weekend sleep shifts ${formatDuration(chronotype.socialJetlagMin!)} later. Keep free-day wake-ups within an hour of workdays and nap early afternoon if needed.`,
@@ -170,6 +175,7 @@ export function buildTips(input: {
     tips.push({
       id: 'latency',
       icon: 'timer-sand',
+      experimentId: 'no-screens',
       priority: 80,
       title: 'Falling asleep takes a while',
       detail: `Median ${Math.round(median(lat))} min. Don't go to bed until sleepy; if awake >20 min, get up and do something calm in dim light, then return. Avoid caffeine after your cut-off.`,
@@ -180,6 +186,7 @@ export function buildTips(input: {
     tips.push({
       id: 'efficiency',
       icon: 'bed-empty',
+      experimentId: 'no-naps',
       priority: 72,
       title: 'Spend less time awake in bed',
       detail: 'Use the bed only for sleep (and sex) so your brain links it with sleeping. Insomnia mode in Settings applies these CBT-I rules to your plan.',
@@ -189,6 +196,7 @@ export function buildTips(input: {
     tips.push({
       id: 'caffeine',
       icon: 'coffee-off',
+      experimentId: 'caffeine-cutoff',
       priority: 78,
       title: 'Caffeine will still be active at bedtime',
       detail: `About ${Math.round(input.caffeine.atBedtimeMg)} mg projected in the first hours of sleep. Caffeine reduces deep sleep even when you fall asleep fine.`,
@@ -199,6 +207,7 @@ export function buildTips(input: {
     tips.push({
       id: 'deep',
       icon: 'waves',
+      experimentId: 'exercise-early',
       priority: 55,
       title: 'Boost deep sleep',
       detail: 'Regular daytime exercise (finish 2h+ before bed), a cool room, a consistent schedule and skipping evening alcohol all increase deep sleep. Note: wrist-based staging is approximate.',
@@ -209,6 +218,7 @@ export function buildTips(input: {
     tips.push({
       id: 'rem',
       icon: 'brain',
+      experimentId: 'no-alcohol',
       priority: 55,
       title: 'Protect REM sleep',
       detail: 'REM is concentrated in the final hours — cutting the morning short or drinking alcohol in the evening removes it first.',
@@ -218,6 +228,7 @@ export function buildTips(input: {
     tips.push({
       id: 'owl',
       icon: 'owl',
+      experimentId: 'morning-light',
       priority: 50,
       title: 'Night-owl strategy',
       detail: `Get outdoor light soon after ${formatClock(profile.workWakeMin)} and dim screens after ${formatTime(tonight.windDownStart)}. Morning light pulls a late clock earlier; evening light pushes it later.`,
@@ -248,6 +259,7 @@ export function buildTips(input: {
     {
       id: 'environment',
       icon: 'thermometer',
+      experimentId: 'cool-bedroom',
       priority: 20,
       title: 'Cool, dark, quiet',
       detail: 'Aim for ~18–20 °C (65–68 °F), blackout curtains or a mask, and earplugs or white noise if needed.',
@@ -255,6 +267,7 @@ export function buildTips(input: {
     {
       id: 'wind-down',
       icon: 'weather-night',
+      experimentId: 'read-not-phone',
       priority: 15,
       title: 'Build a wind-down ritual',
       detail: `Start at ${formatTime(tonight.windDownStart)}: dim lights, warm shower, paper book, breathing exercises. The same cues every night speed up sleep onset.`,
