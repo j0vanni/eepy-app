@@ -1,10 +1,21 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ComponentProps, ReactNode } from 'react';
+import { ComponentProps, createContext, ReactNode, useContext, useState } from 'react';
 import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
+import { EnterPressable, EnterView, FillBar, FillCircle } from './motion';
 import { colors, font, radius, space } from './theme';
+
+/** Background for the dimmed night view. */
+export const NIGHT_BG = '#05070F';
+
+/** Lets a chart that is being scrubbed stop the enclosing Screen from scrolling. */
+const ScrollLockContext = createContext<(locked: boolean) => void>(() => undefined);
+export const useScrollLock = () => useContext(ScrollLockContext);
+
+/** Extra bottom padding for screens with a floating button over their content (set by the tabs layout). */
+export const FloatingInsetContext = createContext(0);
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -18,38 +29,68 @@ export function Screen({
   right,
   children,
   refreshControl,
+  tone = 'default',
 }: {
   title?: string;
   subtitle?: string;
   right?: ReactNode;
   children: ReactNode;
   refreshControl?: ComponentProps<typeof ScrollView>['refreshControl'];
+  /** 'night' dims the whole screen. */
+  tone?: 'default' | 'night';
 }) {
+  const [locked, setLocked] = useState(false);
+  const floatingInset = useContext(FloatingInsetContext);
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll} refreshControl={refreshControl} keyboardShouldPersistTaps="handled">
-        {(title || right) && (
-          <View style={styles.header}>
-            <View style={{ flex: 1 }}>
-              {title ? <Text style={font.h1}>{title}</Text> : null}
-              {subtitle ? <Text style={[font.small, { marginTop: 2 }]}>{subtitle}</Text> : null}
+    <ScrollLockContext.Provider value={setLocked}>
+      <SafeAreaView style={[styles.safe, tone === 'night' && { backgroundColor: NIGHT_BG }]} edges={['top']}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, floatingInset ? { paddingBottom: 48 + floatingInset } : null]}
+          refreshControl={refreshControl}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={!locked}
+        >
+          {(title || right) && (
+            <View style={styles.header}>
+              <View style={{ flex: 1 }}>
+                {title ? <Text style={[font.h1, tone === 'night' && { color: colors.textDim }]}>{title}</Text> : null}
+                {subtitle ? <Text style={[font.small, { marginTop: 2 }]}>{subtitle}</Text> : null}
+              </View>
+              {right}
             </View>
-            {right}
-          </View>
-        )}
-        {children}
-      </ScrollView>
-    </SafeAreaView>
+          )}
+          {children}
+        </ScrollView>
+      </SafeAreaView>
+    </ScrollLockContext.Provider>
   );
 }
 
-export function Card({ children, style, onPress, accent }: { children: ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; accent?: string }) {
+export function Card({
+  children,
+  style,
+  onPress,
+  accent,
+  animate = true,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
+  accent?: string;
+  /** Fade/slide in on mount (default true). */
+  animate?: boolean;
+}) {
   const cardStyle = [styles.card, accent ? { borderColor: accent } : null, style];
-  if (!onPress) return <View style={cardStyle}>{children}</View>;
+  if (!onPress)
+    return (
+      <EnterView animate={animate} style={cardStyle}>
+        {children}
+      </EnterView>
+    );
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [...cardStyle, pressed ? { opacity: 0.85 } : null]}>
+    <EnterPressable animate={animate} onPress={onPress} style={cardStyle} pressedStyle={{ opacity: 0.85 }} accessibilityRole="button">
       {children}
-    </Pressable>
+    </EnterPressable>
   );
 }
 
@@ -202,14 +243,15 @@ export function Ring({ value, max = 100, size = 96, stroke = 10, color = colors.
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.border} strokeWidth={stroke} fill="none" />
-        <Circle
+        <FillCircle
           cx={size / 2}
           cy={size / 2}
           r={r}
           stroke={color}
           strokeWidth={stroke}
           fill="none"
-          strokeDasharray={`${c * frac} ${c}`}
+          fraction={frac}
+          circumference={c}
           strokeLinecap="round"
           rotation={-90}
           origin={`${size / 2}, ${size / 2}`}
@@ -224,7 +266,7 @@ export function Meter({ value, max = 100, color = colors.accent, height = 8 }: {
   const frac = Math.max(0, Math.min(1, value / max));
   return (
     <View style={{ height, borderRadius: height, backgroundColor: colors.border, overflow: 'hidden' }}>
-      <View style={{ width: `${frac * 100}%`, height, backgroundColor: color, borderRadius: height }} />
+      <FillBar fraction={frac} style={{ height, backgroundColor: color, borderRadius: height }} />
     </View>
   );
 }
