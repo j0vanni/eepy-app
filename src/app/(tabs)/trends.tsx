@@ -11,7 +11,7 @@ import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { DurationBars, LineChart, SleepTimeline } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Row, Screen, Section, Segmented, Stat } from '@/ui/components';
-import { shortDate, weekdayInitial } from '@/ui/format';
+import { dayLabel, shortDate, weekdayInitial } from '@/ui/format';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
 export default function TrendsScreen() {
@@ -29,6 +29,11 @@ export default function TrendsScreen() {
   }
 
   const label = (d: string) => (days <= 14 ? weekdayInitial(d) : shortDate(d));
+  const tips = rows.map((r) => dayLabel(r.date));
+  const openNight = (i: number) => {
+    const id = a.nights.find((n) => n.wakeDate === rows[i]?.date)?.main?.id;
+    if (id) router.push({ pathname: '/night/[id]', params: { id } });
+  };
   const withSleep = rows.filter((r) => r.sleepMin !== undefined);
   const avgSleep = withSleep.length ? mean(withSleep.map((r) => r.sleepMin! + r.napMin)) : undefined;
   const scored = rows.filter((r) => r.score !== undefined);
@@ -59,14 +64,26 @@ export default function TrendsScreen() {
 
       <Section title="Sleep vs. need">
         <Card>
-          <DurationBars need={a.need.needMin} data={rows.map((r) => ({ label: label(r.date), value: r.sleepMin !== undefined ? r.sleepMin - r.napMin : undefined, extra: r.napMin || undefined }))} />
-          <Text style={[font.tiny, { marginTop: 6 }]}>Purple = met your need · amber = short · blue cap = naps</Text>
+          <DurationBars
+            need={a.need.needMin}
+            data={rows.map((r, i) => ({ label: label(r.date), title: tips[i], value: r.sleepMin !== undefined ? r.sleepMin - r.napMin : undefined, extra: r.napMin || undefined }))}
+            onPressBar={openNight}
+          />
+          <Text style={[font.tiny, { marginTop: 6 }]}>Purple = met your need · amber = short · blue cap = naps · drag to compare, tap a night to open it</Text>
         </Card>
       </Section>
 
       <Section title="Sleep debt">
         <Card>
-          <LineChart values={rows.map((r) => r.debtMin / 60)} labels={rows.map((r) => label(r.date))} color={colors.warn} minY={0} format={(v) => `${v.toFixed(0)}h`} />
+          <LineChart
+            values={rows.map((r) => r.debtMin / 60)}
+            labels={rows.map((r) => label(r.date))}
+            tooltipLabels={tips}
+            color={colors.warn}
+            minY={0}
+            format={(v) => `${v.toFixed(0)}h`}
+            tooltipFormat={(v) => formatDuration(v * 60)}
+          />
           <Text style={[font.small, { marginTop: space.sm }]}>
             Rolling 14-night debt, recent nights weighted more. Under 2h is low; above 5h measurably dulls reaction time and mood.
           </Text>
@@ -75,7 +92,7 @@ export default function TrendsScreen() {
 
       <Section title="Sleep score">
         <Card>
-          <LineChart values={rows.map((r) => r.score)} labels={rows.map((r) => label(r.date))} color={colors.accent} minY={30} maxY={100} />
+          <LineChart values={rows.map((r) => r.score)} labels={rows.map((r) => label(r.date))} tooltipLabels={tips} tooltipFormat={(v) => `Score ${Math.round(v)}`} color={colors.accent} minY={30} maxY={100} />
         </Card>
       </Section>
 
@@ -121,9 +138,9 @@ export default function TrendsScreen() {
       <Section title="Sleep stages">
         <Card>
           <Text style={[font.small, { marginBottom: 4 }]}>Deep sleep %</Text>
-          <LineChart values={rows.map((r) => (r.deepPct !== undefined ? r.deepPct * 100 : undefined))} labels={rows.map((r) => label(r.date))} color={colors.deep} height={110} format={(v) => `${Math.round(v)}%`} />
+          <LineChart values={rows.map((r) => (r.deepPct !== undefined ? r.deepPct * 100 : undefined))} labels={rows.map((r) => label(r.date))} tooltipLabels={tips} color={colors.deep} height={110} format={(v) => `${Math.round(v)}%`} tooltipFormat={(v) => `${Math.round(v)}% deep`} />
           <Text style={[font.small, { marginVertical: 4 }]}>REM sleep %</Text>
-          <LineChart values={rows.map((r) => (r.remPct !== undefined ? r.remPct * 100 : undefined))} labels={rows.map((r) => label(r.date))} color={colors.rem} height={110} format={(v) => `${Math.round(v)}%`} />
+          <LineChart values={rows.map((r) => (r.remPct !== undefined ? r.remPct * 100 : undefined))} labels={rows.map((r) => label(r.date))} tooltipLabels={tips} color={colors.rem} height={110} format={(v) => `${Math.round(v)}%`} tooltipFormat={(v) => `${Math.round(v)}% REM`} />
           <Text style={[font.tiny, { marginTop: 6 }]}>Wrist-based staging is an estimate — trends matter more than single nights.</Text>
         </Card>
       </Section>
@@ -134,12 +151,14 @@ export default function TrendsScreen() {
           <LineChart
             values={rows.map((r) => r.hrv)}
             labels={rows.map((r) => label(r.date))}
+            tooltipLabels={tips}
+            tooltipFormat={(v) => `${Math.round(v)} ms`}
             color={colors.good}
             height={120}
             band={hrvBase ? { lo: Math.exp(hrvBase.mean - hrvBase.sd), hi: Math.exp(hrvBase.mean + hrvBase.sd) } : undefined}
           />
           <Text style={[font.small, { marginVertical: 4 }]}>Lowest sleeping heart rate (bpm)</Text>
-          <LineChart values={rows.map((r) => r.hrMin)} labels={rows.map((r) => label(r.date))} color={colors.bad} height={120} />
+          <LineChart values={rows.map((r) => r.hrMin)} labels={rows.map((r) => label(r.date))} tooltipLabels={tips} tooltipFormat={(v) => `${Math.round(v)} bpm`} color={colors.bad} height={120} />
           <Text style={[font.tiny, { marginTop: 6 }]}>Shaded band = your normal HRV range (30-day baseline ± 1 SD).</Text>
         </Card>
       </Section>
