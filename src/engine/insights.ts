@@ -5,6 +5,7 @@ import { mean, median, pearson, welchTTest } from './stats';
 import { TAG_BY_ID } from './tags';
 import { addDays, clockDiff, DAY, formatClock, formatDuration, minutesOfDay, normalizeMinutes } from './time';
 import type { CaffeineDose, DailyStats, DayLog, NightVitals, Profile, Workout } from './types';
+import { workoutCoverageStart, workoutsBeforeSleep } from './workouts';
 
 export interface Insight {
   id: string;
@@ -50,14 +51,22 @@ const METRICS: MetricDef[] = [
   { key: 'hr', label: 'sleeping heart rate', higherIsBetter: false, get: (r) => r.vitals?.hrMin, fmt: (d) => `${Math.round(Math.abs(d))} bpm` },
 ];
 
-function compareGroups(withRows: NightRow[], withoutRows: NightRow[]) {
+/** Smallest difference worth reporting per metric (anything less would read as "0 min"). */
+const MIN_DIFF: Record<string, number> = { score: 1, tst: 5, deep: 0.01, rem: 0.01, latency: 1, waso: 1, hrv: 1, hr: 1 };
+
+/**
+ * Best-separating metric between two groups of nights. `keys` limits the metrics considered;
+ * `meaningful` skips differences too small to matter even when they are consistent.
+ */
+function compareGroups(withRows: NightRow[], withoutRows: NightRow[], opts: { keys?: string[]; meaningful?: boolean } = {}) {
   let best: { metric: MetricDef; diff: number; p: number; d: number; mA: number; mB: number; nA: number; nB: number } | undefined;
-  for (const metric of METRICS) {
+  for (const metric of opts.keys ? METRICS.filter((m) => opts.keys!.includes(m.key)) : METRICS) {
     const a = withRows.map(metric.get).filter((x): x is number => x !== undefined);
     const b = withoutRows.map(metric.get).filter((x): x is number => x !== undefined);
     if (a.length < 3 || b.length < 3) continue;
     const res = welchTTest(a, b);
     if (!res || Math.abs(res.d) < 0.35) continue;
+    if (opts.meaningful && Math.abs(res.diff) < (MIN_DIFF[metric.key] ?? 0)) continue;
     if (!best || res.p < best.p) {
       best = { metric, diff: res.diff, p: res.p, d: res.d, mA: res.meanA, mB: res.meanB, nA: a.length, nB: b.length };
     }
@@ -299,6 +308,94 @@ export function socialJetlagInsight(chrono: ChronotypeResult): Insight | undefin
   return undefined;
 }
 
+/** "you take 14 min longer to fall asleep" / "your deep sleep is 4 percentage points higher". */
+function effectPhrase(m: MetricDef, diff: number): string {
+  if (m.key === 'latency') return diff > 0 ? `you take ${m.fmt(diff)} longer to fall asleep` : `you fall asleep ${m.fmt(diff)} faster`;
+  return `your ${m.label} is ${m.fmt(diff)} ${diff > 0 ? 'higher' : 'lower'}`;
+}
+
+const capitalize = (x: string) => `${x[0].toUpperCase()}${x.slice(1)}`;
+
+/** Metrics that evening exercise plausibly moves (core temperature, arousal, recovery). */
+const WORKOUT_METRICS = ['latency', 'deep', 'hr', 'score'];
+
+/**
+ * Workout timing: nights after a workout that ended < 2 h before sleep onset vs nights after
+ * earlier workouts or rest days, and workout days vs rest days. Empty when the watch records no
+ * workouts (Nothing X may not write exercise sessions to Health Connect).
+ */
+export function workoutInsights(rows: NightRow[], workouts: Workout[] = []): Insight[] {
+  const since = workoutCoverageStart(workouts);
+  if (since === undefined) return [];
+  // Before the first recorded workout, "no workout" may just mean "not syncing workouts yet".
+  const covered = rows.filter((r) => r.night.main && r.night.main.sleepOnset >= since);
+  if (covered.length < 6) return [];
+  const byNight = workoutsBeforeSleep(
+    covered.map((r) => ({ wakeDate: r.night.wakeDate, sleepOnset: r.night.main!.sleepOnset })),
+    workouts,
+  );
+  const info = (r: NightRow) => byNight.get(r.night.wakeDate);
+  const out: Insight[] = [];
+
+  const late = covered.filter((r) => info(r)?.timing === 'late');
+  const notLate = covered.filter((r) => info(r)?.timing !== 'late');
+  const lateBest = compareGroups(late, notLate, { keys: WORKOUT_METRICS, meaningful: true });
+  if (lateBest && lateBest.p <= 0.25) {
+    const m = lateBest.metric;
+    const better = m.higherIsBetter ? lateBest.diff > 0 : lateBest.diff < 0;
+    out.push({
+      id: 'workout:late',
+      kind: better ? 'positive' : 'negative',
+      category: 'activity',
+      title: `After late workouts, ${effectPhrase(m, lateBest.diff)}`,
+      detail: better
+        ? `On nights after a workout that ended within 2 hours of falling asleep, your ${m.label} averaged ${fmtMetric(m, lateBest.mA)} vs ${fmtMetric(m, lateBest.mB)} otherwise. Evening exercise seems to suit you — most studies find it's fine unless it's very intense right before bed.`
+        : `On nights when a workout ended less than 2 hours before you fell asleep, your ${m.label} averaged ${fmtMetric(m, lateBest.mA)} vs ${fmtMetric(m, lateBest.mB)} after earlier workouts or rest days. Hard exercise keeps heart rate and body temperature up for a while — if you can, finish intense sessions 2–3 hours before bed, or keep late ones easy.`,
+      evidence: evidenceText(lateBest.nA, lateBest.nB, lateBest.p),
+      strength: (1 - lateBest.p) * Math.min(1, Math.abs(lateBest.d)),
+    });
+  } else if (!lateBest) {
+    // Only claim "no effect" when there was enough data to see one.
+    const enough = METRICS.filter((m) => WORKOUT_METRICS.includes(m.key)).some(
+      (m) => late.filter((r) => m.get(r) !== undefined).length >= 5 && notLate.filter((r) => m.get(r) !== undefined).length >= 5,
+    );
+    if (enough) {
+      out.push({
+        id: 'workout:late-ok',
+        kind: 'positive',
+        category: 'activity',
+        title: "Late workouts don't seem to disturb your sleep",
+        detail: `Across ${late.length} nights with a workout ending within 2 hours of falling asleep, your time to fall asleep, deep sleep, sleeping heart rate and score look much the same as on other nights. That matches most research: evening exercise is fine for most people unless it's very intense right before bed.`,
+        evidence: `${late.length} vs ${notLate.length} nights · no clear difference`,
+        strength: 0.25,
+      });
+    }
+  }
+
+  const active = covered.filter((r) => info(r)?.active);
+  const rest = covered.filter((r) => (info(r)?.workouts.length ?? 0) === 0);
+  const dayBest = compareGroups(active, rest, { meaningful: true });
+  if (dayBest && dayBest.p <= 0.25) {
+    const m = dayBest.metric;
+    const better = m.higherIsBetter ? dayBest.diff > 0 : dayBest.diff < 0;
+    const avg = `${capitalize(m.label)} averaged ${fmtMetric(m, dayBest.mA)} after days with a workout vs ${fmtMetric(m, dayBest.mB)} after rest days.`;
+    out.push({
+      id: 'workout:days',
+      kind: better ? 'positive' : 'neutral',
+      category: 'activity',
+      title: `On workout days, ${effectPhrase(m, dayBest.diff)}`,
+      detail: better
+        ? `${avg} Regular exercise is one of the better-supported ways to sleep more deeply.`
+        : m.key === 'hr'
+          ? `${avg} A slightly higher sleeping heart rate after hard training is a normal recovery response; if it stays up for days, take an easier day.`
+          : `${avg} This is often temporary after hard or unusually long sessions — worth watching if you've recently stepped up training.`,
+      evidence: evidenceText(dayBest.nA, dayBest.nB, dayBest.p),
+      strength: (1 - dayBest.p) * Math.min(1, Math.abs(dayBest.d)),
+    });
+  }
+  return out;
+}
+
 export function generateInsights(input: {
   rows: NightRow[];
   nights: Night[];
@@ -320,6 +417,7 @@ export function generateInsights(input: {
     activityInsight(input.rows, input.daily),
     socialJetlagInsight(input.chronotype),
     ...physiologyInsights(input.rows),
+    ...workoutInsights(input.rows, input.workouts),
   ];
   return list.filter((x): x is Insight => !!x).sort((a, b) => b.strength - a.strength);
 }
