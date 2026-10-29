@@ -1,16 +1,60 @@
 // OWNER: background & notifications workstream.
 import { useEffect, useState } from 'react';
-import { Platform, Text } from 'react-native';
+import { AppState, Platform, Text, View } from 'react-native';
 
 import { BACKGROUND_INTERVAL_MIN, getBackgroundSyncStatus } from '../../background/task';
 import { getPermissionState, healthConnectStatus, requestHealthPermissions } from '../../integrations/healthConnect';
 import { ensureNotificationPermission } from '../../notifications/channels';
+import { FullScreenAlarmStatus, getFullScreenAlarmStatus, openFullScreenAlarmSettings } from '../../notifications/fullScreenAlarm';
 import { NotificationPrefs, useStore } from '../../state/store';
-import { Button, Card, CardTitle, Note, Section } from '../components';
+import { Button, Card, CardTitle, Note, Row, Section } from '../components';
 import { notify } from '../confirm';
 import { relativeTime } from '../format';
 import { font, space } from '../theme';
 import { Toggle } from './Toggle';
+
+/** Whether nap / wake alarms can take over the lock screen; re-checked when you come back from Settings. */
+function useFullScreenAlarmStatus(): FullScreenAlarmStatus | undefined {
+  const [status, setStatus] = useState<FullScreenAlarmStatus>();
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    let cancelled = false;
+    const check = () => {
+      getFullScreenAlarmStatus()
+        .then((s) => !cancelled && setStatus(s))
+        .catch(() => undefined);
+    };
+    check();
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
+  return status;
+}
+
+const FULL_SCREEN_SUB: Record<FullScreenAlarmStatus, string> = {
+  allowed: 'On — nap and wake alarms take over the lock screen with Snooze and "I\'m up"',
+  blocked: 'Blocked by Android — alarms still ring, but only as a notification. Allow "full-screen notifications" for eepy.',
+  unavailable: 'Needs the latest eepy APK — alarms ring as a regular notification for now',
+};
+
+function FullScreenAlarmRow() {
+  const status = useFullScreenAlarmStatus();
+  if (Platform.OS !== 'android' || !status) return null;
+  const open = () => openFullScreenAlarmSettings().catch((e) => notify('Settings', e instanceof Error ? e.message : String(e)));
+  return (
+    <Row style={{ paddingVertical: space.sm }}>
+      <View style={{ flex: 1, paddingRight: space.md }}>
+        <Text style={font.body}>Full-screen alarm</Text>
+        <Text style={font.small}>{FULL_SCREEN_SUB[status]}</Text>
+      </View>
+      {status === 'blocked' ? <Button small icon="cellphone-lock" label="Allow" onPress={open} /> : null}
+      {status === 'allowed' ? <Button small kind="ghost" label="Settings" onPress={open} /> : null}
+    </Row>
+  );
+}
 
 /** Whether Health Connect lets eepy read while closed: undefined = unknown / not applicable. */
 function useBackgroundReadAllowed(enabled: boolean): [boolean | undefined, (v: boolean | undefined) => void] {
@@ -98,6 +142,7 @@ export function NotificationsSection() {
           value={settings.notifications.smartAlarm}
           onChange={(v) => setNotif('smartAlarm', v)}
         />
+        <FullScreenAlarmRow />
         <Toggle
           label="Adaptive reminders"
           sub="Nap nudge when you need one, caffeine last call only on days you log caffeine, quiet during naps, lights-out moved after a long nap — at most 5 a day"

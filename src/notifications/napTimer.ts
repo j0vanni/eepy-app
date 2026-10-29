@@ -4,12 +4,14 @@
  *
  * Keep this module free of imports from ./channels or ./features: the reminders feature imports
  * it, and channels.ts imports every feature — a cycle would leave FEATURES half-initialised.
+ * (./fullScreenAlarm follows the same rule, so importing it here is fine.)
  */
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { MINUTE } from '../engine/time';
 import type { AppState } from '../state/store';
+import { cancelFullScreenAlarm, NAP_ALARM_ID } from './fullScreenAlarm';
 
 /**
  * One identifier for everything nap-related: the pinned "Napping" card is presented under it and
@@ -23,13 +25,17 @@ export const NAP_ALARM_CATEGORY = 'nap-alarm';
 
 export type NapState = Pick<AppState, 'settings' | 'setSettings' | 'addManualSession'>;
 
-/** Cancels the nap alarm and removes the pinned card (or the alarm, if it already rang). */
+/**
+ * Cancels the nap alarm and removes the pinned card (or the alarm, if it already rang) — including
+ * the native full-screen alarm and its snooze, which stop ringing if they are.
+ */
 export async function clearNapNotifications(id: string | undefined = NAP_NOTIFICATION_ID): Promise<void> {
   if (Platform.OS === 'web') return;
   for (const x of new Set([id ?? NAP_NOTIFICATION_ID, NAP_NOTIFICATION_ID])) {
     await Notifications.cancelScheduledNotificationAsync(x).catch(() => undefined);
   }
   await Notifications.dismissNotificationAsync(NAP_NOTIFICATION_ID).catch(() => undefined);
+  await cancelFullScreenAlarm(NAP_ALARM_ID);
 }
 
 /** Stops the running nap timer, optionally logging the nap as a manual session. */

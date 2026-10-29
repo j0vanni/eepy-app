@@ -16,6 +16,7 @@ import { Platform } from 'react-native';
 
 import { analyze } from '../engine/analysis';
 import { MINUTE } from '../engine/time';
+import { syncWakeAlarm } from '../notifications/fullScreenAlarm';
 import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
 import { getFirstEventTomorrowDetails } from '../state/calendar';
@@ -127,6 +128,7 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
           analyzeOptionsFor(state, { now, firstEventTomorrow: firstEvent?.start, firstEventTitle: firstEvent?.title }),
         );
         await replanNotifications(analysis, useStore.getState(), { background: true, now });
+        await syncWakeAlarm(analysis, useStore.getState(), now);
       }
     }
   } catch (e) {
