@@ -35,7 +35,7 @@ export default function TrendsScreen() {
     if (id) router.push({ pathname: '/night/[id]', params: { id } });
   };
   const withSleep = rows.filter((r) => r.sleepMin !== undefined);
-  const avgSleep = withSleep.length ? mean(withSleep.map((r) => r.sleepMin! + r.napMin)) : undefined;
+  const avgSleep = withSleep.length ? mean(withSleep.map((r) => r.sleepMin!)) : undefined;
   const scored = rows.filter((r) => r.score !== undefined);
   const avgScore = scored.length ? Math.round(mean(scored.map((r) => r.score!))) : undefined;
   const chrono = a.chronotype;
