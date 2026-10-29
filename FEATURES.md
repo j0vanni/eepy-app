@@ -31,7 +31,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Nap detection**: short daytime sessions are classified as naps (and Health Connect sessions titled "nap") |
 | ✅ | **Missing-night resilience**: if last night hasn't synced yet, eepy says so and assumes a typical night instead of thinking you've been awake for 30 hours |
 | ✅ | **Write-back**: manually logged sleep/naps can be saved to Health Connect so other apps see them |
-| 🗺️ | Background sync with `READ_HEALTH_DATA_IN_BACKGROUND` + Android WorkManager, so data is fresh before you open the app |
+| 🧪 | **Background sync** (Android WorkManager via expo-background-task, ~every 30 min while eepy is closed) with Health Connect's background-read permission; never overwrites stored nights with a failed read |
 | 🗺️ | Incremental sync with Health Connect's Changes API (change tokens) instead of re-reading a window |
 | 🗺️ | **Gadgetbridge import** (open-source, has experimental CMF Watch 3 Pro support): import its database export for people who don't want the official app |
 | 🗺️ | Generic CSV import (start, end, stage) for other trackers |
@@ -107,7 +107,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Schedule shifter**: move your wake time permanently, ≤20 min/day earlier or ≤30 min/day later, with daily light-seek / light-avoid windows |
 | ✅ | **Jet-lag planner**: time-zone offsets, optional 1–3 pre-flight days, advance vs. delay strategy (delays the long way round for >9 h eastward jumps), day-by-day sleep times and bright-light seek/avoid windows timed to your shifting body-temperature minimum |
 | ✅ | **Daily timeline** on the Today screen: wake, morning light, focus windows, dip, nap, caffeine cut-off, last hard workout, last big meal, wind-down, lights-out, alarm |
-| 🗺️ | Calendar integration: read tomorrow's first event and plan the alarm/bedtime around it |
+| ✅ | **Calendar-aware plan**: tomorrow's first event (chosen calendars, declined invites skipped) moves the wake-up and bedtime earlier when needed, with your own prep time; late events tonight are flagged |
 | 🗺️ | Rotating shift-work planner |
 
 ## 8. Caffeine
@@ -136,7 +136,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Readiness score** each morning from last night's score, sleep debt, HRV vs. your 30-day baseline (ln RMSSD z-score), resting/sleeping heart rate vs. baseline, and schedule consistency — with an explanation per factor |
 | ✅ | HRV trend with your normal band; sleeping-heart-rate trend |
 | ✅ | Flags frequent overnight SpO₂ dips (when the watch samples densely enough) and points to the apnoea screen |
-| 🗺️ | Illness early-warning (rising resting HR + falling HRV + higher breathing rate for 2+ nights) |
+| ✅ | **Recovery early warning**: sleeping HR up, HRV down and/or breathing faster than your 30-day baseline on 2 of the last 3 nights (gentle, non-diagnostic) |
 
 ## 11. Journal & insights
 
@@ -183,13 +183,30 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | Expo SDK 58 / React Native 0.88, TypeScript, new architecture, arm64 |
 | ✅ | 70+ unit tests over the sleep engine and the Health Connect mapping |
 | ✅ | Dark, night-friendly UI; works offline |
-| 🗺️ | Home-screen widget (tonight's bedtime, debt, nap verdict) |
-| 🗺️ | Wind-down audio: breathing exercises, white/brown noise, sleep stories |
+| ⏭️ | Home-screen widget — dropped at your request |
+| 🧪 | **Wind-down routine**: generated white / pink / brown / rain loops with a fading sleep timer (keeps playing with the screen off), box and 4-7-8 breathing with haptics, live room-brightness check, checklist and countdown |
 | 🗺️ | Smart-light integration (dim Hue/Matter lights at wind-down, wake-up light ramp before the alarm) |
-| 🗺️ | Structured CBT-I programme (sleep diary → supervised sleep-window titration) |
+| ✅ | **6-week CBT-I programme**: safety screen, sleep-restriction window from your own nights, weekly titration by sleep efficiency, lessons and stimulus-control rules; tonight's plan follows the window |
 | 🗺️ | Menstrual-cycle-aware insights (via Health Connect cycle data) |
-| 🗺️ | Weekly / monthly report export (PDF) to share with a doctor |
+| 🧪 | **PDF report** (14/30/90 days, with charts) and **CSV export** of every night, via the share sheet |
 | 🗺️ | Localisation, accessibility pass, light theme |
+
+## 16. New in 0.2 — dynamic and learning
+
+| | Feature |
+| --- | --- |
+| ✅ | **Learns your body clock**: 2–3 daily "how alert are you?" pings (😀/😐/🥱 buttons, work without opening the app) plus quick check-ins; a regularised fit of your circadian timing, rhythm strength, afternoon dip and personal rating bias. It's only applied when it predicts held-out check-ins better than the average-person model; "forecast accuracy" is shown honestly. Tapers to 1 ping/day once well calibrated |
+| ✅ | **"Your body clock" screen**: your curve vs the average person with your ratings plotted, plain-language findings (peak times, dip timing/strength, early/late clock), check-in coverage, sleep-need learning progress |
+| ✅ | **Free-day "Did you wake up on your own?" prompt** → feeds the sleep-need estimate faster |
+| ✅ | **Experiments**: 12 templates ranked by your own insights; adherence inferred from data (caffeine log, tags, wake times, naps, workouts) or a daily Yes/No; before/after comparison against your previous 28 nights with statistics |
+| ✅ | **Goals & streaks** (pick up to 3) and a **weekly review** every Sunday with a focus for next week |
+| 🧪 | **Morning report** notification as soon as last night syncs; **missing-night nudge** to open Nothing X; **adaptive reminders** (nap nudge when needed, caffeine last call only if you had caffeine, bedtime shifts after a long nap, max 5/day) |
+| 🧪 | **Pinned wind-down and nap cards** in the notification shade (I'm up / Cancel from the lock screen); gentle generated wake chime for the cycle-timed alarm |
+| ✅ | **"What if?" simulator**: drag tonight's bedtime/alarm, add a nap or coffee, and watch tomorrow's energy, debt, sleep and expected score redraw live |
+| ✅ | **Today changes through the day** (morning report & check-in → energy now → countdown & wind-down → dimmed "go to sleep" view), live countdowns, sleep-pressure gauge |
+| ✅ | **Touchable charts** (drag to read values, haptic ticks; tap a night on Trends), animations, floating quick check-in (sleepiness, energy, coffee, tags) |
+| ✅ | **Workout-timing insights** from Health Connect exercise sessions (if Nothing X writes them) |
+| ✅ | **Coach tab** hub for all of the above |
 
 ---
 

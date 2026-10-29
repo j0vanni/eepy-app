@@ -89,19 +89,8 @@ export function EveningHero({ a, now }: HeroProps) {
   return (
     <>
       <CountdownCard a={a} />
+      {/* Links to the wind-down routine and plays the default sound (same evening window as this hero). */}
       <WindDownCard analysis={a} />
-      <Card onPress={() => router.push('/winddown')}>
-        <Row gap={space.md}>
-          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="weather-night" size={24} color={colors.light} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={font.h3}>Wind-down routine</Text>
-            <Text style={font.small}>Breathing, calming sounds and a checklist for the last hour.</Text>
-          </View>
-          <Icon name="chevron-right" color={colors.textFaint} />
-        </Row>
-      </Card>
       <Card>
         <CardTitle icon="gauge" title="Sleep pressure" color={colors.light} />
         <SleepPressureCard a={a} now={now} embedded />
