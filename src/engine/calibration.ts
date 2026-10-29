@@ -13,8 +13,9 @@
  * - Search: a coarse grid over phase × amplitude × dip (the KSS offset is solved in closed form at
  *   each grid point), then a pattern search that refines all four parameters.
  * - Accuracy is measured out of sample: leave-one-out (small n) or 5-fold cross-validation. The
- *   number shown is the share of held-out check-ins predicted within ±1 KSS point. If the personal
- *   fit doesn't beat the population model's mean error on held-out check-ins, it isn't applied.
+ *   number shown is the share of held-out check-ins predicted within ±1 KSS point. The personal fit
+ *   is applied only if, on held-out check-ins, neither its mean error nor that share is worse than
+ *   the population model's (within small tie bands).
  */
 import { CircadianParams, DEFAULT_CIRCADIAN, Interval, KSS_PER_ALERTNESS, kssFromAlertness, simulateAlertness, TPM } from './alertness';
 import { analyzeChronotype } from './chronotype';
@@ -361,8 +362,9 @@ export function fitCircadian(input: CalibrationInput): CalibrationResult | undef
   const cvErrors = crossValidatedErrors(samples);
   const maeBefore = meanOf(popErrors);
   const maeAfter = meanOf(cvErrors);
-  // Small tolerance: an essentially equal fit is still worth applying (it is shrunk toward defaults anyway).
-  const applied = maeAfter <= maeBefore + 0.02;
+  // Apply only if held-out check-ins got no worse on either measure (small tie bands: the fit is shrunk
+  // toward the defaults anyway), so switching the personal model on never visibly lowers the accuracy.
+  const applied = maeAfter <= maeBefore + 0.02 && withinOne(cvErrors) >= withinOne(popErrors) - 0.02;
 
   const coverage: Record<TimeOfDay, number> = { morning: 0, afternoon: 0, evening: 0 };
   for (const s of samples) coverage[timeOfDay(s.t)]++;
@@ -463,7 +465,7 @@ export interface RhythmFinding {
 
 const about = (min: number) => {
   const r = Math.round(Math.abs(min) / 5) * 5;
-  return r >= 60 ? `about ${Math.round((r / 60) * 10) / 10}h` : `about ${r} min`;
+  return r < 100 ? `about ${r} min` : `about ${Math.round(r / 30) / 2}h`;
 };
 
 /** What the learned parameters mean, in words. */
@@ -481,8 +483,8 @@ export function describeRhythm(params: CircadianParams): RhythmFinding[] {
       id: 'phase',
       text:
         p.phaseShiftMin > 0
-          ? `Your body clock runs ${about(p.phaseShiftMin)} later than your sleep schedule suggests: peak focus and the evening second wind come later, and early nights may be hard.`
-          : `Your body clock runs ${about(p.phaseShiftMin)} earlier than your sleep schedule suggests: you're sharpest early and fade sooner in the evening.`,
+          ? 'Your whole body clock runs later than your sleep times suggest, so peak focus and the evening second wind come later too — and early nights may be hard.'
+          : "Your whole body clock runs earlier than your sleep times suggest: you're sharpest early and fade sooner in the evening.",
     });
   }
   if (p.ampScale >= 1.2) {

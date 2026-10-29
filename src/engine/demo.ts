@@ -27,7 +27,8 @@ import { computeSessionMetrics } from './sessions';
 export const DEMO_ORIGIN = 'demo.cmf.watch';
 
 /** The demo person's "true" body clock: ~50 min later than average, a pronounced post-lunch dip. */
-export const DEMO_RHYTHM: CircadianParams = { phaseShiftMin: 50, ampScale: 1.1, dipScale: 1.8, kssOffset: 0.5 };
+export const DEMO_RHYTHM: CircadianParams = { phaseShiftMin: 60, ampScale: 1.15, dipScale: 2, kssOffset: 0.6 };
+const DEMO_NOISE = 0.6;
 
 interface NightFx {
   alcohol: boolean;
@@ -260,7 +261,7 @@ function demoCheckins(data: SleepDataset, now: number, rand: () => number): Aler
     const night = data.sessions.find((s) => s.id === `demo-${date}`);
     if (!night) continue;
     const windows: [string, number, number][] = [
-      ['morning', night.end + 1.25 * HOUR, night.end + 4 * HOUR],
+      ['morning', night.end + 1.25 * HOUR, Math.min(night.end + 4 * HOUR, atMinutes(date, 12 * 60))],
       ['afternoon', atMinutes(date, 13 * 60), atMinutes(date, 16 * 60)],
       ['evening', atMinutes(date, 18.5 * 60), atMinutes(date, 21.75 * 60)],
     ];
@@ -268,8 +269,8 @@ function demoCheckins(data: SleepDataset, now: number, rand: () => number): Aler
     windows.forEach(([slot, lo, hi], k) => {
       const t = Math.round((lo + rand() * (hi - lo)) / MINUTE) * MINUTE;
       const ping = rand() < 0.65;
-      const noise = gaussian(rand, 0, 0.8);
-      if (k === skip || t > now - 10 * MINUTE) return;
+      const noise = gaussian(rand, 0, DEMO_NOISE);
+      if (k === skip || hi - lo < 30 * MINUTE || t > now - 10 * MINUTE) return;
       const kss = predictor.kssAt(t, DEMO_RHYTHM);
       if (kss === undefined) return;
       let rated = Math.round(clamp(kss + noise, 1, 9));

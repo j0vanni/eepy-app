@@ -181,7 +181,8 @@ describe('describeRhythm', () => {
   it('puts a strong, late dip into words', () => {
     const f = describeRhythm({ phaseShiftMin: 40, ampScale: 1, dipScale: 1.6 });
     expect(f.find((x) => x.id === 'dip')!.text).toBe('Your afternoon dip is stronger than average and about 40 min later than typical for your sleep times.');
-    expect(f.find((x) => x.id === 'phase')!.text).toMatch(/later than your sleep schedule/);
+    expect(f.find((x) => x.id === 'phase')!.text).toMatch(/runs later than your sleep times/);
+    expect(describeRhythm({ phaseShiftMin: -130, ampScale: 1, dipScale: 1 })[0].text).toMatch(/about 2h earlier/);
   });
 
   it('mentions amplitude and scale use, and falls back to "average"', () => {
