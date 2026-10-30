@@ -1,6 +1,7 @@
 /**
  * Background sync: pulls new Health Connect data, re-runs the engine and re-plans notifications
- * (morning report, adaptive reminders, pings) while eepy is closed.
+ * (morning report, adaptive reminders, pings) while eepy is closed, then checks GitHub for a newer
+ * eepy build (throttled to every 6 h inside checkForUpdates).
  *
  * This module is imported from the app entry (index.ts) so the task is defined before Android
  * wakes the JS runtime headlessly (no React tree is mounted then — only module scope runs).
@@ -23,6 +24,7 @@ import { getFirstEventTomorrowDetails } from '../state/calendar';
 import { refitCalibration } from '../state/learning';
 import { selectDataset, useStore } from '../state/store';
 import { runSync } from '../state/sync';
+import { checkForUpdates } from '../updates/check';
 
 export const BACKGROUND_SYNC_TASK = 'eepy-background-sync';
 /** WorkManager's floor is 15 min; 30 keeps the battery cost low and mornings fresh. */
@@ -31,6 +33,8 @@ export const BACKGROUND_INTERVAL_MIN = 30;
 const RECENT_SYNC = 10 * MINUTE;
 /** WorkManager stops a worker after ~10 min; finish well before that. */
 const SYNC_TIMEOUT = 4 * MINUTE;
+/** The GitHub release check is one small request; never let it hold the worker up. */
+const UPDATE_CHECK_TIMEOUT = MINUTE;
 
 export interface BackgroundRunOutcome {
   result: BackgroundTask.BackgroundTaskResult;
@@ -134,6 +138,13 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
   } catch (e) {
     summary = `Error: ${e instanceof Error ? e.message : String(e)}`;
     result = BackgroundTask.BackgroundTaskResult.Failed;
+  }
+  // 3. A newer eepy build on GitHub? Posts one "tap to update" notification per build. Its own
+  //    throttle and errors never change the task's result.
+  try {
+    await withTimeout(checkForUpdates('background', now), UPDATE_CHECK_TIMEOUT, 'Update check');
+  } catch {
+    // the next run tries again
   }
   try {
     useStore.getState().setBackground({ lastRun: now, lastResult: summary });

@@ -1,0 +1,107 @@
+[
+  {
+    "tag_name": "build-7",
+    "name": "eepy build 7",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-29T20:46:25Z",
+    "target_commitish": "e75f8331ffeb9ee2ffc550db2d78d3efee4bc752",
+    "html_url": "https://github.com/j0vanni/eepy-app/releases/tag/build-7",
+    "body": "Android APK built from `claude/practical-hypatia-nbsdgy` @ e75f8331ffeb9ee2ffc550db2d78d3efee4bc752.\n\n**Install:** open this page on your phone, download the `.apk`, and allow\n\"Install unknown apps\" for your browser when Android asks.\nThen open eepy \u2192 Settings \u2192 Connect CMF Watch.\n",
+    "assets": [
+      {
+        "id": 689859094,
+        "url": "https://api.github.com/repos/j0vanni/eepy-app/releases/assets/689859094",
+        "name": "eepy-0.1.0-build7.apk",
+        "size": 46440274,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/j0vanni/eepy-app/releases/download/build-7/eepy-0.1.0-build7.apk"
+      }
+    ]
+  },
+  {
+    "tag_name": "build-5",
+    "name": "eepy build 5",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-29T19:39:18Z",
+    "target_commitish": "0e83f700199832506231cff87a029865ad6fc604",
+    "html_url": "https://github.com/j0vanni/eepy-app/releases/tag/build-5",
+    "body": "Android APK built from `claude/practical-hypatia-nbsdgy` @ 0e83f700199832506231cff87a029865ad6fc604.\n\n**Install:** open this page on your phone, download the `.apk`, and allow\n\"Install unknown apps\" for your browser when Android asks.\nThen open eepy \u2192 Settings \u2192 Connect CMF Watch.\n",
+    "assets": [
+      {
+        "id": 689690641,
+        "url": "https://api.github.com/repos/j0vanni/eepy-app/releases/assets/689690641",
+        "name": "eepy-0.1.0-build5.apk",
+        "size": 43282258,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/j0vanni/eepy-app/releases/download/build-5/eepy-0.1.0-build5.apk"
+      }
+    ]
+  },
+  {
+    "tag_name": "build-13",
+    "name": "eepy build 13",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-29T22:05:52Z",
+    "target_commitish": "fd4cc8e5dba686bd0524782a31006917ff6e2958",
+    "html_url": "https://github.com/j0vanni/eepy-app/releases/tag/build-13",
+    "body": "Android APK built from `claude/practical-hypatia-nbsdgy` @ fd4cc8e5dba686bd0524782a31006917ff6e2958.\n\n**Install:** open this page on your phone, download the `.apk`, and allow\n\"Install unknown apps\" for your browser when Android asks.\nThen open eepy \u2192 Settings \u2192 Connect CMF Watch.\n",
+    "assets": [
+      {
+        "id": 690050923,
+        "url": "https://api.github.com/repos/j0vanni/eepy-app/releases/assets/690050923",
+        "name": "eepy-0.2.0-build13.apk",
+        "size": 51771954,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/j0vanni/eepy-app/releases/download/build-13/eepy-0.2.0-build13.apk"
+      }
+    ]
+  },
+  {
+    "tag_name": "build-12",
+    "name": "eepy build 12",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-29T21:36:21Z",
+    "target_commitish": "e37ed7b91c3636ca4ead051a66fb419215d25f28",
+    "html_url": "https://github.com/j0vanni/eepy-app/releases/tag/build-12",
+    "body": "Android APK built from `claude/practical-hypatia-nbsdgy` @ e37ed7b91c3636ca4ead051a66fb419215d25f28.\n\n**Install:** open this page on your phone, download the `.apk`, and allow\n\"Install unknown apps\" for your browser when Android asks.\nThen open eepy \u2192 Settings \u2192 Connect CMF Watch.\n",
+    "assets": [
+      {
+        "id": 689981409,
+        "url": "https://api.github.com/repos/j0vanni/eepy-app/releases/assets/689981409",
+        "name": "eepy-0.2.0-build12.apk",
+        "size": 51746206,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/j0vanni/eepy-app/releases/download/build-12/eepy-0.2.0-build12.apk"
+      }
+    ]
+  },
+  {
+    "tag_name": "build-4",
+    "name": "eepy build 4",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-28T19:47:29Z",
+    "target_commitish": "83b698a0da51c5e13c0c7f0845b12f1e6669e4b9",
+    "html_url": "https://github.com/j0vanni/eepy-app/releases/tag/build-4",
+    "body": "Android APK built from `claude/practical-hypatia-nbsdgy` @ 83b698a0da51c5e13c0c7f0845b12f1e6669e4b9.\n\n**Install:** open this page on your phone, download the `.apk`, and allow\n\"Install unknown apps\" for your browser when Android asks.\nThen open eepy \u2192 Settings \u2192 Connect CMF Watch.\n",
+    "assets": [
+      {
+        "id": 686143005,
+        "url": "https://api.github.com/repos/j0vanni/eepy-app/releases/assets/686143005",
+        "name": "eepy-0.1.0-build4.apk",
+        "size": 43280574,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/j0vanni/eepy-app/releases/download/build-4/eepy-0.1.0-build4.apk"
+      }
+    ]
+  }
+]

@@ -209,6 +209,32 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Coach tab** hub for all of the above |
 | 🧪 | **Full-screen alarm** for naps and the cycle-timed wake-up: rings over the lock screen at alarm volume with Snooze (9 min) / I'm up, survives reboots, falls back to a ringing heads-up when the phone is in use (Android 14+ asks you to allow full-screen alarms) |
 
+## 17. App updates
+
+eepy updates itself from the GitHub releases CI publishes (`build-<N>` prereleases with one APK each). Not Expo/EAS Update: every build is a full APK, so native changes ship too.
+
+| | Feature |
+| --- | --- |
+| ✅ | **Knows its build**: CI writes the run number into the APK as `android.versionCode`; Settings shows "eepy 0.2.0 · build 15". Development and web builds say so and never prompt |
+| ✅ | **Checks GitHub** when eepy opens and after each background sync — at most every 6 h, switchable off — and with **Check now**. Picks the highest `build-N` that has an APK (prereleases included, drafts skipped) |
+| ✅ | **One notification per new build** ("eepy build 15 is ready — tap to update", with the first changelog line) on the Sleep reports channel; tapping it opens App updates. While eepy is open, an **Update available** card on Today and Settings says it instead |
+| ✅ | **Changelog** from the release notes (CI lists the commit subjects since the previous build) |
+| 🧪 | **Update to build N**: downloads the APK with a progress bar and opens Android's installer. The first time, Android asks to allow eepy to *install unknown apps* — tap Settings, turn on **Allow from this source**, go back, tap Install. Your data stays: the new build installs over the old one (same signing key, higher versionCode) |
+| 🧪 | **Sign in for updates** (the repository is private): **Sign in with GitHub** (device flow of the eepy GitHub App: copy the 8-character code, enter it at github.com/login/device, authorize) or paste a **fine-grained token** (pre-filled link: Contents read-only; pick *Only select repositories → eepy-app*). The token is kept in Android's encrypted storage (expo-secure-store), excluded from backups, and only sent to api.github.com |
+| ✅ | Sign-in problems (revoked token, private repo while signed out, a token that can't see eepy-app) never notify; Settings explains them with **Sign in again** |
+
+**Create the GitHub App (repo owner, once)** — until this is done, eepy offers only the token option:
+
+1. github.com → Settings → Developer settings → GitHub Apps → **New GitHub App**.
+2. Name: e.g. *eepy updates*; Homepage URL: `https://github.com/j0vanni/eepy-app`. No callback URL; turn **Webhook → Active** off.
+3. Tick **Enable Device Flow**. Leave **Expire user authorization tokens** *unticked* (eepy has no client secret to refresh them).
+4. Permissions → Repository → **Contents: Read-only** (Metadata: Read-only is added automatically). Nothing else.
+5. *Where can this GitHub App be installed?* → **Only on this account**. Create it.
+6. **Install App** → your account → **Only select repositories → eepy-app**.
+7. Copy the **Client ID** (starts with `Iv`, not the App ID) into `app.json` → `expo.extra.githubClientId`, commit, and let CI build. The client ID is public; no secret is needed.
+
+To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (sign-in) or github.com/settings/personal-access-tokens (tokens).
+
 ---
 
 ## Science behind it
