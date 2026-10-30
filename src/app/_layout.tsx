@@ -12,6 +12,7 @@ import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { useAutoSync } from '@/state/sync';
+import { useUpdateChecks } from '@/updates/useUpdates';
 import { colors } from '@/ui/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -21,9 +22,10 @@ const theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
-/** App-wide side effects: sync, notification planning, notification responses, background task. */
+/** App-wide side effects: sync, notification planning, notification responses, background task, update checks. */
 function Background() {
   useAutoSync();
+  useUpdateChecks();
   useLearning();
   const analysis = useAnalysis();
   const settings = useStore((s) => s.settings);
@@ -96,6 +98,7 @@ export default function RootLayout() {
         <Stack.Screen name="winddown" options={{ title: 'Wind down' }} />
         <Stack.Screen name="cbti" options={{ title: 'Insomnia programme' }} />
         <Stack.Screen name="export" options={{ title: 'Reports & export' }} />
+        <Stack.Screen name="updates" options={{ title: 'App updates' }} />
       </Stack>
     </ThemeProvider>
   );

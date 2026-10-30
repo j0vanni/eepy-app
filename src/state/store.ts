@@ -77,6 +77,23 @@ export interface AudioSettings {
   timerMin: number;
 }
 
+/** In-app updates from GitHub Releases (src/updates). */
+export interface UpdateSettings {
+  /** Check for a newer build when eepy opens and from background sync (at most every 6 h). */
+  autoCheck: boolean;
+  /** Last successful check (epoch ms). */
+  lastCheck?: number;
+  /** Newest build GitHub had at the last check. */
+  latestBuild?: number;
+  /** Newest build the "update ready" notification (or banner) was already shown for. */
+  notifiedBuild?: number;
+  /** GitHub account used for update checks. The token itself is in expo-secure-store. */
+  login?: string;
+  authMethod?: 'device' | 'token';
+  /** Why the last check couldn't read the releases (shown in Settings; checks stay silent). */
+  authProblem?: 'auth' | 'private' | 'no-access';
+}
+
 export interface NapTimer {
   start: number;
   alarmAt: number;
@@ -104,6 +121,7 @@ export interface Settings {
   calendar: CalendarSettings;
   audio: AudioSettings;
   watch: WatchSettings;
+  updates: UpdateSettings;
   /** Small bookkeeping values for features (e.g. last morning report sent). */
   marks: Record<string, string | number | undefined>;
 }
@@ -148,6 +166,7 @@ export interface AppState extends SleepDataset {
   setCalendarSettings(patch: Partial<CalendarSettings>): void;
   setAudioSettings(patch: Partial<AudioSettings>): void;
   setWatchSettings(patch: Partial<WatchSettings>): void;
+  setUpdateSettings(patch: Partial<UpdateSettings>): void;
   setMark(key: string, value: string | number | undefined): void;
 }
 
@@ -179,6 +198,7 @@ const DEFAULT_SETTINGS: Settings = {
   calendar: { enabled: false, calendarIds: [], prepMin: 60 },
   audio: { sound: 'brown', volume: 0.6, timerMin: 45 },
   watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
+  updates: { autoCheck: true },
   marks: {},
 };
 
@@ -297,6 +317,7 @@ export const useStore = create<AppState>()(
       setCalendarSettings: (patch) => set((s) => ({ settings: { ...s.settings, calendar: { ...s.settings.calendar, ...patch } } })),
       setAudioSettings: (patch) => set((s) => ({ settings: { ...s.settings, audio: { ...s.settings.audio, ...patch } } })),
       setWatchSettings: (patch) => set((s) => ({ settings: { ...s.settings, watch: { ...s.settings.watch, ...patch } } })),
+      setUpdateSettings: (patch) => set((s) => ({ settings: { ...s.settings, updates: { ...s.settings.updates, ...patch } } })),
       setMark: (key, value) => set((s) => ({ settings: { ...s.settings, marks: { ...s.settings.marks, [key]: value } } })),
     }),
     {
@@ -337,6 +358,7 @@ export const useStore = create<AppState>()(
             calendar: { ...DEFAULT_SETTINGS.calendar, ...ps?.calendar },
             audio: { ...DEFAULT_SETTINGS.audio, ...ps?.audio },
             watch: { ...DEFAULT_SETTINGS.watch, ...ps?.watch },
+            updates: { ...DEFAULT_SETTINGS.updates, ...ps?.updates },
             marks: { ...ps?.marks },
           },
         };

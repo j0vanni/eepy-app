@@ -11,6 +11,7 @@ import { CbtiCard } from '@/ui/cards/CbtiCard';
 import { ExperimentCard, GoalsCard, RecoveryAlertCard, WeeklyReviewCard } from '@/ui/cards/CoachCards';
 import { LearningCard } from '@/ui/cards/LearningCard';
 import { SimulatorCard } from '@/ui/cards/SimulatorCard';
+import { UpdateBanner } from '@/ui/cards/UpdateBanner';
 import { Button, Empty, Icon, Note, Row, Screen } from '@/ui/components';
 import { dayLabel, greeting, relativeTime } from '@/ui/format';
 import { colors, space } from '@/ui/theme';
@@ -86,6 +87,7 @@ export default function Today() {
 
   const notes = (
     <>
+      {!night ? <UpdateBanner /> : null}
       {settings.dataMode === 'demo' && !night ? (
         <Note tone="info" icon="flask-outline">
           Demo data. Connect your watch in Settings → Data sources to switch to your own sleep.

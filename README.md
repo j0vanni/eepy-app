@@ -23,7 +23,11 @@ The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 
 3. When Android asks, allow your browser to *install unknown apps*, then install.
 4. Open eepy → follow the onboarding → **Connect CMF Watch**.
 
-Every push to the repository builds a fresh APK (`.github/workflows/android-apk.yml`). Builds are signed with the same debug key, so new versions install over old ones and keep your data. The APK targets arm64 phones (every modern Android phone).
+Every push to the repository builds a fresh APK (`.github/workflows/android-apk.yml`). Builds are signed with the same debug key and numbered (`versionCode` = build number), so new versions install over old ones and keep your data. The APK targets arm64 phones (every modern Android phone).
+
+### Updates
+
+After the first install, eepy updates itself from those GitHub releases: **Settings → App updates** shows your build, checks for a newer one (also automatically, at most every 6 h, with one notification per new build), shows what changed and installs it. Because the repository is private, sign in there first — **Sign in with GitHub** (enter a code at github.com/login/device) or paste a fine-grained token with read-only *Contents* on eepy-app. The first update asks you to allow eepy to *install unknown apps*. Details, and the one-time GitHub App setup for the repo owner, are in [FEATURES.md § 17](FEATURES.md#17-app-updates).
 
 ## Connecting your CMF Watch 3 Pro
 
@@ -64,6 +68,7 @@ src/
     demo.ts          realistic synthetic data
   integrations/    Health Connect bridge + pure record mappers, JSON backup
   state/           zustand store (persisted on-device), sync, notifications
+  updates/         self-updates from GitHub Releases: release parsing, GitHub sign-in, download + install
   ui/              theme, components, SVG charts
   app/             Expo Router screens
 ```

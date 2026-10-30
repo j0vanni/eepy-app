@@ -12,6 +12,7 @@ import { selectDataset, useStore } from '@/state/store';
 import { runSync } from '@/state/sync';
 import { Button, Card, CardTitle, Chip, ListRow, Note, Row, Screen, Section, Segmented, Stepper } from '@/ui/components';
 import { confirm, notify } from '@/ui/confirm';
+import { UpdateBanner } from '@/ui/cards/UpdateBanner';
 import { relativeTime } from '@/ui/format';
 import { CalendarSection } from '@/ui/settings/CalendarSection';
 import { LearningSection } from '@/ui/settings/LearningSection';
@@ -19,6 +20,7 @@ import { NotificationsSection } from '@/ui/settings/NotificationsSection';
 import { ProgramsSection } from '@/ui/settings/ProgramsSection';
 import { Toggle } from '@/ui/settings/Toggle';
 import { WatchSection } from '@/ui/settings/WatchSection';
+import { UpdatesSection } from '@/ui/settings/UpdatesSection';
 import { WindDownSection } from '@/ui/settings/WindDownSection';
 import { colors, font, space } from '@/ui/theme';
 
@@ -46,6 +48,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      <UpdateBanner />
       <Section title="You">
         <Card>
           <Stepper
@@ -246,6 +249,8 @@ export default function SettingsScreen() {
           </Row>
         </Card>
       </Section>
+
+      <UpdatesSection />
 
       <Section title="About">
         <Card>

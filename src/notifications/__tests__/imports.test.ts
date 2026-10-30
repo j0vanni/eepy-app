@@ -14,6 +14,7 @@ const ENTRY_POINTS = [
   '../features/liveWindDown',
   '../features/morningReport',
   '../features/missingNight',
+  '../features/appUpdates',
 ];
 
 describe('notification module graph', () => {

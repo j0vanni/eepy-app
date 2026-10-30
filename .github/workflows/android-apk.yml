@@ -34,6 +34,9 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history and tags: the release notes list the commits since the previous build.
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -44,6 +47,18 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
+      - name: Stamp the build number
+        # CI-only, never committed: android.versionCode = run number. eepy reads it (expo-constants)
+        # to know which build it is when checking GitHub for updates, and Android only installs an
+        # APK over an older one when its versionCode is higher.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const config = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            config.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER);
+            fs.writeFileSync("app.json", JSON.stringify(config, null, 2) + "\n");
+          '
+          node -p '"android.versionCode = " + require("./app.json").expo.android.versionCode'
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
         env:
@@ -60,6 +75,29 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "dist-apk/${NAME}"
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           ls -la dist-apk
+      - name: Release notes
+        # eepy shows the "What's new" bullets in Settings → App updates and in its update notification.
+        run: |
+          PREV=$(git tag --list 'build-*' --sort=-v:refname | grep -vx "build-${GITHUB_RUN_NUMBER}" | sed -n 1p || true)
+          if [ -n "$PREV" ]; then
+            CHANGES=$(git log --no-merges -n 30 --format='- %s' "${PREV}..HEAD")
+          else
+            CHANGES=$(git log --no-merges -n 15 --format='- %s')
+          fi
+          [ -n "$CHANGES" ] || CHANGES="- Rebuild of ${GITHUB_SHA::7}"
+          {
+            echo "## What's new"
+            echo
+            echo "$CHANGES"
+            echo
+            echo "Android APK built from \`${GITHUB_REF_NAME}\` @ ${GITHUB_SHA}${PREV:+ (changes since ${PREV})}."
+            echo
+            echo '**Install:** open this page on your phone, download the `.apk`, and allow'
+            echo '"Install unknown apps" for your browser when Android asks.'
+            echo 'Then open eepy → Settings → Connect CMF Watch. Later builds install from'
+            echo 'inside eepy: Settings → App updates.'
+          } > release-notes.md
+          cat release-notes.md
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.apk.outputs.name }}
@@ -73,9 +111,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: true
           files: dist-apk/*.apk
-          body: |
-            Android APK built from `${{ github.ref_name }}` @ ${{ github.sha }}.
-
-            **Install:** open this page on your phone, download the `.apk`, and allow
-            "Install unknown apps" for your browser when Android asks.
-            Then open eepy → Settings → Connect CMF Watch.
+          body_path: release-notes.md

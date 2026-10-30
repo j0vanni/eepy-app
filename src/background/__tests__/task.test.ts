@@ -13,6 +13,7 @@ jest.mock('expo-background-task', () => ({
 }));
 jest.mock('../../state/sync', () => ({ runSync: jest.fn() }));
 jest.mock('../../notifications/scheduler', () => ({ replanNotifications: jest.fn(() => Promise.resolve()) }));
+jest.mock('../../updates/check', () => ({ checkForUpdates: jest.fn(() => Promise.resolve({ status: 'skipped' })) }));
 
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
@@ -22,11 +23,13 @@ import { atMinutes } from '../../engine/time';
 import { replanNotifications } from '../../notifications/scheduler';
 import { useStore } from '../../state/store';
 import { runSync } from '../../state/sync';
+import { checkForUpdates } from '../../updates/check';
 import { BACKGROUND_INTERVAL_MIN, BACKGROUND_SYNC_TASK, registerBackgroundSync, runBackgroundSync } from '../task';
 
 const NOW = atMinutes('2026-10-21', 8 * 60 + 30);
 const sync = runSync as jest.Mock;
 const replan = replanNotifications as jest.Mock;
+const updateCheck = checkForUpdates as jest.Mock;
 const { Success, Failed } = BackgroundTask.BackgroundTaskResult;
 
 // Captured at import: the task must be defined at module scope for headless runs.
@@ -98,6 +101,29 @@ describe('background sync task', () => {
     expect(useStore.getState().settings.background.lastRun).toBeUndefined();
     expect(sync).not.toHaveBeenCalled();
     expect(replan).not.toHaveBeenCalled();
+  });
+
+  it('checks GitHub for a newer eepy build after re-planning', async () => {
+    setup();
+    await runBackgroundSync(NOW);
+    expect(updateCheck).toHaveBeenCalledWith('background', NOW);
+    expect(updateCheck.mock.invocationCallOrder[0]).toBeGreaterThan(replan.mock.invocationCallOrder[0]);
+    // Also while the sleep data side is skipped (demo data), but not when background sync is off.
+    updateCheck.mockClear();
+    setup({ dataMode: 'demo' });
+    await runBackgroundSync(NOW);
+    expect(updateCheck).toHaveBeenCalledTimes(1);
+    updateCheck.mockClear();
+    setup({ background: { enabled: false } });
+    await runBackgroundSync(NOW);
+    expect(updateCheck).not.toHaveBeenCalled();
+  });
+
+  it('a failing update check never changes the result', async () => {
+    setup();
+    updateCheck.mockRejectedValueOnce(new Error('GitHub down'));
+    await expect(runBackgroundSync(NOW)).resolves.toEqual({ result: Success, summary: 'Synced · 1 new sleep' });
+    expect(useStore.getState().settings.background.lastResult).toBe('Synced · 1 new sleep');
   });
 
   it('never throws out of the task', async () => {

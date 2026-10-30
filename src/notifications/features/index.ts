@@ -1,4 +1,5 @@
 import type { NotificationFeature } from '../types';
+import { appUpdates } from './appUpdates';
 import { caffeineNudge } from './caffeineNudge';
 import { experiments } from './experiments';
 import { liveWindDown } from './liveWindDown';
@@ -10,4 +11,4 @@ import { reminders } from './reminders';
 import { weeklyReview } from './weeklyReview';
 
 /** Every notification feature. The scheduler plans, de-duplicates and routes responses for these. */
-export const FEATURES: NotificationFeature[] = [reminders, morningReport, missingNight, liveWindDown, pings, naturalWake, weeklyReview, experiments, caffeineNudge];
+export const FEATURES: NotificationFeature[] = [reminders, morningReport, missingNight, liveWindDown, pings, naturalWake, weeklyReview, experiments, caffeineNudge, appUpdates];
