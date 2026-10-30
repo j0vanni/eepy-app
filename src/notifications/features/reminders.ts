@@ -8,12 +8,15 @@
  * Also routes taps on the nap-timer notifications (see ../napTimer.ts).
  * OWNER: background & notifications workstream.
  */
+import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
+import { Platform } from 'react-native';
 
 import type { Analysis } from '../../engine/analysis';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
-import { hasFullScreenAlarm, wakeAlarmContent } from '../fullScreenAlarm';
+import { cancelFullScreenAlarm, hasFullScreenAlarm, nextWakeAlarm, WAKE_ALARM_ID, WAKE_DONE_MARK, WRIST_BUZZ_OFFSETS_MIN } from '../fullScreenAlarm';
+import { plannedId } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
@@ -23,6 +26,9 @@ import { liveWindDownCoversBedtime } from './liveWindDown';
 export const DAILY_REMINDER_CAP = 5;
 /** Nap need (0–100) above which a "nap window open" nudge is worth sending. */
 export const NAP_NUDGE_MIN_NEED = 55;
+export const WRIST_WAKE_CATEGORY = 'wrist-wake';
+export const WRIST_WAKE_KIND = 'wrist-wake';
+const wristWakeId = (i: number) => `wrist-wake-${i}`;
 /** Highest priority first; lower ones are dropped when a day goes over the cap. */
 const PRIORITY = ['bedtime', 'winddown', 'nap', 'checkin', 'caffeine'];
 
@@ -141,12 +147,43 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
   }
 
   const planned = day.adaptive ? capPerDay(out, DAILY_REMINDER_CAP) : out;
-  // Builds with the native full-screen alarm ring it from there instead (see syncWakeAlarm).
-  if (prefs.smartAlarm && !hasFullScreenAlarm()) {
-    const wake = wakeAlarmContent(a);
-    planned.push({ id: 'wake', at: wake.at, channel: 'wake', sound: 'wake.wav', alarm: true, title: wake.title, body: wake.body });
+  if (prefs.smartAlarm) {
+    const wake = nextWakeAlarm(a, state.settings, now);
+    if (!wake.done) {
+      // Watch-first: silent buzzes on the wrist, then the phone alarm as a backup.
+      const backup = formatTime(wake.at);
+      wake.wrist.forEach((at, i) =>
+        planned.push({
+          id: wristWakeId(i),
+          at,
+          channel: 'wrist',
+          alarm: true,
+          silent: true,
+          categoryId: WRIST_WAKE_CATEGORY,
+          title: i === 0 ? `${wake.title} ⌚` : 'Still in bed?',
+          body: i === 0 ? `${wake.body} Tap "I'm up", or the phone alarm rings at ${backup}.` : `Phone alarm at ${backup} unless you tap "I'm up".`,
+          data: { kind: WRIST_WAKE_KIND, base: wake.base },
+        }),
+      );
+      // Builds with the native full-screen alarm ring the phone alarm from there instead (see syncWakeAlarm).
+      if (!hasFullScreenAlarm()) {
+        planned.push({ id: 'wake', at: wake.at, channel: 'wake', sound: 'wake.wav', alarm: true, title: wake.title, body: wake.body });
+      }
+    }
   }
   return planned;
+}
+
+/** "I'm up" on a watch buzz: stop the remaining buzzes and the phone backup for that alarm. */
+export async function stopWristWake(state: Pick<AppState, 'setMark'>, base: number): Promise<void> {
+  state.setMark(WAKE_DONE_MARK, base);
+  if (Platform.OS === 'web') return;
+  const ids = [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristWakeId(i))), plannedId('reminders', 'wake')];
+  for (const id of ids) {
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
+    await Notifications.dismissNotificationAsync(id).catch(() => undefined);
+  }
+  await cancelFullScreenAlarm(WAKE_ALARM_ID);
 }
 
 const ROUTES = new Set(['/nap', '/journal', '/winddown']);
@@ -163,18 +200,30 @@ export const reminders: NotificationFeature = {
       ],
     },
     { id: NAP_ALARM_CATEGORY, actions: [{ id: 'nap-done', title: "I'm up — log nap" }] },
+    { id: WRIST_WAKE_CATEGORY, actions: [{ id: 'wrist-up', title: "I'm up" }] },
   ],
   async onResponse(r, state: AppState) {
     markResponseHandled();
     if (r.data.kind === NAP_TIMER_KIND) {
       const start = typeof r.data.start === 'number' ? r.data.start : undefined;
+      // Tapping a watch buzz itself also means you're up.
+      const action = r.actionId === 'default' && r.data.wrist === true ? 'nap-done' : r.actionId;
       // Only act on the timer this notification belongs to (a response can be replayed later).
-      if (r.actionId === 'nap-done' || r.actionId === 'nap-cancel') {
+      if (action === 'nap-done' || action === 'nap-cancel') {
         if (state.settings.napTimer && (start === undefined || state.settings.napTimer.start === start)) {
-          await stopNapTimer(state, r.actionId === 'nap-done');
+          await stopNapTimer(state, action === 'nap-done');
         }
       }
       openFromNotification('/nap');
+      return;
+    }
+    if (r.data.kind === WRIST_WAKE_KIND) {
+      const base = typeof r.data.base === 'number' ? r.data.base : undefined;
+      // A replayed response for an old alarm must not cancel a newer one.
+      if (base !== undefined && Date.now() - base < 3 * HOUR && state.settings.marks[WAKE_DONE_MARK] !== base) {
+        await stopWristWake(state, base);
+      }
+      openFromNotification('/checkin');
       return;
     }
     if (r.actionId === 'default' && typeof r.data.route === 'string' && ROUTES.has(r.data.route)) {

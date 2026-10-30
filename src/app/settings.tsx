@@ -18,6 +18,7 @@ import { LearningSection } from '@/ui/settings/LearningSection';
 import { NotificationsSection } from '@/ui/settings/NotificationsSection';
 import { ProgramsSection } from '@/ui/settings/ProgramsSection';
 import { Toggle } from '@/ui/settings/Toggle';
+import { WatchSection } from '@/ui/settings/WatchSection';
 import { WindDownSection } from '@/ui/settings/WindDownSection';
 import { colors, font, space } from '@/ui/theme';
 
@@ -171,6 +172,8 @@ export default function SettingsScreen() {
       </Section>
 
       <NotificationsSection />
+
+      <WatchSection />
 
       <LearningSection />
 

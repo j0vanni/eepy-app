@@ -122,15 +122,27 @@ export default function JournalScreen() {
         </View>
         {dayDoses.map((d) => (
           <Row key={d.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}>
-            <Text style={[font.body, { width: 56 }]}>{formatTime(d.time)}</Text>
-            <Text style={[font.small, { flex: 1 }]}>
-              {d.label} · {d.mg} mg
-            </Text>
+            <Pressable
+              onPress={() => router.push({ pathname: '/caffeine', params: { id: d.id } })}
+              style={({ pressed }) => [{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm }, pressed ? { opacity: 0.6 } : null]}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${d.label} at ${formatTime(d.time)}`}
+            >
+              <Text style={[font.body, { width: 56 }]}>{formatTime(d.time)}</Text>
+              <Text style={[font.small, { flex: 1 }]}>
+                {d.label} · {d.mg} mg
+              </Text>
+              <Icon name="pencil-outline" size={16} color={colors.textFaint} />
+            </Pressable>
             <Pressable onPress={() => removeCaffeine(d.id)} hitSlop={8} accessibilityLabel="Remove drink">
               <Icon name="close" color={colors.textFaint} />
             </Pressable>
           </Row>
         ))}
+        <Row style={{ marginTop: space.sm, justifyContent: 'space-between' }}>
+          <Text style={[font.tiny, { flex: 1 }]}>{dayDoses.length ? 'Tap a drink to change its time or amount.' : ''}</Text>
+          <Button small kind="ghost" icon="clock-edit-outline" label="Log with exact time" onPress={() => router.push({ pathname: '/caffeine', params: { date } })} />
+        </Row>
       </Card>
 
       <Button label="Log sleep or a nap manually" icon="pencil-plus" kind="secondary" onPress={() => router.push({ pathname: '/log-sleep', params: { date } })} />

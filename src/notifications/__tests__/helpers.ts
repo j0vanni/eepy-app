@@ -26,6 +26,7 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     background: { enabled: true },
     calendar: { enabled: false, calendarIds: [], prepMin: 60 },
     audio: { sound: 'brown', volume: 0.6, timerMin: 45 },
+    watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
     marks: {},
     ...over.settings,
   };
@@ -50,6 +51,7 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     logDay: fn(),
     toggleTag: fn(),
     addCaffeine: fn(),
+    updateCaffeine: fn(),
     removeCaffeine: fn(),
     saveScreening: fn(),
     loadDemo: fn(),
@@ -67,6 +69,7 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     setCalendarSettings: fn(),
     setAudioSettings: fn(),
     setMark: fn(),
+    setWatchSettings: fn(),
   } as AppState;
 }
 

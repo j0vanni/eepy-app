@@ -1,7 +1,8 @@
 import type { Analysis } from '../engine/analysis';
 import type { AppState } from '../state/store';
 
-export type ChannelId = 'reminders' | 'alarms' | 'wake' | 'pings' | 'reports' | 'live';
+/** 'wrist' = silent alarm buzzes meant for the CMF Watch (mirrored by Nothing X). */
+export type ChannelId = 'reminders' | 'alarms' | 'wake' | 'pings' | 'reports' | 'live' | 'wrist';
 
 export interface PlannedNotification {
   /** Stable id, unique within the feature. The scheduler namespaces it. */
@@ -22,6 +23,8 @@ export interface PlannedNotification {
   sound?: string;
   /** Pinned until dismissed by the app. */
   sticky?: boolean;
+  /** No sound even with `alarm` (watch buzzes: the wrist vibrates, the phone stays quiet). */
+  silent?: boolean;
 }
 
 export interface PlannerContext {

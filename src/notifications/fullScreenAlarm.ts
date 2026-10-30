@@ -11,8 +11,8 @@ import { Platform } from 'react-native';
 
 import EepyAlarm from '../../modules/eepy-alarm';
 import type { Analysis } from '../engine/analysis';
-import { MINUTE } from '../engine/time';
-import type { AppState } from '../state/store';
+import { dateKey, HOUR, MINUTE } from '../engine/time';
+import type { AppState, Settings } from '../state/store';
 
 /** Native alarm ids (their own namespace: AlarmManager + notifications tagged "eepy-alarm"). */
 export const NAP_ALARM_ID = 'eepy-nap';
@@ -93,20 +93,78 @@ export function wakeAlarmContent(a: Analysis): WakeAlarmContent {
   };
 }
 
+/** marks key: first ring (epoch ms) of the wake alarm that is scheduled — see nextWakeAlarm. */
+export const WAKE_AT_MARK = 'wake.at';
+/** marks key: first ring of a wake alarm already stopped from its watch buzz. */
+export const WAKE_DONE_MARK = 'wake.done';
+/** Watch-first alarms buzz the wrist at these offsets (min) before the phone alarm takes over. */
+export const WRIST_BUZZ_OFFSETS_MIN = [0, 1, 2];
+/** A wake alarm that has rung stays current this long (it may be ringing or snoozed). */
+const RINGING_GRACE_MIN = 30;
+
+export type WakeSettings = Pick<Settings, 'marks' | 'watch'>;
+
+export interface WakeAlarmPlan extends WakeAlarmContent {
+  /** First ring: the watch buzz in watch-first mode, otherwise the phone alarm itself. */
+  base: number;
+  /** Watch buzz times (empty unless the wake alarm is watch-first). */
+  wrist: number[];
+  /** This morning's alarm, kept although "tonight" has moved on to tomorrow. */
+  held: boolean;
+  /** Stopped from the watch already: nothing left to ring. */
+  done: boolean;
+}
+
 /**
- * What the native wake alarm should do: 'cancel' (alarm off), 'keep' (it's due now or already
- * rang — it may be ringing or snoozed, so leave it alone) or 'set' this alarm.
+ * The wake alarm that should ring next. `at` is the phone alarm (a backup `backupMin` after the
+ * first buzz in watch-first mode).
+ *
+ * After 4am the analysis plans the *next* night, so its alarm is tomorrow's — while this morning's
+ * may not have rung yet. The alarm last scheduled (WAKE_AT_MARK) is therefore held until it has
+ * rung (plus its backup and snoozes) instead of being moved to tomorrow by a re-plan.
+ */
+export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number): WakeAlarmPlan {
+  const planned = wakeAlarmContent(a);
+  const wristMode = settings.watch.wakeAlarm === 'wrist';
+  const backupMs = wristMode ? settings.watch.backupMin * MINUTE : 0;
+  const held = settings.marks[WAKE_AT_MARK];
+  const done = settings.marks[WAKE_DONE_MARK];
+  const holding =
+    typeof held === 'number' &&
+    held !== done &&
+    held < planned.at &&
+    dateKey(held) !== dateKey(planned.at) &&
+    held > now - 24 * HOUR &&
+    now < held + backupMs + RINGING_GRACE_MIN * MINUTE;
+  const base = holding ? held : planned.at;
+  return {
+    title: planned.title,
+    body: holding ? 'Time to get up.' : planned.body,
+    base,
+    at: base + backupMs,
+    wrist: wristMode ? WRIST_BUZZ_OFFSETS_MIN.map((m) => base + m * MINUTE) : [],
+    held: holding,
+    done: base === done,
+  };
+}
+
+/**
+ * What the native wake alarm should do: 'cancel' (alarm off or already stopped from the watch),
+ * 'keep' (it's due now, already rang — it may be ringing or snoozed — or it's this morning's alarm,
+ * scheduled before 4am) or 'set' this alarm.
  */
 export function planNativeWakeAlarm(
   a: Analysis | undefined,
   smartAlarm: boolean,
   now: number,
+  settings: WakeSettings = { marks: {}, watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 } },
 ): { action: 'cancel' } | { action: 'keep' } | { action: 'set'; alarm: WakeAlarmContent } {
   if (!smartAlarm) return { action: 'cancel' };
   if (!a) return { action: 'keep' };
-  const alarm = wakeAlarmContent(a);
-  if (alarm.at <= now + MIN_LEAD_MS) return { action: 'keep' };
-  return { action: 'set', alarm };
+  const next = nextWakeAlarm(a, settings, now);
+  if (next.done) return { action: 'cancel' };
+  if (next.held || next.at <= now + MIN_LEAD_MS) return { action: 'keep' };
+  return { action: 'set', alarm: { at: next.at, title: next.title, body: next.body } };
 }
 
 /** What this process last told the native side about the wake alarm: undefined = nothing yet, null = cancelled. */
@@ -118,18 +176,25 @@ export function resetWakeAlarmMemo(): void {
 }
 
 /**
- * Side effect that goes with `replanNotifications`: keeps the native wake alarm ('eepy-wake') in
- * line with `prefs.smartAlarm` and tonight's cycle-timed alarm. With the native module present the
- * reminders planner leaves the wake alarm out, so this must run wherever notifications are re-planned.
- * No-op without the native module. Never throws.
+ * Side effect that goes with `replanNotifications`: remembers which wake alarm is scheduled (so it
+ * survives the 4am switch to tomorrow's plan) and keeps the native wake alarm ('eepy-wake') in
+ * line with `prefs.smartAlarm` and the cycle-timed alarm. With the native module present the
+ * reminders planner leaves the phone wake alarm out, so this must run wherever notifications are
+ * re-planned, right after them. Never throws.
  */
 export async function syncWakeAlarm(analysis: Analysis | undefined, state: AppState, now = Date.now()): Promise<void> {
-  if (!EepyAlarm || Platform.OS === 'web') return;
+  if (Platform.OS === 'web') return;
   try {
-    let smartAlarm = state.settings.notifications.smartAlarm;
+    const { settings } = state;
+    if (analysis) {
+      const mark = settings.notifications.smartAlarm ? nextWakeAlarm(analysis, settings, now).base : undefined;
+      if (settings.marks[WAKE_AT_MARK] !== mark) state.setMark(WAKE_AT_MARK, mark);
+    }
+    if (!EepyAlarm) return;
+    let smartAlarm = settings.notifications.smartAlarm;
     // Without notification permission the alarm couldn't show, so treat it as off.
     if (smartAlarm && !(await Notifications.getPermissionsAsync()).granted) smartAlarm = false;
-    const plan = planNativeWakeAlarm(analysis, smartAlarm, now);
+    const plan = planNativeWakeAlarm(analysis, smartAlarm, now, settings);
     if (plan.action === 'cancel') {
       if (lastWake !== null) {
         await cancelFullScreenAlarm(WAKE_ALARM_ID);

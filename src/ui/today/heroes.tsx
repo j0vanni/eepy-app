@@ -11,7 +11,7 @@ import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
 import { colors, font, radius, space } from '@/ui/theme';
-import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, TonightCard, until } from './cards';
+import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, TonightCard, until, UsualCoffeeCard } from './cards';
 
 type HeroProps = { a: Analysis; now: number };
 
@@ -30,6 +30,7 @@ export function MorningHero({ a, now }: HeroProps) {
         </Card>
       )}
       <MorningCheckInCard a={a} />
+      <UsualCoffeeCard />
       <LightNowCard a={a} now={now} />
     </>
   );
@@ -39,6 +40,7 @@ export function DayHero({ a, now }: HeroProps) {
   return (
     <>
       <EnergyCard a={a} now={now} hero />
+      <UsualCoffeeCard />
       <NapCard a={a} />
       <CaffeineLiveCard a={a} />
     </>

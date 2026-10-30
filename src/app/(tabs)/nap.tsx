@@ -65,7 +65,7 @@ export default function NapScreen() {
           <Text style={font.tiny}>{timer.label.toUpperCase()}</Text>
           <Ring value={Math.min(1, (now - timer.start) / (timer.alarmAt - timer.start)) * 100} size={170} stroke={12}>
             <Text style={[font.stat, { fontSize: 38 }]}>{countdown(timer.alarmAt - now)}</Text>
-            <Text style={font.small}>alarm {formatTime(timer.alarmAt)}</Text>
+            <Text style={font.small}>{timer.backupAt ? `watch ${formatTime(timer.alarmAt)} · phone ${formatTime(timer.backupAt)}` : `alarm ${formatTime(timer.alarmAt)}`}</Text>
           </Ring>
           <Text style={[font.small, { textAlign: 'center', marginVertical: space.md }]}>
             {now < timer.alarmAt

@@ -6,10 +6,12 @@ import { HOUR } from '../engine/time';
 import type { AppState } from '../state/store';
 import { configureNotifications } from './channels';
 import { FEATURES } from './features';
+import { PLAN_PREFIX, plannedId } from './ids';
 import type { NotificationResponse, PlannedNotification } from './types';
 
-const PREFIX = 'eepy-plan-';
 const HORIZON = 36 * HOUR;
+/** Too close to (re)schedule reliably — leave whatever is already scheduled alone. */
+const MIN_LEAD_MS = 30_000;
 
 function toRequest(id: string, p: PlannedNotification, feature: string): Notifications.NotificationRequestInput {
   return {
@@ -20,7 +22,7 @@ function toRequest(id: string, p: PlannedNotification, feature: string): Notific
       data: { ...p.data, feature },
       categoryIdentifier: p.categoryId,
       sticky: p.sticky,
-      sound: p.sound ?? (p.alarm ? 'default' : undefined),
+      sound: p.silent ? false : (p.sound ?? (p.alarm ? 'default' : undefined)),
       priority: p.alarm ? 'max' : 'default',
     },
     trigger: p.immediate
@@ -42,6 +44,8 @@ export async function replanNotifications(analysis: Analysis, state: AppState, o
   const ctx = { analysis, state, now, background: !!opts.background };
 
   const wanted = new Map<string, { p: PlannedNotification; feature: string }>();
+  // Due within seconds: already scheduled (or about to show) — neither reschedule nor cancel it.
+  const imminent = new Set<string>();
   for (const f of FEATURES) {
     let planned: PlannedNotification[] = [];
     try {
@@ -50,14 +54,16 @@ export async function replanNotifications(analysis: Analysis, state: AppState, o
       console.warn(`notification feature ${f.id} failed to plan`, e);
     }
     for (const p of planned) {
-      if (!p.immediate && (p.at <= now + 30_000 || p.at > now + HORIZON)) continue;
-      wanted.set(`${PREFIX}${f.id}-${p.id}`, { p, feature: f.id });
+      const id = plannedId(f.id, p.id);
+      if (!p.immediate && p.at > now - MIN_LEAD_MS && p.at <= now + MIN_LEAD_MS) imminent.add(id);
+      if (!p.immediate && (p.at <= now + MIN_LEAD_MS || p.at > now + HORIZON)) continue;
+      wanted.set(id, { p, feature: f.id });
     }
   }
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
-    if (n.identifier.startsWith(PREFIX) && !wanted.has(n.identifier)) {
+    if (n.identifier.startsWith(PLAN_PREFIX) && !wanted.has(n.identifier) && !imminent.has(n.identifier)) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => undefined);
     }
   }
@@ -83,5 +89,5 @@ export async function handleNotificationResponse(r: Notifications.NotificationRe
 /** Dismisses a delivered (e.g. sticky) planner notification. */
 export async function dismissPlanned(featureId: string, id: string): Promise<void> {
   if (Platform.OS === 'web') return;
-  await Notifications.dismissNotificationAsync(`${PREFIX}${featureId}-${id}`).catch(() => undefined);
+  await Notifications.dismissNotificationAsync(plannedId(featureId, id)).catch(() => undefined);
 }

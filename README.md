@@ -39,6 +39,8 @@ CMF Watch 3 Pro ──Bluetooth──▶ Nothing X ──▶ Health Connect ─�
 
 eepy's Connect screen ticks off the Nothing X step by itself once it finds sleep from Nothing X (`com.nothing.smartcenter`) in Health Connect. If last night is missing, open Nothing X and let it sync the watch first, and exclude Nothing X from battery optimisation.
 
+**Alarms on the watch:** turn on eepy under Nothing X → your watch → Notifications, then Settings → CMF Watch → *Send test buzz*. With *Watch first* the nap / morning alarm buzzes your wrist silently and the phone alarm only rings a few minutes later as a backup.
+
 ## How it works
 
 ```

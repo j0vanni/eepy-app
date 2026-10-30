@@ -5,10 +5,11 @@ import { Pressable, Text, View } from 'react-native';
 import { sleepPressureAt } from '@/engine/alertness';
 import type { Analysis } from '@/engine/analysis';
 import { caffeineAt } from '@/engine/caffeine';
+import { USUAL_SKIPPED_MARK, usualCaffeine, usualCaffeineMissing, usualDose } from '@/engine/caffeineHabits';
 import { CHRONOTYPE_LABELS } from '@/engine/chronotype';
 import type { PlanKind } from '@/engine/coach';
 import { curvePosition } from '@/engine/dayPhase';
-import { formatDuration, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
+import { dateKey, formatClock, formatDuration, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { ArcGauge, EnergyChart, energyWord, Hypnogram } from '@/ui/charts';
@@ -229,6 +230,41 @@ export function NapCard({ a }: A) {
   );
 }
 
+const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '');
+
+/** "Had your usual coffee?" — shown when the usual morning drink hasn't been logged by an hour after its time. */
+export function UsualCoffeeCard() {
+  const now = useNow(60_000);
+  const doses = useStore((s) => s.caffeine);
+  const skipped = useStore((s) => s.settings.marks[USUAL_SKIPPED_MARK]);
+  const addCaffeine = useStore((s) => s.addCaffeine);
+  const setMark = useStore((s) => s.setMark);
+  const usual = usualCaffeine(doses, now);
+  if (!usual || skipped === dateKey(now) || !usualCaffeineMissing(doses, now, usual)) return null;
+  return (
+    <Card accent={colors.caffeine}>
+      <CardTitle icon="coffee" title="Had your usual coffee?" color={colors.caffeine} />
+      <Text style={font.small}>
+        Nothing logged today. You usually have a {shortDrink(usual.label).toLowerCase()} ({usual.mg} mg) around {formatClock(usual.timeMin)} — logging it keeps your cut-off and
+        bedtime advice right.
+      </Text>
+      <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+        <Button
+          small
+          icon="check"
+          label={`Yes, at ${formatClock(usual.timeMin)}`}
+          onPress={() => {
+            const dose = usualDose(usual, Date.now());
+            if (!useStore.getState().caffeine.some((d) => d.id === dose.id)) addCaffeine(dose);
+          }}
+        />
+        <Button small kind="secondary" icon="clock-edit-outline" label="Other time" onPress={() => router.push({ pathname: '/caffeine', params: { usual: '1' } })} />
+        <Button small kind="ghost" label="Not today" onPress={() => setMark(USUAL_SKIPPED_MARK, dateKey(Date.now()))} />
+      </Row>
+    </Card>
+  );
+}
+
 /** Caffeine in your system, recomputed every few seconds so it visibly ticks down. */
 export function CaffeineLiveCard({ a }: A) {
   const now = useNow(4000);
@@ -259,7 +295,15 @@ export function CaffeineLiveCard({ a }: A) {
       <View style={{ marginTop: space.sm }}>
         <Meter value={mg} max={Math.max(200, mg)} color={colors.caffeine} height={10} />
         <Row style={{ marginTop: 4 }}>
-          <Text style={[font.tiny, { flex: 1 }]}>{lastDose ? `last: ${lastDose.label.replace(/\s*\(.*\)/, '').toLowerCase()} at ${formatTime(lastDose.time)}` : 'nothing logged in the last day'}</Text>
+          {lastDose ? (
+            <Pressable onPress={() => router.push({ pathname: '/caffeine', params: { id: lastDose.id } })} hitSlop={8} style={{ flex: 1 }} accessibilityRole="button">
+              <Text style={font.tiny}>
+                last: {shortDrink(lastDose.label).toLowerCase()} at {formatTime(lastDose.time)} · <Text style={{ color: colors.accent }}>change</Text>
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={[font.tiny, { flex: 1 }]}>nothing logged in the last day</Text>
+          )}
           <Text style={font.tiny}>half-life {halfLife} h</Text>
         </Row>
       </View>

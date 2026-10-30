@@ -53,7 +53,7 @@ function Background() {
     replanNotifications(analysis, useStore.getState()).catch(() => undefined);
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.notifications, settings.napTimer, goals, experiments, checkins]);
+  }, [analysis, settings.notifications, settings.napTimer, settings.watch, goals, experiments, checkins]);
   return null;
 }
 
@@ -86,6 +86,7 @@ export default function RootLayout() {
         <Stack.Screen name="need" options={{ title: 'Your sleep need' }} />
         <Stack.Screen name="journal" options={{ title: 'Journal' }} />
         <Stack.Screen name="checkin" options={{ title: 'Quick check-in', presentation: 'modal' }} />
+        <Stack.Screen name="caffeine" options={{ title: 'Drink', presentation: 'modal' }} />
         <Stack.Screen name="simulate" options={{ title: 'What if?' }} />
         <Stack.Screen name="learning" options={{ title: 'Your body clock' }} />
         <Stack.Screen name="experiments/index" options={{ title: 'Experiments' }} />

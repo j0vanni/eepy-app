@@ -22,6 +22,8 @@ export const NAP_TIMER_KIND = 'nap-timer';
 /** Action-button categories (registered by the reminders feature, which also routes the taps). */
 export const NAP_TIMER_CATEGORY = 'nap-timer';
 export const NAP_ALARM_CATEGORY = 'nap-alarm';
+/** Watch-first naps: the wrist buzzes (see WRIST_BUZZ_OFFSETS_MIN) before the phone alarm. */
+export const NAP_WRIST_IDS = ['eepy-nap-wrist-0', 'eepy-nap-wrist-1', 'eepy-nap-wrist-2'];
 
 export type NapState = Pick<AppState, 'settings' | 'setSettings' | 'addManualSession'>;
 
@@ -31,10 +33,12 @@ export type NapState = Pick<AppState, 'settings' | 'setSettings' | 'addManualSes
  */
 export async function clearNapNotifications(id: string | undefined = NAP_NOTIFICATION_ID): Promise<void> {
   if (Platform.OS === 'web') return;
-  for (const x of new Set([id ?? NAP_NOTIFICATION_ID, NAP_NOTIFICATION_ID])) {
+  for (const x of new Set([id ?? NAP_NOTIFICATION_ID, NAP_NOTIFICATION_ID, ...NAP_WRIST_IDS])) {
     await Notifications.cancelScheduledNotificationAsync(x).catch(() => undefined);
   }
-  await Notifications.dismissNotificationAsync(NAP_NOTIFICATION_ID).catch(() => undefined);
+  for (const x of [NAP_NOTIFICATION_ID, ...NAP_WRIST_IDS]) {
+    await Notifications.dismissNotificationAsync(x).catch(() => undefined);
+  }
   await cancelFullScreenAlarm(NAP_ALARM_ID);
 }
 

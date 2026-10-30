@@ -43,6 +43,8 @@ export interface NotificationPrefs {
   naturalWakePrompt: boolean;
   weeklyReview: boolean;
   experimentNudges: boolean;
+  /** "Had your usual coffee?" when the usual morning drink hasn't been logged. */
+  caffeineNudge: boolean;
 }
 
 export interface BackgroundSettings {
@@ -59,6 +61,16 @@ export interface CalendarSettings {
   prepMin: number;
 }
 
+/** How alarms use the CMF Watch (via notifications mirrored by Nothing X). */
+export interface WatchSettings {
+  /** 'wrist' = silent buzzes on the watch first, phone alarm only as a backup. */
+  napAlarm: 'phone' | 'wrist';
+  wakeAlarm: 'phone' | 'wrist';
+  /** Watch-first: minutes of wrist buzzes before the phone alarm rings as a backup. */
+  backupMin: number;
+  testSentAt?: number;
+}
+
 export interface AudioSettings {
   sound: 'white' | 'pink' | 'brown' | 'rain';
   volume: number;
@@ -70,6 +82,8 @@ export interface NapTimer {
   alarmAt: number;
   label: string;
   notificationId?: string;
+  /** Watch-first nap: when the phone backup alarm rings (alarmAt is the first wrist buzz). */
+  backupAt?: number;
 }
 
 export interface Settings {
@@ -89,6 +103,7 @@ export interface Settings {
   background: BackgroundSettings;
   calendar: CalendarSettings;
   audio: AudioSettings;
+  watch: WatchSettings;
   /** Small bookkeeping values for features (e.g. last morning report sent). */
   marks: Record<string, string | number | undefined>;
 }
@@ -113,6 +128,8 @@ export interface AppState extends SleepDataset {
   logDay(date: string, patch: Partial<DayLog>): void;
   toggleTag(date: string, tag: string): void;
   addCaffeine(d: CaffeineDose): void;
+  /** Edit a logged drink (e.g. move a forgotten morning coffee to when it was actually drunk). */
+  updateCaffeine(id: string, patch: Partial<Omit<CaffeineDose, 'id'>>): void;
   removeCaffeine(id: string): void;
   saveScreening(id: string, answers: number[], score: number, date: string): void;
   loadDemo(now?: number): void;
@@ -130,6 +147,7 @@ export interface AppState extends SleepDataset {
   setBackground(patch: Partial<BackgroundSettings>): void;
   setCalendarSettings(patch: Partial<CalendarSettings>): void;
   setAudioSettings(patch: Partial<AudioSettings>): void;
+  setWatchSettings(patch: Partial<WatchSettings>): void;
   setMark(key: string, value: string | number | undefined): void;
 }
 
@@ -148,6 +166,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   naturalWakePrompt: true,
   weeklyReview: true,
   experimentNudges: true,
+  caffeineNudge: true,
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -159,6 +178,7 @@ const DEFAULT_SETTINGS: Settings = {
   background: { enabled: true },
   calendar: { enabled: false, calendarIds: [], prepMin: 60 },
   audio: { sound: 'brown', volume: 0.6, timerMin: 45 },
+  watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
   marks: {},
 };
 
@@ -238,6 +258,8 @@ export const useStore = create<AppState>()(
 
       addCaffeine: (d) => set((s) => ({ caffeine: [...s.caffeine, d].sort((a, b) => a.time - b.time) })),
       removeCaffeine: (id) => set((s) => ({ caffeine: s.caffeine.filter((x) => x.id !== id) })),
+      updateCaffeine: (id, patch) =>
+        set((s) => ({ caffeine: s.caffeine.map((x) => (x.id === id ? { ...x, ...patch } : x)).sort((a, b) => a.time - b.time) })),
 
       saveScreening: (id, answers, score, date) =>
         set((s) => ({ profile: { ...s.profile, screenings: { ...s.profile.screenings, [id]: { score, answers, date } } } })),
@@ -274,6 +296,7 @@ export const useStore = create<AppState>()(
       setBackground: (patch) => set((s) => ({ settings: { ...s.settings, background: { ...s.settings.background, ...patch } } })),
       setCalendarSettings: (patch) => set((s) => ({ settings: { ...s.settings, calendar: { ...s.settings.calendar, ...patch } } })),
       setAudioSettings: (patch) => set((s) => ({ settings: { ...s.settings, audio: { ...s.settings.audio, ...patch } } })),
+      setWatchSettings: (patch) => set((s) => ({ settings: { ...s.settings, watch: { ...s.settings.watch, ...patch } } })),
       setMark: (key, value) => set((s) => ({ settings: { ...s.settings, marks: { ...s.settings.marks, [key]: value } } })),
     }),
     {
@@ -313,6 +336,7 @@ export const useStore = create<AppState>()(
             background: { ...DEFAULT_SETTINGS.background, ...ps?.background },
             calendar: { ...DEFAULT_SETTINGS.calendar, ...ps?.calendar },
             audio: { ...DEFAULT_SETTINGS.audio, ...ps?.audio },
+            watch: { ...DEFAULT_SETTINGS.watch, ...ps?.watch },
             marks: { ...ps?.marks },
           },
         };

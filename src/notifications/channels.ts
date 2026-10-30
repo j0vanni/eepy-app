@@ -32,6 +32,16 @@ export function configureNotifications(): Promise<void> {
       await Notifications.setNotificationChannelAsync('pings', { name: 'Alertness check-ins', importance: Notifications.AndroidImportance.DEFAULT });
       await Notifications.setNotificationChannelAsync('reports', { name: 'Sleep reports', importance: Notifications.AndroidImportance.DEFAULT });
       await Notifications.setNotificationChannelAsync('live', { name: 'Live countdowns', importance: Notifications.AndroidImportance.LOW });
+      // Nothing X mirrors these to the CMF Watch, which buzzes; the phone only gives a short tick.
+      await Notifications.setNotificationChannelAsync('wrist', {
+        name: 'Watch buzzes (silent alarms)',
+        description: 'Silent nap and wake alarms that buzz your CMF Watch through Nothing X. The phone alarm rings later only as a backup.',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: null,
+        enableVibrate: true,
+        vibrationPattern: [0, 200],
+        bypassDnd: true,
+      });
     }
     for (const f of FEATURES) {
       for (const c of f.categories ?? []) {

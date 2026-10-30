@@ -10,6 +10,7 @@ A sleep coach for Android that turns the data your **CMF Watch 3 Pro** already c
 | ✅ | Built and covered by automated tests or verified in the UI |
 | 🧪 | Built, but needs checking on a real phone with a real CMF Watch (Health Connect specifics) |
 | 🗺️ | Planned — designed but not built yet |
+| ℹ️ | Not possible / a known limit |
 
 ---
 
@@ -119,6 +120,9 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Personal cut-off time**: latest moment a standard coffee keeps caffeine in the first 3 hours of sleep under your limit (default 50 mg, adjustable) |
 | ✅ | Live "mg in your system" and a curve through bedtime; warning if you're already over |
 | ✅ | Insight: what caffeine left at bedtime does to *your* sleep latency / deep sleep |
+| ✅ | **Fix forgotten drinks**: tap any logged drink (Journal, Today's caffeine card, the check-in toast's *Change*) to move its time, day or amount; log with "30 min / 1 h / 2 h ago" or an exact time |
+| ✅ | **Learns your usual morning drink** (first drink of the day over the last 3 weeks) — one tap logs it *at its usual time* from the check-in sheet or a Today card |
+| 🧪 | **"Had your usual coffee?"** notification an hour after your usual time if nothing is logged: *Yes* logs it at the usual time without opening the app, *Not today* stops asking |
 
 ## 9. Chronotype & regularity
 
@@ -165,6 +169,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | --- | --- |
 | ✅ | Wind-down reminder, bedtime, caffeine cut-off, morning check-in — re-planned automatically from the latest analysis |
 | ✅ | Cycle-timed wake alarm and nap alarm on a high-priority "alarms" channel using exact alarm-clock delivery |
+| ✅ | This morning's alarm is held until it has rung — re-planning after 4 am (when "tonight" becomes tomorrow) can no longer move it to the next day |
 
 ## 14. Privacy & your data
 
@@ -208,6 +213,16 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | ✅ | **Workout-timing insights** from Health Connect exercise sessions (if Nothing X writes them) |
 | ✅ | **Coach tab** hub for all of the above |
 | 🧪 | **Full-screen alarm** for naps and the cycle-timed wake-up: rings over the lock screen at alarm volume with Snooze (9 min) / I'm up, survives reboots, falls back to a ringing heads-up when the phone is in use (Android 14+ asks you to allow full-screen alarms) |
+
+## 17. New in 0.3 — coffee times and the watch on your wrist
+
+| | Feature |
+| --- | --- |
+| ✅ | **Drink editor**: change the time, day or amount of any logged drink; shows what it leaves in your system at lights-out |
+| ✅ | **Usual-coffee learning** + one-tap "log my usual" and the 🧪 *Had your usual coffee?* nudge (see §8) |
+| 🧪 | **Watch-first alarms** (Settings → CMF Watch): nap and/or morning alarms buzz the CMF Watch silently three times through Nothing X's notification mirroring; the phone alarm rings 3/5/10 min later only if you haven't tapped *I'm up* |
+| 🧪 | **Test buzz** and step-by-step Nothing X notification setup; sleep sounds are controllable from the watch's music controls |
+| ℹ️ | The CMF Watch 3 Pro has no third-party apps, watch faces or SDK, so eepy can't put a screen or tile on the watch — notifications, music controls and Health Connect are the three ways in |
 
 ---
 

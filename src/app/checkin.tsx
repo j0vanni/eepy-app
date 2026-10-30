@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { caffeineAt, CAFFEINE_PRESETS } from '@/engine/caffeine';
+import { relativeTimeOptions, usualCaffeine, usualDose } from '@/engine/caffeineHabits';
 import { TAG_BY_ID } from '@/engine/tags';
-import { addDays, dateKey, formatTime, HOUR, minutesOfDay } from '@/engine/time';
+import { addDays, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { Button, Chip, Icon, Row, Screen, Section } from '@/ui/components';
@@ -36,6 +37,8 @@ const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '').replace('Es
 interface Toast {
   text: string;
   undo?: () => void;
+  /** e.g. "Change time" for a drink just logged. */
+  edit?: { label: string; run: () => void };
   n: number;
 }
 
@@ -59,6 +62,8 @@ export default function CheckInSheet() {
   const [toast, setToast] = useState<Toast>();
   const [keepOpen, setKeepOpen] = useState(false);
   const [moreDrinks, setMoreDrinks] = useState(false);
+  /** Minutes ago the drink was had (forgot to log it straight away?). */
+  const [agoMin, setAgoMin] = useState(0);
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -69,9 +74,9 @@ export default function CheckInSheet() {
     return () => clearTimeout(id);
   }, [toast, keepOpen]);
 
-  const logged = (text: string, undo?: () => void) => {
+  const logged = (text: string, undo?: () => void, edit?: Toast['edit']) => {
     confirmHaptic();
-    setToast({ text, undo, n: (toast?.n ?? 0) + 1 });
+    setToast({ text, undo, edit, n: (toast?.n ?? 0) + 1 });
   };
 
   const recent = checkins.filter((c) => c.time <= now && now - c.time < 3 * HOUR);
@@ -93,10 +98,21 @@ export default function CheckInSheet() {
     logDay(day, { energy });
     logged(`Energy ${energy} (${ENERGY[energy - 1].toLowerCase()}) logged`, () => logDay(day, { energy: prev }));
   };
+  const editDrink = (id: string) => ({ label: 'Change', run: () => router.replace({ pathname: '/caffeine', params: { id } }) });
   const drink = (label: string, mg: number) => {
+    const time = Date.now() - agoMin * MINUTE;
     const id = `c-${Date.now()}-${mg}`;
-    addCaffeine({ id, time: Date.now(), mg, label });
-    logged(`${shortDrink(label)} · ${mg} mg logged`, () => removeCaffeine(id));
+    addCaffeine({ id, time, mg, label });
+    logged(`${shortDrink(label)} · ${mg} mg at ${formatTime(time)}`, () => removeCaffeine(id), editDrink(id));
+  };
+  const usual = usualCaffeine(doses, now);
+  const hadToday = doses.some((d) => dateKey(d.time) === dateKey(now));
+  const logUsual = () => {
+    if (!usual) return;
+    const dose = usualDose(usual, Date.now());
+    if (doses.some((d) => d.id === dose.id)) return;
+    addCaffeine(dose);
+    logged(`${shortDrink(dose.label)} · ${dose.mg} mg at ${formatTime(dose.time)}`, () => removeCaffeine(dose.id), editDrink(dose.id));
   };
   const tag = (id: string) => {
     const on = !(log?.tags.includes(id) ?? false);
@@ -163,6 +179,24 @@ export default function CheckInSheet() {
         </Section>
 
         <Section title="Coffee & caffeine" action={<Text style={font.small}>{caffeineNow >= 1 ? `${Math.round(caffeineNow)} mg active` : ''}</Text>}>
+          {usual && !hadToday && minutesOfDay(now) >= usual.timeMin ? (
+            <Pressable onPress={logUsual} style={({ pressed }) => [styles.usual, pressed ? { opacity: 0.7 } : null]} accessibilityRole="button">
+              <Icon name="coffee" size={20} color={colors.caffeine} />
+              <View style={{ flex: 1 }}>
+                <Text style={[font.body, { fontWeight: '600' }]}>Had your usual?</Text>
+                <Text style={font.small}>
+                  {shortDrink(usual.label)} · {usual.mg} mg at {formatClock(usual.timeMin)} — tap to log it at that time
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+          <Text style={[font.tiny, { marginBottom: 6 }]}>When?</Text>
+          <View style={[styles.wrap, { marginBottom: space.sm }]}>
+            {relativeTimeOptions(now).map((o) => {
+              const min = Math.round((now - o.time) / MINUTE);
+              return <Chip key={o.label} label={o.label} selected={agoMin === min} onPress={() => setAgoMin(min)} />;
+            })}
+          </View>
           <View style={styles.wrap}>
             {drinks.map((p) => (
               <Chip key={p.label} icon="coffee-outline" label={`${shortDrink(p.label)} · ${p.mg}`} color={colors.caffeine} onPress={() => drink(p.label, p.mg)} />
@@ -197,11 +231,16 @@ export default function CheckInSheet() {
         <EnterView key={toast.n} style={[styles.toast, { bottom: insets.bottom + 16 }]}>
           <Icon name="check-circle" size={20} color={colors.good} />
           <View style={{ flex: 1 }}>
-            <Text style={[font.body, { fontWeight: '600' }]} numberOfLines={1}>
+            <Text style={[font.body, { fontWeight: '600' }]} numberOfLines={toast.edit ? 2 : 1}>
               {toast.text}
             </Text>
             <Text style={font.tiny}>{keepOpen ? 'Saved' : 'Saved · closing…'}</Text>
           </View>
+          {toast.edit ? (
+            <Pressable onPress={toast.edit.run} hitSlop={8} accessibilityRole="button">
+              <Text style={[font.small, { color: colors.accent, fontWeight: '700' }]}>{toast.edit.label}</Text>
+            </Pressable>
+          ) : null}
           {toast.undo ? (
             <Pressable
               onPress={() => {
@@ -250,6 +289,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  usual: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    marginBottom: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.caffeine,
+    backgroundColor: colors.surface,
+  },
   toast: {
     position: 'absolute',
     left: space.lg,

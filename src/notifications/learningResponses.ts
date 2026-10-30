@@ -13,6 +13,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { useStore } from '../state/store';
+import { caffeineNudge } from './features/caffeineNudge';
 import { experiments } from './features/experiments';
 import { naturalWake } from './features/naturalWake';
 import { pings } from './features/pings';
@@ -20,7 +21,7 @@ import type { NotificationFeature, NotificationResponse } from './types';
 
 export const LEARNING_RESPONSE_TASK = 'eepy-learning-notification-response';
 // Features whose action buttons don't open the app.
-const HANDLED: NotificationFeature[] = [pings, naturalWake, experiments];
+const HANDLED: NotificationFeature[] = [pings, naturalWake, experiments, caffeineNudge];
 
 /** Writing before the persisted store has loaded would overwrite it — wait (or give up). */
 function whenHydrated(timeoutMs = 10_000): Promise<boolean> {

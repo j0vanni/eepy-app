@@ -135,6 +135,12 @@ export function NotificationsSection() {
         />
         <Toggle label="Bedtime" value={settings.notifications.bedtime} onChange={(v) => setNotif('bedtime', v)} />
         <Toggle label="Caffeine cut-off" value={settings.notifications.caffeine} onChange={(v) => setNotif('caffeine', v)} />
+        <Toggle
+          label="Forgot your coffee?"
+          sub={'An hour after your usual morning drink, if nothing is logged: "Yes" logs it at your usual time'}
+          value={settings.notifications.caffeineNudge}
+          onChange={(v) => setNotif('caffeineNudge', v)}
+        />
         <Toggle label="Morning check-in" value={settings.notifications.morningCheckIn} onChange={(v) => setNotif('morningCheckIn', v)} />
         <Toggle
           label="Wake alarm (cycle-timed)"
