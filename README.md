@@ -18,7 +18,7 @@ The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 
 
 ## Install the APK
 
-1. Open the repository's **Releases** page on your phone (or the latest run under **Actions → Android APK → Artifacts**).
+1. Open the repository's **Releases** page on your phone (signed in to GitHub, since the repository is private).
 2. Download `eepy-<version>-build<N>.apk`.
 3. When Android asks, allow your browser to *install unknown apps*, then install.
 4. Open eepy → follow the onboarding → **Connect CMF Watch**.

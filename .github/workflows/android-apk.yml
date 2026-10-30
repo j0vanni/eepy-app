@@ -14,22 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Typecheck & tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test -- --ci
-
+  # One job: a second job would repeat checkout, npm ci and runner start-up, and each job's
+  # minutes are rounded up separately (this repo's Actions minutes are limited once it's private).
   apk:
-    name: Build APK
-    needs: checks
+    name: Test & build APK
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -47,6 +35,8 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --ci
       - name: Stamp the build number
         # CI-only, never committed: android.versionCode = run number. eepy reads it (expo-constants)
         # to know which build it is when checking GitHub for updates, and Android only installs an
@@ -98,11 +88,6 @@ jobs:
             echo 'inside eepy: Settings → App updates.'
           } > release-notes.md
           cat release-notes.md
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.apk.outputs.name }}
-          path: dist-apk/*.apk
-          retention-days: 30
       - name: Publish as a GitHub release
         uses: softprops/action-gh-release@v2
         with:
