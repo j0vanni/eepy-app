@@ -97,6 +97,8 @@ export function wakeAlarmContent(a: Analysis): WakeAlarmContent {
 export const WAKE_AT_MARK = 'wake.at';
 /** marks key: first ring of a wake alarm already stopped from its watch buzz. */
 export const WAKE_DONE_MARK = 'wake.done';
+/** marks key: wake date (YYYY-MM-DD) whose alarm the user skipped ("Skip tomorrow's alarm"). */
+export const WAKE_SKIP_MARK = 'wake.skip';
 /** Watch-first alarms buzz the wrist at these offsets (min) before the phone alarm takes over. */
 export const WRIST_BUZZ_OFFSETS_MIN = [0, 1, 2];
 /** A wake alarm that has rung stays current this long (it may be ringing or snoozed). */
@@ -111,7 +113,9 @@ export interface WakeAlarmPlan extends WakeAlarmContent {
   wrist: number[];
   /** This morning's alarm, kept although "tonight" has moved on to tomorrow. */
   held: boolean;
-  /** Stopped from the watch already: nothing left to ring. */
+  /** Skipped for that morning by the user. */
+  skipped: boolean;
+  /** Nothing left to ring: stopped from the watch already, or skipped. */
   done: boolean;
 }
 
@@ -144,7 +148,8 @@ export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number):
     at: base + backupMs,
     wrist: wristMode ? WRIST_BUZZ_OFFSETS_MIN.map((m) => base + m * MINUTE) : [],
     held: holding,
-    done: base === done,
+    skipped: settings.marks[WAKE_SKIP_MARK] === dateKey(base),
+    done: base === done || settings.marks[WAKE_SKIP_MARK] === dateKey(base),
   };
 }
 

@@ -4,7 +4,7 @@ import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as S
 
 import type { AlertnessPoint } from '../engine/alertness';
 import type { StageMinutes } from '../engine/sessions';
-import { clamp, formatClock, formatDuration, formatTime, HOUR, minutesOfDay, MINUTE } from '../engine/time';
+import { clamp, formatClock, formatDuration, formatHourLabel, formatTime, getClockFormat, HOUR, minutesOfDay, MINUTE } from '../engine/time';
 import type { StageSegment } from '../engine/types';
 import { FillPath, PulseCircle, Reveal } from './motion';
 import { ScrubSurface, ScrubTooltip, useScrub } from './scrub';
@@ -21,7 +21,12 @@ export function ChartFrame({ height, children }: { height: number; children: (wi
   );
 }
 
-const hourLabel = (t: number) => formatClock(minutesOfDay(t)).slice(0, 2);
+/** Tiny hourly tick ("23" / "11p") for dense axes like the hypnogram. */
+const hourLabel = (t: number) => {
+  const h = new Date(t).getHours();
+  if (getClockFormat() === '24h') return String(h).padStart(2, '0');
+  return `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`;
+};
 
 /** Local clock hours between start and end that are multiples of `every`. */
 function hourTicks(start: number, end: number, every: number): number[] {
@@ -233,7 +238,7 @@ const EnergyLayer = memo(function EnergyLayer({ points, now, dip, focusWindows, 
       ) : null}
       {hourTicks(start, end, 3).map((t) => (
         <SvgText key={t} x={x(t)} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
-          {formatClock(minutesOfDay(t))}
+          {formatHourLabel(minutesOfDay(t))}
         </SvgText>
       ))}
     </Svg>
@@ -537,7 +542,7 @@ export function SleepTimeline({ rows, height = 180 }: { rows: { label: string; o
                   <G key={h}>
                     <Line x1={labelW} x2={width} y1={yy} y2={yy} stroke={colors.border} strokeWidth={0.5} />
                     <SvgText x={0} y={yy + 4} fill={colors.textFaint} fontSize={9}>
-                      {formatClock(h * 60)}
+                      {formatHourLabel(h * 60)}
                     </SvgText>
                   </G>
                 );

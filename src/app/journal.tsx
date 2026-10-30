@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { CAFFEINE_PRESETS } from '@/engine/caffeine';
+import { drinkOptions } from '@/engine/caffeineHabits';
 import { TAGS } from '@/engine/tags';
 import { addDays, atMinutes, dateKey, formatClock, formatDuration, formatTime, minutesOfDay, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
@@ -23,6 +23,7 @@ export default function JournalScreen() {
   const caffeine = useStore((s) => s.caffeine);
   const addCaffeine = useStore((s) => s.addCaffeine);
   const removeCaffeine = useStore((s) => s.removeCaffeine);
+  const customDrinks = useStore((s) => s.settings.customDrinks);
   const a = useAnalysis();
   const [doseMin, setDoseMin] = useState(() => (date === today ? Math.round(minutesOfDay(Date.now()) / 5) * 5 : 9 * 60));
 
@@ -112,7 +113,7 @@ export default function JournalScreen() {
         <CardTitle icon="coffee-outline" title="Caffeine" color={colors.caffeine} right={<Text style={font.small}>{dayDoses.reduce((s, d) => s + d.mg, 0)} mg</Text>} />
         <Stepper label="Time" value={formatClock(doseMin)} onDec={() => setDoseMin(normalizeMinutes(doseMin - 15))} onInc={() => setDoseMin(normalizeMinutes(doseMin + 15))} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {CAFFEINE_PRESETS.map((p) => (
+          {drinkOptions(customDrinks).map((p) => (
             <Chip
               key={p.label}
               label={`${p.label} · ${p.mg}`}

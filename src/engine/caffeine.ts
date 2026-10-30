@@ -1,10 +1,18 @@
 import { HOUR, MINUTE } from './time';
 import type { CaffeineDose } from './types';
 
+export interface DrinkPreset {
+  label: string;
+  mg: number;
+}
+
 /** Common drinks, mg of caffeine per serving (typical values; brands vary a lot). */
-export const CAFFEINE_PRESETS: { label: string; mg: number }[] = [
+export const CAFFEINE_PRESETS: DrinkPreset[] = [
   { label: 'Espresso shot', mg: 63 },
   { label: 'Coffee (8 oz / 240 ml)', mg: 95 },
+  // ~1 rounded tsp of granules per cup; strength varies a lot with how much you use.
+  { label: 'Instant coffee (8 oz)', mg: 62 },
+  { label: 'Decaf coffee (8 oz)', mg: 3 },
   { label: 'Large coffee (16 oz)', mg: 190 },
   { label: 'Cold brew (16 oz)', mg: 200 },
   { label: 'Black tea', mg: 47 },

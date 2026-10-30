@@ -11,7 +11,7 @@ import type { Tip } from './coach';
 import type { Insight } from './insights';
 import type { Night } from './sessions';
 import { mean, welchTTest } from './stats';
-import { addDays, atMinutes, clockDiff, dateKey, daysBetween, formatClock, formatDuration, minutesOfDay } from './time';
+import { addDays, atMinutes, clockDiff, dateKey, daysBetween, formatClock, formatDuration, localizeClockText, minutesOfDay } from './time';
 import type { CaffeineDose, DayLog, NightVitals, SleepDataset, Workout } from './types';
 
 export type RecommendationKind = 'keep' | 'extend' | 'no-effect' | 'too-early';
@@ -186,8 +186,13 @@ export interface ExperimentTemplate {
 export const EXPERIMENT_TEMPLATES: ExperimentTemplate[] = [
   {
     id: 'caffeine-cutoff',
-    title: 'Caffeine cut-off at 14:00',
-    rule: 'No coffee, tea, cola or energy drinks after 14:00',
+    // Getters: times follow the 12/24-hour setting at the moment they're shown.
+    get title() {
+      return `Caffeine cut-off at ${formatClock(14 * 60)}`;
+    },
+    get rule() {
+      return `No coffee, tea, cola or energy drinks after ${formatClock(14 * 60)}`;
+    },
     why: "Caffeine's half-life is about five hours, so an afternoon coffee is still half-active at bedtime. In lab studies, caffeine even six hours before bed cut total sleep by about an hour.",
     icon: 'coffee-off-outline',
     durationDays: 7,
@@ -294,8 +299,12 @@ export const EXPERIMENT_TEMPLATES: ExperimentTemplate[] = [
   },
   {
     id: 'exercise-early',
-    title: 'Exercise before 18:00',
-    rule: '20+ minutes of exercise, finished before 18:00',
+    get title() {
+      return `Exercise before ${formatClock(18 * 60)}`;
+    },
+    get rule() {
+      return `20+ minutes of exercise, finished before ${formatClock(18 * 60)}`;
+    },
     why: 'Regular daytime exercise is one of the most reliable ways to deepen sleep. Hard sessions close to bedtime can keep your heart rate up, so finishing earlier gets the benefit without the delay.',
     icon: 'run-fast',
     durationDays: 14,
@@ -380,7 +389,7 @@ export function templateFor(e: Pick<Experiment, 'templateId'>): ExperimentTempla
 
 /** Fills `{target}` placeholders with the experiment's target time. */
 export function fillTarget(text: string, targetMin?: number): string {
-  return text.replace(/\{target\}/g, targetMin !== undefined ? formatClock(targetMin) : 'your target time');
+  return localizeClockText(text.replace(/\{target\}/g, targetMin !== undefined ? formatClock(targetMin) : 'your target time'));
 }
 
 export function experimentRule(e: Experiment): string {
@@ -866,7 +875,7 @@ export function rankTemplates(input: SuggestionInput): TemplateSuggestion[] {
       const lateDays = new Set(input.caffeine.filter((c) => dateKey(c.time) > since && minutesOfDay(c.time) >= 14 * 60).map((c) => dateKey(c.time))).size;
       if (lateDays >= 3) {
         score += 8 + lateDays * 2;
-        reasons.push({ w: 8 + lateDays * 2, text: `You had caffeine after 14:00 on ${lateDays} of the last 14 days` });
+        reasons.push({ w: 8 + lateDays * 2, text: `You had caffeine after ${formatClock(14 * 60)} on ${lateDays} of the last 14 days` });
       }
     }
     if (t.id === 'consistent-wake') {

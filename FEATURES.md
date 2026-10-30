@@ -252,6 +252,19 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 
 ---
 
+## 19. New in 0.4 — everyday polish
+
+| | Feature |
+| --- | --- |
+| ✅ | **12-hour clock** everywhere (times, charts, notifications, quiz answers, experiment rules): Settings → You → *Time format* — follow the phone (default), 12-hour or 24-hour |
+| ✅ | **Instant coffee** (62 mg) and **decaf** (3 mg) presets |
+| ✅ | **Your own drinks**: name + amount (e.g. "Instant, 2 tsp · 105 mg") saved from the drink editor, shown first everywhere, removable in Settings |
+| ✅ | **The check-in shows what you actually drink** — your most-logged drinks of the last 30 days first, common ones after; *More…* shows everything |
+| ✅ | **Skip tomorrow's alarm** in one tap (evening countdown or Plan → Smart alarm), with Undo; only that morning is skipped, and it counts as a free morning for sleep-need learning |
+| ✅ | The evening countdown and Plan show the **alarm that will actually ring** (this morning's held alarm, or watch buzz + phone backup times) |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

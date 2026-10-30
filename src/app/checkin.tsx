@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { caffeineAt, CAFFEINE_PRESETS } from '@/engine/caffeine';
-import { relativeTimeOptions, usualCaffeine, usualDose } from '@/engine/caffeineHabits';
+import { caffeineAt } from '@/engine/caffeine';
+import { drinkOptions, frequentDrinks, relativeTimeOptions, usualCaffeine, usualDose } from '@/engine/caffeineHabits';
 import { TAG_BY_ID } from '@/engine/tags';
 import { addDays, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import { useStore } from '@/state/store';
@@ -28,7 +28,6 @@ const KSS = [
 ];
 const KSS_COLOR = ['#5FD3A5', '#5FD3A5', '#7FD0B8', '#6CC6FF', '#9B8CFF', '#B48CF0', '#FFB86B', '#FF9E7A', '#FF7A90'];
 const ENERGY = ['Exhausted', 'Tired', 'OK', 'Good', 'Energised'];
-const QUICK_DRINKS = ['Espresso shot', 'Coffee (8 oz / 240 ml)', 'Large coffee (16 oz)', 'Black tea', 'Green tea', 'Energy drink (8 oz)'];
 const QUICK_TAGS = ['alcohol', 'late-meal', 'exercise', 'stress', 'nap', 'outdoor-light', 'screens', 'late-caffeine'];
 const CLOSE_AFTER_MS = 2200;
 
@@ -50,6 +49,7 @@ export default function CheckInSheet() {
   const checkins = useStore((s) => s.checkins);
   const doses = useStore((s) => s.caffeine);
   const halfLife = useStore((s) => s.profile.caffeineHalfLifeH);
+  const customDrinks = useStore((s) => s.settings.customDrinks);
   const addCheckIn = useStore((s) => s.addCheckIn);
   const removeCheckIn = useStore((s) => s.removeCheckIn);
   const logDay = useStore((s) => s.logDay);
@@ -121,7 +121,9 @@ export default function CheckInSheet() {
   };
   const go = (path: '/journal' | '/log-sleep') => router.replace(path);
 
-  const drinks = moreDrinks ? CAFFEINE_PRESETS : CAFFEINE_PRESETS.filter((p) => QUICK_DRINKS.includes(p.label));
+  // What you drink most comes first; "More…" shows everything, your own drinks included.
+  const options = drinkOptions(customDrinks);
+  const drinks = moreDrinks ? options : frequentDrinks(doses, now, options);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

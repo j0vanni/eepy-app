@@ -10,6 +10,7 @@ import { CHRONOTYPE_LABELS } from '@/engine/chronotype';
 import type { PlanKind } from '@/engine/coach';
 import { curvePosition } from '@/engine/dayPhase';
 import { dateKey, formatClock, formatDuration, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
+import { nextWakeAlarm } from '@/notifications/fullScreenAlarm';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { ArcGauge, EnergyChart, energyWord, Hypnogram } from '@/ui/charts';
@@ -396,13 +397,21 @@ export function NeedDebtRow({ a }: A) {
 }
 
 export function TonightCard({ a, now, detailed }: A & { now: number; detailed?: boolean }) {
+  const settings = useStore((s) => s.settings);
+  const wake = settings.notifications.smartAlarm ? nextWakeAlarm(a, settings, now) : undefined;
+  const skipped = wake?.skipped && dateKey(wake.base) === a.tonight.wakeDate;
   return (
     <Card onPress={() => router.push('/plan')}>
       <CardTitle icon="moon-waning-crescent" title={detailed ? "Tonight's plan" : 'Tonight'} right={chevron} />
       <Row>
         <Stat label="Wind down" value={formatTime(a.tonight.windDownStart)} />
         <Stat label="Lights out" value={formatTime(a.tonight.bedtime)} color={colors.accent} />
-        <Stat label="Alarm" value={formatTime(a.alarm.alarm)} sub={a.alarm.onBoundary ? 'cycle-timed' : undefined} />
+        <Stat
+          label="Alarm"
+          value={skipped ? 'Skipped' : formatTime(a.alarm.alarm)}
+          color={skipped ? colors.textDim : undefined}
+          sub={skipped ? 'sleep in' : a.alarm.onBoundary ? 'cycle-timed' : undefined}
+        />
       </Row>
       <View style={{ marginTop: space.md, gap: 4 }}>
         {a.caffeine.cutoff.cutoff ? (

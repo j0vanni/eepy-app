@@ -3,7 +3,7 @@ import { PanResponder, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { AlertnessPoint } from '../engine/alertness';
-import { formatClock, formatTime, HOUR, minutesOfDay } from '../engine/time';
+import { formatClock, formatHourLabel, formatTime, HOUR, minutesOfDay } from '../engine/time';
 import { ChartFrame } from './charts';
 import { colors, font, space } from './theme';
 
@@ -132,7 +132,7 @@ export const CompareChart = memo(function CompareChart({
                 ) : null}
                 {hourTicks(from, to, 3).map((t) => (
                   <SvgText key={t} x={Math.min(width - 14, Math.max(14, x(t)))} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
-                    {formatClock(minutesOfDay(t))}
+                    {formatHourLabel(minutesOfDay(t))}
                   </SvgText>
                 ))}
               </Svg>

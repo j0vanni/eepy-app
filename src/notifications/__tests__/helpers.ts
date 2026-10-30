@@ -18,6 +18,8 @@ export const at = (day: string, h: number) => atMinutes(day, h * 60);
 /** A plain AppState around a dataset, with jest.fn() actions. */
 export function makeState(data: SleepDataset, over: { settings?: Partial<Settings>; prefs?: Partial<NotificationPrefs> } = {}): AppState {
   const settings: Settings = {
+    clock: '24h',
+    customDrinks: [],
     dataMode: 'live',
     preferredOrigins: [],
     historyDays: 60,

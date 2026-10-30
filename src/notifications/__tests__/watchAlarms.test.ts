@@ -34,7 +34,8 @@ import { atMinutes, dateKey, MINUTE } from '../../engine/time';
 import type { AppState, WatchSettings } from '../../state/store';
 import { startNapTimer } from '../alarms';
 import { planReminders, reminders, stopWristWake } from '../features/reminders';
-import { nextWakeAlarm, planNativeWakeAlarm, resetWakeAlarmMemo, syncWakeAlarm, WAKE_ALARM_ID, WAKE_AT_MARK, WAKE_DONE_MARK } from '../fullScreenAlarm';
+import { nextWakeAlarm, planNativeWakeAlarm, resetWakeAlarmMemo, syncWakeAlarm, WAKE_ALARM_ID, WAKE_AT_MARK, WAKE_DONE_MARK, WAKE_SKIP_MARK } from '../fullScreenAlarm';
+import { naturalWake } from '../features/naturalWake';
 import { NAP_NOTIFICATION_ID, NAP_WRIST_IDS, stopNapTimer } from '../napTimer';
 import { makeState } from './helpers';
 
@@ -46,7 +47,7 @@ const WRIST: WatchSettings = { napAlarm: 'wrist', wakeAlarm: 'wrist', backupMin:
 const THU = '2026-10-22';
 const data = generateDemoData(atMinutes(THU, 12 * 60));
 
-function ctxAt(hour: number, watch: WatchSettings = PHONE, marks: Record<string, number | undefined> = {}) {
+function ctxAt(hour: number, watch: WatchSettings = PHONE, marks: Record<string, string | number | undefined> = {}) {
   const now = atMinutes(THU, hour * 60);
   const state = makeState(data, { settings: { watch, marks }, prefs: { smartAlarm: true } });
   return { analysis: analyze({ ...data, sessions: state.sessions }, now), state, now, background: true };
@@ -177,5 +178,30 @@ describe('watch-first nap alarm', () => {
       expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(id);
       expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith(id);
     }
+  });
+});
+
+describe('skipping an alarm', () => {
+  it("silences only that morning's alarm, watch buzzes included", async () => {
+    mockModule.available = false;
+    const eve = ctxAt(21, WRIST);
+    const tomorrow = dateKey(eve.analysis.alarm.alarm);
+    const skipped = ctxAt(21, WRIST, { [WAKE_SKIP_MARK]: tomorrow });
+    expect(nextWakeAlarm(skipped.analysis, skipped.state.settings, skipped.now)).toMatchObject({ skipped: true, done: true });
+    expect(planReminders(skipped).filter((p) => p.channel === 'wrist' || p.id === 'wake')).toEqual([]);
+    // A skip for another day changes nothing.
+    const other = ctxAt(21, WRIST, { [WAKE_SKIP_MARK]: THU });
+    expect(planReminders(other).filter((p) => p.channel === 'wrist' || p.id === 'wake')).toHaveLength(4);
+
+    mockModule.available = true;
+    expect(planNativeWakeAlarm(skipped.analysis, true, skipped.now, skipped.state.settings)).toEqual({ action: 'cancel' });
+  });
+
+  it('asks "did you wake up on your own?" on a skipped workday', () => {
+    const eve = ctxAt(21, PHONE);
+    const tomorrow = eve.analysis.tonight.wakeDate; // Friday, a workday
+    expect(naturalWake.plan(eve).map((p) => p.id)).not.toContain(tomorrow);
+    const skipped = ctxAt(21, PHONE, { [WAKE_SKIP_MARK]: tomorrow });
+    expect(naturalWake.plan(skipped).map((p) => p.id)).toContain(tomorrow);
   });
 });

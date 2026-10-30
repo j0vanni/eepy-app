@@ -7,6 +7,7 @@ import { bedtimesForWake, shiftSchedule, wakesForBedtime } from '@/engine/schedu
 import { addDays, atMinutes, formatClock, formatDuration, formatTime, HOUR, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
+import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { PlanCalendarLines } from '@/ui/cards/CalendarNote';
 import { LineChart } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Icon, ListRow, Note, Row, Screen, Section, Segmented, Stat, Stepper } from '@/ui/components';
@@ -95,9 +96,9 @@ export default function PlanScreen() {
             : `No cycle boundary lands in the 30 minutes before ${formatTime(a.tonight.wake)}, so keep your alarm at ${formatTime(a.alarm.alarm)}.`}
         </Text>
         <Text style={[font.small, { marginTop: space.sm }]}>
-          Based on your {cyc}-minute cycle length and {Math.round(latency)} minutes to fall asleep. Turn on "Wake alarm" in Settings → Notifications to have eepy ring at
-          this time (your watch's own alarm works too).
+          Based on your {cyc}-minute cycle length and {Math.round(latency)} minutes to fall asleep. Watch-first buzzes and the phone backup are in Settings → CMF Watch.
         </Text>
+        <AlarmControl a={a} />
       </Card>
 
       <Section title="Bedtime calculator">

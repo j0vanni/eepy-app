@@ -1,9 +1,9 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { caffeineAt, CAFFEINE_PRESETS } from '@/engine/caffeine';
-import { relativeTimeOptions, usualCaffeine, usualDose, usualDoseId } from '@/engine/caffeineHabits';
+import { drinkOptions, relativeTimeOptions, usualCaffeine, usualDose, usualDoseId } from '@/engine/caffeineHabits';
 import { addDays, atMinutes, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import type { CaffeineDose } from '@/engine/types';
 import { useStore } from '@/state/store';
@@ -37,6 +37,9 @@ export default function DrinkEditor() {
   const halfLife = useStore((s) => s.profile.caffeineHalfLifeH);
   const limit = useStore((s) => s.profile.caffeineBedtimeLimitMg);
   const a = useAnalysis();
+  const customDrinks = useStore((s) => s.settings.customDrinks);
+  const setSettings = useStore((s) => s.setSettings);
+  const [newName, setNewName] = useState<string>();
 
   const [now] = useState(() => Date.now());
   const existing = params.id ? doses.find((d) => d.id === params.id) : undefined;
@@ -134,9 +137,10 @@ export default function DrinkEditor() {
       <Card>
         <CardTitle icon="coffee-outline" title="What" color={colors.caffeine} right={<Text style={font.h3}>{mg} mg</Text>} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {CAFFEINE_PRESETS.map((p) => (
+          {drinkOptions(customDrinks).map((p) => (
             <Chip
               key={p.label}
+              icon={customDrinks.some((c) => c.label === p.label) ? 'star-outline' : undefined}
               label={`${shortDrink(p.label)} · ${p.mg}`}
               selected={p.label === label}
               color={colors.caffeine}
@@ -146,8 +150,35 @@ export default function DrinkEditor() {
               }}
             />
           ))}
+          <Chip icon="plus" label="Your own drink" selected={newName !== undefined} onPress={() => setNewName(newName === undefined ? '' : undefined)} />
         </View>
         <Stepper label="Amount" sub="Stronger or weaker than usual?" value={`${mg} mg`} onDec={() => setMg(Math.max(5, mg - 5))} onInc={() => setMg(Math.min(600, mg + 5))} />
+        {newName !== undefined ? (
+          <View style={{ gap: space.sm, marginTop: space.sm }}>
+            <Text style={font.small}>Name it, set the amount above, and it's saved as one of your drinks (they show first everywhere).</Text>
+            <TextInput
+              autoFocus
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="e.g. Instant coffee, 2 tsp"
+              placeholderTextColor={colors.textFaint}
+              maxLength={40}
+              style={{ color: colors.text, backgroundColor: colors.surfaceAlt, borderRadius: 12, padding: 12, fontSize: 15 }}
+            />
+            <Button
+              small
+              icon="star-plus-outline"
+              label={`Save "${newName.trim() || '…'}" · ${mg} mg`}
+              onPress={() => {
+                const name = newName.trim();
+                if (!name) return;
+                setSettings({ customDrinks: [{ label: name, mg }, ...customDrinks.filter((c) => c.label !== name)] });
+                setLabel(name);
+                setNewName(undefined);
+              }}
+            />
+          </View>
+        ) : null}
       </Card>
 
       {atBed !== undefined && bedtime !== undefined ? (

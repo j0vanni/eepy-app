@@ -20,6 +20,7 @@ import { MINUTE } from '../engine/time';
 import { syncWakeAlarm } from '../notifications/fullScreenAlarm';
 import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
+import { applyClockSetting } from '../state/clockFormat';
 import { getFirstEventTomorrowDetails } from '../state/calendar';
 import { refitCalibration } from '../state/learning';
 import { selectDataset, useStore } from '../state/store';
@@ -123,6 +124,8 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
       refitCalibration(useStore.getState());
       const state = useStore.getState();
       if (state.sessions.length > 0) {
+        // Notification text uses the user's 12/24-hour choice (nothing else sets it headlessly).
+        applyClockSetting(state.settings.clock);
         const firstEvent = state.settings.calendar.enabled
           ? await getFirstEventTomorrowDetails(state.settings.calendar, now).catch(() => undefined)
           : undefined;

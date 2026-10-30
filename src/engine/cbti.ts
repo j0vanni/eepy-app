@@ -520,7 +520,13 @@ export function stimulusControlRules(wakeMin?: number): CbtiRule[] {
       title: wakeMin === undefined ? 'Same wake time every day' : `Get up at ${formatClock(wakeMin)} every day`,
       detail: 'Weekends too, however you slept.',
     },
-    { id: 'no-naps', title: 'No naps', detail: 'If you must for safety, keep it under 20 minutes and before 15:00.' },
+    {
+      id: 'no-naps',
+      title: 'No naps',
+      get detail() {
+        return `If you must for safety, keep it under 20 minutes and before ${formatClock(15 * 60)}.`;
+      },
+    },
   ];
 }
 

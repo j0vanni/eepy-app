@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { defaultTargetMin, EXPERIMENT_METRICS, ExperimentTemplate, fillTarget, TEMPLATE_BY_ID, TemplateSuggestion } from '@/engine/experiments';
 import type { Analysis } from '@/engine/analysis';
-import { formatClock, normalizeMinutes } from '@/engine/time';
+import { formatClock, localizeClockText, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { ExperimentCard } from '@/ui/cards/CoachCards';
@@ -165,7 +165,7 @@ export default function ExperimentsScreen() {
                 <ListRow
                   key={e.id}
                   icon={TEMPLATE_BY_ID[e.templateId]?.icon ?? 'flask-outline'}
-                  title={e.title}
+                  title={localizeClockText(e.title)}
                   sub={`${dayLabel(e.startDate, a.day)} · ${e.outcome ? `${e.outcome.nights} nights · ` : ''}${e.outcome?.adherencePct !== undefined ? `${Math.round(e.outcome.adherencePct * 100)}% kept` : e.status}`}
                   right={
                     <Row gap={6}>

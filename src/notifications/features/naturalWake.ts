@@ -11,6 +11,7 @@
 import { atMinutes, MINUTE, weekdayOfKey } from '../../engine/time';
 import { wakeTargetFor } from '../../engine/schedule';
 import { useStore } from '../../state/store';
+import { WAKE_SKIP_MARK } from '../fullScreenAlarm';
 import type { NotificationFeature, PlannedNotification } from '../types';
 import { dismissPresented, openRoute } from './learningShared';
 
@@ -39,7 +40,8 @@ export const naturalWake: NotificationFeature = {
     const { profile, dayLogs } = state;
     const out: PlannedNotification[] = [];
     for (const date of [a.day, a.tonight.wakeDate]) {
-      if (profile.workdays.includes(weekdayOfKey(date))) continue;
+      // Workdays too when the alarm was skipped: that's a free morning.
+      if (profile.workdays.includes(weekdayOfKey(date)) && state.settings.marks[WAKE_SKIP_MARK] !== date) continue;
       if (dayLogs[date]?.wokeNaturally !== undefined) continue;
       // Stable fallback time, so the prompt doesn't move around (or repeat) as data arrives.
       let at = atMinutes(date, wakeTargetFor(profile, date).wakeMin + SLEEP_IN_MIN + AFTER_WAKE_MIN);

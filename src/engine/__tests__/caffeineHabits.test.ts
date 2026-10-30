@@ -1,4 +1,5 @@
-import { usualCaffeine, usualCaffeineMissing, usualDose } from '../caffeineHabits';
+import { CAFFEINE_PRESETS } from '../caffeine';
+import { drinkOptions, frequentDrinks, usualCaffeine, usualCaffeineMissing, usualDose } from '../caffeineHabits';
 import { addDays, atMinutes, formatTime } from '../time';
 import type { CaffeineDose } from '../types';
 
@@ -44,5 +45,32 @@ describe('usual caffeine', () => {
     const u = usualCaffeine(history(14), now(12))!;
     expect(formatTime(usualDose(u, now(12)).time)).toBe('08:10');
     expect(usualDose(u, now(7)).time).toBe(now(7));
+  });
+});
+
+describe('drink options', () => {
+  it('has instant and decaf coffee', () => {
+    expect(CAFFEINE_PRESETS.find((p) => p.label.startsWith('Instant coffee'))?.mg).toBe(62);
+    expect(CAFFEINE_PRESETS.find((p) => p.label.startsWith('Decaf'))?.mg).toBeLessThan(10);
+  });
+
+  it('puts your own drinks first and lets them replace a preset of the same name', () => {
+    const opts = drinkOptions([{ label: 'My instant (2 tsp)', mg: 90 }, { label: 'Espresso shot', mg: 80 }]);
+    expect(opts[0]).toEqual({ label: 'My instant (2 tsp)', mg: 90 });
+    expect(opts.filter((o) => o.label === 'Espresso shot')).toEqual([{ label: 'Espresso shot', mg: 80 }]);
+    expect(opts.length).toBe(CAFFEINE_PRESETS.length + 1);
+  });
+
+  it('offers what you drink most, then common defaults', () => {
+    const opts = drinkOptions([{ label: 'My instant (2 tsp)', mg: 90 }]);
+    const doses = [
+      ...Array.from({ length: 5 }, (_, i) => ({ id: `a${i}`, time: now(8) - i * 86_400_000, mg: 90, label: 'My instant (2 tsp)' })),
+      ...Array.from({ length: 2 }, (_, i) => ({ id: `b${i}`, time: now(14) - (i + 1) * 86_400_000, mg: 47, label: 'Black tea' })),
+      // Too old to count.
+      { id: 'old', time: now(8) - 40 * 86_400_000, mg: 200, label: 'Cold brew (16 oz)' },
+    ];
+    const quick = frequentDrinks(doses, now(12), opts);
+    expect(quick.map((d) => d.label)).toEqual(['My instant (2 tsp)', 'Black tea', 'Coffee (8 oz / 240 ml)', 'Instant coffee (8 oz)', 'Espresso shot', 'Large coffee (16 oz)']);
+    expect(frequentDrinks([], now(12), opts).map((d) => d.label)[1]).toBe('Instant coffee (8 oz)');
   });
 });

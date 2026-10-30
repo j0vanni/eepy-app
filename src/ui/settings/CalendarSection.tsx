@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
 
-import { formatDuration, formatTime, MINUTE } from '../../engine/time';
+import { formatClock, formatDuration, formatTime, MINUTE } from '../../engine/time';
 import {
   CalendarAccess,
   calendarSupported,
@@ -116,7 +116,7 @@ export function CalendarSection() {
         ) : null}
         {demo ? (
           <Note tone="info" icon="flask-outline">
-            Demo: {cal.enabled ? 'showing' : 'turn this on to try it with'} sample events (dinner tonight, a 07:30 stand-up tomorrow). On your phone eepy reads your real
+            Demo: {cal.enabled ? 'showing' : 'turn this on to try it with'} sample events (dinner tonight, a {formatClock(7 * 60 + 30)} stand-up tomorrow). On your phone eepy reads your real
             calendars.
           </Note>
         ) : null}

@@ -6,6 +6,7 @@ import { BACKGROUND_INTERVAL_MIN, getBackgroundSyncStatus } from '../../backgrou
 import { getPermissionState, healthConnectStatus, requestHealthPermissions } from '../../integrations/healthConnect';
 import { ensureNotificationPermission } from '../../notifications/channels';
 import { FullScreenAlarmStatus, getFullScreenAlarmStatus, openFullScreenAlarmSettings } from '../../notifications/fullScreenAlarm';
+import { formatClock } from '../../engine/time';
 import { NotificationPrefs, useStore } from '../../state/store';
 import { Button, Card, CardTitle, Note, Row, Section } from '../components';
 import { notify } from '../confirm';
@@ -179,7 +180,7 @@ export function NotificationsSection() {
         />
         <Toggle
           label="Missing-night nudge"
-          sub="Around 10:00 if last night hasn't arrived from Nothing X"
+          sub={`Around ${formatClock(10 * 60)} if last night hasn't arrived from Nothing X`}
           value={settings.notifications.missingNightNudge}
           onChange={(v) => setNotif('missingNightNudge', v)}
         />

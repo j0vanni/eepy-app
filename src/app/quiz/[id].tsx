@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { CHRONOTYPE_LABELS, categoryFromRmeq } from '@/engine/chronotype';
 import { Quiz, QUIZZES, scoreQuiz } from '@/engine/screening';
-import { dateKey } from '@/engine/time';
+import { dateKey, localizeClockText } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { Button, Card, Empty, Meter, Note, Row, Screen } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
@@ -86,7 +86,7 @@ export default function QuizScreen() {
       {q.options.map((o) => (
         <Pressable key={o.label} onPress={() => choose(o.value)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Card style={answers[step] === o.value ? { borderColor: colors.accent } : undefined}>
-            <Text style={font.body}>{o.label}</Text>
+            <Text style={font.body}>{localizeClockText(o.label)}</Text>
           </Card>
         </Pressable>
       ))}

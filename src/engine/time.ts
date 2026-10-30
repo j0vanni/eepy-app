@@ -95,10 +95,51 @@ export function parseHHMM(s: string): number | undefined {
   return h * 60 + min;
 }
 
-/** Formats minutes-after-midnight as HH:MM (24h). */
+export type ClockFormat = '12h' | '24h';
+
+/**
+ * How clock times are shown everywhere (set by the app from Settings; tests keep the 24h default).
+ * Module state on purpose: formatting happens deep inside the engine (plan rationale, notification
+ * text) and threading a parameter through every caller isn't worth it.
+ */
+let clockFormat: ClockFormat = '24h';
+
+export function setClockFormat(format: ClockFormat): void {
+  clockFormat = format;
+}
+
+export function getClockFormat(): ClockFormat {
+  return clockFormat;
+}
+
+/** 12-hour pieces of a time of day: 0 → 12 AM, 13:05 → 1:05 PM. */
+function twelveHour(m: number): { h: number; mm: string; ampm: 'AM' | 'PM' } {
+  const h24 = Math.floor(m / 60);
+  return { h: h24 % 12 === 0 ? 12 : h24 % 12, mm: pad(m % 60), ampm: h24 < 12 ? 'AM' : 'PM' };
+}
+
+/** Formats minutes-after-midnight as "07:05" (24h) or "7:05 AM" (12h, with a no-break space). */
 export function formatClock(minutes: number): string {
   const m = Math.round(normalizeMinutes(minutes)) % MIN_PER_DAY;
+  if (clockFormat === '12h') {
+    const t = twelveHour(m);
+    return `${t.h}:${t.mm}\u00A0${t.ampm}`;
+  }
   return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+}
+
+/** Compact hour label for chart axes: "09:00" or "9 AM" (minutes shown only when not on the hour). */
+export function formatHourLabel(minutes: number): string {
+  const m = Math.round(normalizeMinutes(minutes)) % MIN_PER_DAY;
+  if (clockFormat === '24h') return formatClock(m);
+  const t = twelveHour(m);
+  return t.mm === '00' ? `${t.h}\u00A0${t.ampm}` : `${t.h}:${t.mm}\u00A0${t.ampm}`;
+}
+
+/** Rewrites "HH:MM" times inside fixed text (quiz answers, experiment rules) in the current format. */
+export function localizeClockText(text: string): string {
+  if (clockFormat === '24h') return text;
+  return text.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, (_, h: string, mm: string) => formatClock(Number(h) * 60 + Number(mm)));
 }
 
 export function formatTime(t: number): string {
@@ -108,7 +149,7 @@ export function formatTime(t: number): string {
 /** Formats a timestamp's clock time as seen in a fixed UTC offset (minutes east of UTC). */
 export function formatTimeInOffset(t: number, offsetMin: number): string {
   const shifted = new Date(t + offsetMin * MINUTE);
-  return `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`;
+  return formatClock(shifted.getUTCHours() * 60 + shifted.getUTCMinutes());
 }
 
 /** "7h 32m", "45m", "-1h 05m". */

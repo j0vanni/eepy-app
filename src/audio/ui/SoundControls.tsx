@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GestureResponderEvent, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { formatTime } from '@/engine/time';
 import { useNow } from '@/state/useAnalysis';
 import { Card, CardTitle, Icon, Note, Segmented } from '@/ui/components';
 import { colors, font, radius, space } from '@/ui/theme';
@@ -134,10 +135,7 @@ function fadeText(ms: number): string {
   return ms >= 60_000 ? `${Math.round(ms / 60_000)} minutes` : `${Math.round(ms / 1000)} seconds`;
 }
 
-function clock(t: number): string {
-  const d = new Date(t);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+const clock = formatTime;
 
 /** Round play/stop button. */
 export function PlayButton({ playing, onPress, size = 56, label }: { playing: boolean; onPress: () => void; size?: number; label?: string }) {

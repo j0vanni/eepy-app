@@ -1,16 +1,17 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 
 import { HALF_LIFE_OPTIONS } from '@/engine/caffeine';
 import { QUIZZES, scoreQuiz } from '@/engine/screening';
 import { formatClock, formatDuration, normalizeMinutes } from '@/engine/time';
 import { exportBackup, pickBackup } from '@/integrations/backup';
 import { summarizeOrigins } from '@/integrations/healthConnectMapper';
+import { systemClockFormat } from '@/state/clockFormat';
 import { selectDataset, useStore } from '@/state/store';
 import { runSync } from '@/state/sync';
-import { Button, Card, CardTitle, Chip, ListRow, Note, Row, Screen, Section, Segmented, Stepper } from '@/ui/components';
+import { Button, Card, CardTitle, Chip, Icon, ListRow, Note, Row, Screen, Section, Segmented, Stepper } from '@/ui/components';
 import { confirm, notify } from '@/ui/confirm';
 import { UpdateBanner } from '@/ui/cards/UpdateBanner';
 import { relativeTime } from '@/ui/format';
@@ -83,6 +84,16 @@ export default function SettingsScreen() {
             onInc={() => setProfile({ freeWakeMin: normalizeMinutes((profile.freeWakeMin ?? profile.workWakeMin + 60) + 15) })}
           />
           {profile.freeWakeMin !== undefined ? <Button small kind="ghost" label="Reset to auto" onPress={() => setProfile({ freeWakeMin: undefined })} /> : null}
+          <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Time format</Text>
+          <Segmented
+            value={settings.clock}
+            onChange={(clock) => setSettings({ clock })}
+            options={[
+              { label: `Phone (${systemClockFormat() === '12h' ? '12h' : '24h'})`, value: 'system' },
+              { label: '12-hour', value: '12h' },
+              { label: '24-hour', value: '24h' },
+            ]}
+          />
         </Card>
       </Section>
 
@@ -118,6 +129,26 @@ export default function SettingsScreen() {
             onDec={() => setProfile({ caffeineBedtimeLimitMg: Math.max(10, profile.caffeineBedtimeLimitMg - 10) })}
             onInc={() => setProfile({ caffeineBedtimeLimitMg: Math.min(150, profile.caffeineBedtimeLimitMg + 10) })}
           />
+          <Text style={[font.body, { marginTop: space.sm }]}>Your drinks</Text>
+          {settings.customDrinks.length === 0 ? (
+            <Text style={[font.small, { marginTop: 2 }]}>None yet. When logging a drink, tap "Your own drink" to save one with your own amount (e.g. how strong you make instant coffee).</Text>
+          ) : (
+            settings.customDrinks.map((d) => (
+              <Row key={d.label} style={{ paddingVertical: 6 }}>
+                <Icon name="star-outline" size={16} color={colors.caffeine} />
+                <Text style={[font.body, { flex: 1 }]}>
+                  {d.label} · {d.mg} mg
+                </Text>
+                <Pressable
+                  onPress={() => setSettings({ customDrinks: settings.customDrinks.filter((c) => c.label !== d.label) })}
+                  hitSlop={8}
+                  accessibilityLabel={`Remove ${d.label}`}
+                >
+                  <Icon name="close" color={colors.textFaint} />
+                </Pressable>
+              </Row>
+            ))
+          )}
           <Toggle
             label="Insomnia mode"
             sub="CBT-I principles: no naps, no extra time in bed, consistent schedule"

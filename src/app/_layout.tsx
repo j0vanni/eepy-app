@@ -6,7 +6,8 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { registerBackgroundSync } from '@/background/task';
-import { syncWakeAlarm } from '@/notifications/fullScreenAlarm';
+import { syncWakeAlarm, WAKE_SKIP_MARK } from '@/notifications/fullScreenAlarm';
+import { applyClockSetting } from '@/state/clockFormat';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
 import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
@@ -32,6 +33,7 @@ function Background() {
   const goals = useStore((s) => s.goals);
   const experiments = useStore((s) => s.experiments);
   const checkins = useStore((s) => s.checkins);
+  const skippedAlarm = useStore((s) => s.settings.marks[WAKE_SKIP_MARK]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -55,12 +57,14 @@ function Background() {
     replanNotifications(analysis, useStore.getState()).catch(() => undefined);
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.notifications, settings.napTimer, settings.watch, goals, experiments, checkins]);
+  }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, goals, experiments, checkins]);
   return null;
 }
 
 export default function RootLayout() {
   const hydrated = useStore((s) => s.hydrated);
+  // Before anything renders a time: every formatter reads the 12/24-hour choice from the engine.
+  applyClockSetting(useStore((s) => s.settings.clock));
   useEffect(() => {
     if (hydrated) SplashScreen.hideAsync().catch(() => undefined);
   }, [hydrated]);

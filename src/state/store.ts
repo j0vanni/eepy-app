@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { DrinkPreset } from '../engine/caffeine';
 import type { CalibrationResult } from '../engine/calibration';
 import type { CbtiProgram } from '../engine/cbti';
 import { generateDemoData } from '../engine/demo';
@@ -104,6 +105,10 @@ export interface NapTimer {
 }
 
 export interface Settings {
+  /** 12/24-hour clock; 'system' follows the phone (see state/clockFormat.ts). */
+  clock: 'system' | '12h' | '24h';
+  /** Your own drinks (name + mg), offered before the built-in presets. */
+  customDrinks: DrinkPreset[];
   dataMode: 'live' | 'demo';
   /** Health Connect data origins (apps) to trust for sleep, most preferred first. */
   preferredOrigins: string[];
@@ -189,6 +194,8 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 const DEFAULT_SETTINGS: Settings = {
+  clock: 'system',
+  customDrinks: [],
   dataMode: 'live',
   preferredOrigins: [],
   historyDays: 60,

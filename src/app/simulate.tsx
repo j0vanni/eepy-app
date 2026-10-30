@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import type { Analysis } from '@/engine/analysis';
 import { CAFFEINE_PRESETS } from '@/engine/caffeine';
+import { drinkOptions } from '@/engine/caffeineHabits';
 import { baselineScenario, Scenario, SimulationResult, simulateTomorrow, SIM } from '@/engine/simulate';
 import { atMinutes, formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
 import type { SleepDataset } from '@/engine/types';
@@ -345,7 +346,7 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
                 onChange={(v) => patch({ coffees: draft.coffees.map((x) => (x.id === c.id ? { ...x, time: v } : x)) })}
               />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingVertical: 2 }}>
-                {CAFFEINE_PRESETS.map((p) => (
+                {drinkOptions(useStore.getState().settings.customDrinks).map((p) => (
                   <Chip
                     key={p.label}
                     label={`${shortLabel(p.label)} · ${p.mg}`}

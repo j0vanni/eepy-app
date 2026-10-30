@@ -2,7 +2,7 @@
  * Learns the user's usual morning drink from their caffeine log, so a forgotten coffee can be
  * logged at the right time with one tap (or from a nudge).
  */
-import { CAFFEINE_PRESETS } from './caffeine';
+import { CAFFEINE_PRESETS, DrinkPreset } from './caffeine';
 import { addDays, atMinutes, circularMeanMinutes, dateKey, MINUTE, minutesOfDay } from './time';
 import type { CaffeineDose } from './types';
 
@@ -98,4 +98,36 @@ export function relativeTimeOptions(now: number): { label: string; time: number 
 
 export function presetFor(mg: number, label: string) {
   return CAFFEINE_PRESETS.find((p) => p.label === label) ?? CAFFEINE_PRESETS.find((p) => p.mg === mg);
+}
+
+/** Your own drinks first, then the built-in presets (a custom drink with a preset's name wins). */
+export function drinkOptions(custom: DrinkPreset[] = []): DrinkPreset[] {
+  const seen = new Set(custom.map((d) => d.label));
+  return [...custom, ...CAFFEINE_PRESETS.filter((p) => !seen.has(p.label))];
+}
+
+/** Quick-pick drinks when you haven't logged enough yet. */
+export const DEFAULT_QUICK_DRINKS = ['Coffee (8 oz / 240 ml)', 'Instant coffee (8 oz)', 'Espresso shot', 'Large coffee (16 oz)', 'Black tea', 'Energy drink (8 oz)'];
+const FREQUENT_DAYS = 30;
+
+/**
+ * The drinks to offer first: what you actually logged most over the last month (most recent
+ * breaking ties), topped up with common defaults, `n` in total.
+ */
+export function frequentDrinks(doses: CaffeineDose[], now: number, options: DrinkPreset[], n = 6): DrinkPreset[] {
+  const since = now - FREQUENT_DAYS * 24 * 60 * MINUTE;
+  const counts = new Map<string, { d: DrinkPreset; n: number; last: number }>();
+  for (const dose of doses) {
+    if (dose.time < since || dose.time > now) continue;
+    const key = `${dose.label}|${dose.mg}`;
+    const c = counts.get(key) ?? { d: { label: dose.label, mg: dose.mg }, n: 0, last: 0 };
+    counts.set(key, { d: c.d, n: c.n + 1, last: Math.max(c.last, dose.time) });
+  }
+  const out = [...counts.values()].sort((a, b) => b.n - a.n || b.last - a.last).map((c) => c.d);
+  const has = (label: string) => out.some((d) => d.label === label);
+  for (const label of DEFAULT_QUICK_DRINKS) {
+    const d = options.find((o) => o.label === label);
+    if (d && !has(label)) out.push(d);
+  }
+  return out.slice(0, n);
 }

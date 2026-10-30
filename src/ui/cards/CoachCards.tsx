@@ -7,7 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Analysis } from '@/engine/analysis';
 import { computeExperimentResult, experimentQuestion, experimentRule, templateFor } from '@/engine/experiments';
 import { WIND_DOWN_TAG } from '@/engine/goals';
-import { formatDuration, weekdayOfKey } from '@/engine/time';
+import { formatDuration, localizeClockText, weekdayOfKey } from '@/engine/time';
 import { buildWeeklyReview, latestReviewWeek } from '@/engine/weeklyReview';
 import { selectDataset, useStore } from '@/state/store';
 import { setAnswer } from '@/ui/coach/actions';
@@ -63,7 +63,7 @@ export function ExperimentCard({ analysis: a, showEmpty }: { analysis: Analysis;
   const recColor = rec.kind === 'keep' ? colors.good : rec.kind === 'no-effect' ? colors.warn : colors.accent;
   return (
     <Card onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: exp.id } })} accent={colors.accentSoft}>
-      <CardTitle icon={t?.icon ?? 'flask-outline'} title={exp.title} right={<Text style={font.small}>{result.complete ? 'Done' : `Day ${dayN}/${exp.durationDays}`}</Text>} />
+      <CardTitle icon={t?.icon ?? 'flask-outline'} title={localizeClockText(exp.title)} right={<Text style={font.small}>{result.complete ? 'Done' : `Day ${dayN}/${exp.durationDays}`}</Text>} />
       <Text style={font.body}>{experimentRule(exp)}</Text>
       <View style={{ marginTop: space.md }}>
         <ExperimentDots days={result.days} size={exp.durationDays > 7 ? 18 : 24} />

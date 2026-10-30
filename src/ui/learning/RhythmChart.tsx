@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import type { AlertnessPoint } from '@/engine/alertness';
-import { formatClock, HOUR, minutesOfDay, MINUTE } from '@/engine/time';
+import { formatClock, formatHourLabel, HOUR, minutesOfDay, MINUTE } from '@/engine/time';
 import { ChartFrame } from '../charts';
 import { colors, font, space } from '../theme';
 
@@ -101,7 +101,7 @@ export function RhythmChart({
                 ))}
               {hourTicks(start, end, 3).map((t) => (
                 <SvgText key={t} x={x(t)} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
-                  {formatClock(minutesOfDay(t))}
+                  {formatHourLabel(minutesOfDay(t))}
                 </SvgText>
               ))}
             </Svg>

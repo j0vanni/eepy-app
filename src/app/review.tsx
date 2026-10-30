@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
-import { formatClock, formatDuration } from '@/engine/time';
+import { formatClock, formatDuration, localizeClockText } from '@/engine/time';
 import { availableWeeks, buildWeeklyReview, latestReviewWeek, reviewNightLabel, ReviewNight, weekStartOf } from '@/engine/weeklyReview';
 import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
@@ -169,7 +169,7 @@ export default function ReviewScreen() {
       {review.experiment ? (
         <Section title="Experiment">
           <Card onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: review.experiment!.id } })}>
-            <CardTitle icon="flask-outline" title={review.experiment.title} right={<Icon name="chevron-right" color={colors.textFaint} />} />
+            <CardTitle icon="flask-outline" title={localizeClockText(review.experiment.title)} right={<Icon name="chevron-right" color={colors.textFaint} />} />
             <Text style={font.small}>{review.experiment.text}</Text>
           </Card>
         </Section>

@@ -15,7 +15,7 @@ import {
   Signal,
   templateFor,
 } from '@/engine/experiments';
-import { addDays, formatTime } from '@/engine/time';
+import { addDays, formatTime, localizeClockText } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { cycleAnswer, setAnswer } from '@/ui/coach/actions';
@@ -103,7 +103,7 @@ export default function ExperimentDetail() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: exp.title }} />
+      <Stack.Screen options={{ title: localizeClockText(exp.title) }} />
       <Card accent={isActive ? colors.accentSoft : undefined}>
         <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
           <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>

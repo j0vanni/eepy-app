@@ -16,6 +16,7 @@
 import { AudioPlayer, AudioStatus, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
 
+import { formatTime } from '../engine/time';
 import { effectiveVolume, FADE_IN_MS, isTimerFading, SWITCH_FADE_MS, voiceFinished, VoiceEnvelope } from './envelope';
 import { SoundId, soundInfo } from './sounds';
 
@@ -77,10 +78,7 @@ function lockScreenTitle(sound: SoundId): string {
   return sound === 'rain' ? 'Rain' : `${soundInfo(sound).label} noise`;
 }
 
-function formatClock(t: number): string {
-  const d = new Date(t);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+const formatClock = formatTime;
 
 export class SoundController {
   private voices: Voice[] = [];

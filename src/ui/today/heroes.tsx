@@ -6,6 +6,7 @@ import type { Analysis } from '@/engine/analysis';
 import { DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/engine/dayPhase';
 import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
 import { useNow } from '@/state/useAnalysis';
+import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { CalendarNote } from '@/ui/cards/CalendarNote';
 import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
@@ -59,8 +60,8 @@ function CountdownCard({ a }: { a: Analysis }) {
       <Text style={font.tiny}>{winding ? 'WIND-DOWN · LIGHTS OUT IN' : 'LIGHTS OUT IN'}</Text>
       <Text style={[font.stat, { fontSize: 46, lineHeight: 54, color: colors.text, fontVariant: ['tabular-nums'] }]}>{until(bedtime - now)}</Text>
       <Text style={[font.small, { color: colors.text }]}>
-        at {formatTime(bedtime)} · alarm {formatTime(a.alarm.alarm)}
-        {a.alarm.onBoundary ? ` (${a.alarm.cycles} cycles)` : ''}
+        at {formatTime(bedtime)}
+        {a.alarm.onBoundary ? ` · ${a.alarm.cycles} sleep cycles to your alarm` : ''}
       </Text>
       <View style={{ marginTop: space.md }}>
         <Meter value={progress} max={1} color={colors.light} height={6} />
@@ -83,6 +84,7 @@ function CountdownCard({ a }: { a: Analysis }) {
           )}
         </View>
       </Row>
+      <AlarmControl a={a} />
     </Card>
   );
 }
