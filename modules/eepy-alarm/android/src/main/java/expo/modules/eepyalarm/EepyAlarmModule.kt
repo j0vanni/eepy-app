@@ -33,6 +33,51 @@ class EepyAlarmModule : Module() {
     AsyncFunction("openFullScreenIntentSettings") {
       openFullScreenIntentSettings(context)
     }.runOnQueue(Queues.MAIN)
+
+    // ---- One-tap shortcuts (AppShortcuts.kt, CoffeeTileService.kt) ----
+
+    AsyncFunction("setShortcuts") { json: String ->
+      AppShortcuts.publish(context, json)
+    }
+
+    AsyncFunction<Boolean>("requestAddCoffeeTile") {
+      CoffeeTileService.requestAdd(context)
+    }.runOnQueue(Queues.MAIN)
+
+    // ---- Bedtime autopilot (SleepMode.kt, SleepModeReceiver.kt) ----
+
+    AsyncFunction<Map<String, Any?>>("getSleepModeStatus") {
+      SleepMode.status(context)
+    }
+
+    AsyncFunction("scheduleSleepMode") { night: String, onAtMs: Double, offAtMs: Double, sounds: String? ->
+      SleepMode.schedule(context, SleepWindow(night, onAtMs.toLong(), offAtMs.toLong(), sounds))
+      SleepMode.status(context)
+    }
+
+    AsyncFunction("cancelSleepMode") {
+      SleepMode.cancelAll(context)
+    }
+
+    AsyncFunction("startSleepModeNow") { night: String, offAtMs: Double ->
+      SleepMode.startNow(context, night, offAtMs.toLong())
+    }
+
+    AsyncFunction("stopSleepModeNow") { night: String ->
+      SleepMode.stopNow(context, night)
+    }
+
+    AsyncFunction("dismissSleepModePrompt") {
+      SleepMode.dismissPrompt(context)
+    }
+
+    AsyncFunction<Boolean>("openSleepModeAccessSettings") {
+      SleepMode.openAccessSettings(context)
+    }.runOnQueue(Queues.MAIN)
+
+    AsyncFunction<Boolean>("openSleepModeSettings") {
+      SleepMode.openModeSettings(context)
+    }.runOnQueue(Queues.MAIN)
   }
 
   /** Android 14+: the per-app "Allow full-screen notifications" switch; older: notification settings. */

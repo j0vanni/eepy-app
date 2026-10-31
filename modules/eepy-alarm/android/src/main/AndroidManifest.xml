@@ -5,6 +5,8 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <!-- AlarmManager forgets alarms on reboot; AlarmBootReceiver puts the pending ones back. -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- Bedtime autopilot: lists eepy under "Do Not Disturb / Modes access"; the user grants it once. -->
+  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
   <application>
     <receiver
@@ -19,6 +21,23 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
       </intent-filter>
     </receiver>
+
+    <!-- Bedtime autopilot: switches the "eepy sleep" mode on and off (exact alarms, works while eepy is closed). -->
+    <receiver
+      android:name="expo.modules.eepyalarm.SleepModeReceiver"
+      android:exported="false" />
+
+    <!-- Quick Settings tile "Log coffee" (opens eepy://quick/coffee). -->
+    <service
+      android:name="expo.modules.eepyalarm.CoffeeTileService"
+      android:exported="true"
+      android:icon="@drawable/eepy_tile_coffee"
+      android:label="Log coffee"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE" />
+      </intent-filter>
+    </service>
 
     <activity
       android:name="expo.modules.eepyalarm.AlarmActivity"

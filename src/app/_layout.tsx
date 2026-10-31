@@ -7,6 +7,8 @@ import { Platform } from 'react-native';
 
 import { registerBackgroundSync } from '@/background/task';
 import { syncWakeAlarm, WAKE_SKIP_MARK } from '@/notifications/fullScreenAlarm';
+import { syncSleepMode } from '@/notifications/sleepMode';
+import { refreshAppShortcuts } from '@/shortcuts/appShortcuts';
 import { applyClockSetting } from '@/state/clockFormat';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
 import { useLearning } from '@/state/learning';
@@ -24,7 +26,7 @@ const theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
-/** App-wide side effects: sync, notification planning, notification responses, background task, update checks. */
+/** App-wide side effects: sync, notification planning, notification responses, background task, update checks, shortcuts, sleep mode. */
 function Background() {
   useAutoSync();
   useUpdateChecks();
@@ -39,6 +41,8 @@ function Background() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
     configureNotifications().catch(() => undefined);
+    // Long-press app-icon shortcuts (no-op without the native module).
+    refreshAppShortcuts().catch(() => undefined);
     const sub = Notifications.addNotificationResponseReceivedListener((r) => {
       handleNotificationResponse(r, useStore.getState()).catch(() => undefined);
     });
@@ -59,6 +63,12 @@ function Background() {
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
   }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, goals, experiments, checkins]);
+
+  // Bedtime autopilot: after the wake alarm (its off time is the morning alarm). Cheap when nothing changed.
+  useEffect(() => {
+    if (!analysis) return;
+    syncSleepMode(analysis, useStore.getState()).catch(() => undefined);
+  }, [analysis, settings.sleepMode, settings.notifications.smartAlarm, settings.watch, skippedAlarm, settings.audio.sound, settings.audio.timerMin]);
   return null;
 }
 
@@ -105,6 +115,11 @@ export default function RootLayout() {
         <Stack.Screen name="cbti" options={{ title: 'Insomnia programme' }} />
         <Stack.Screen name="export" options={{ title: 'Reports & export' }} />
         <Stack.Screen name="updates" options={{ title: 'App updates' }} />
+        {/* One-tap actions from app-icon shortcuts, the Quick Settings tile and the sleep-mode notification. */}
+        <Stack.Screen
+          name="quick/[action]"
+          options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
+        />
       </Stack>
       <EveningScreen />
     </ThemeProvider>

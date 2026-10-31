@@ -18,6 +18,7 @@ import { Platform } from 'react-native';
 import { analyze } from '../engine/analysis';
 import { MINUTE } from '../engine/time';
 import { syncWakeAlarm } from '../notifications/fullScreenAlarm';
+import { syncSleepMode } from '../notifications/sleepMode';
 import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
 import { applyClockSetting } from '../state/clockFormat';
@@ -136,6 +137,7 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
         );
         await replanNotifications(analysis, useStore.getState(), { background: true, now });
         await syncWakeAlarm(analysis, useStore.getState(), now);
+        await syncSleepMode(analysis, useStore.getState(), now);
       }
     }
   } catch (e) {

@@ -9,6 +9,7 @@ import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { CalendarNote } from '@/ui/cards/CalendarNote';
 import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
+import { SleepModeLine } from '@/ui/cards/SleepModeLine';
 import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
@@ -91,6 +92,7 @@ function CountdownCard({ a }: { a: Analysis }) {
         </View>
       </Row>
       <AlarmControl a={a} />
+      <SleepModeLine a={a} />
     </Card>
   );
 }
