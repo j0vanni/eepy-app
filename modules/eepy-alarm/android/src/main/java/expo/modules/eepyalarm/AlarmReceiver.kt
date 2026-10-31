@@ -18,12 +18,17 @@ class AlarmReceiver : BroadcastReceiver() {
   }
 }
 
-/** AlarmManager drops every alarm on reboot; put back the ones that haven't rung yet. */
+/** AlarmManager drops every alarm on reboot; put back the ones that haven't rung yet (and sleep mode's). */
 class AlarmBootReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val action: String? = intent.getAction()
     if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
       AlarmScheduler.restore(context)
+      try {
+        SleepMode.restore(context)
+      } catch (e: Exception) {
+        // The wake alarms above matter more; sleep mode re-plans when eepy next runs.
+      }
     }
   }
 }

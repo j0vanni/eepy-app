@@ -19,6 +19,8 @@ import { CalendarSection } from '@/ui/settings/CalendarSection';
 import { LearningSection } from '@/ui/settings/LearningSection';
 import { NotificationsSection } from '@/ui/settings/NotificationsSection';
 import { ProgramsSection } from '@/ui/settings/ProgramsSection';
+import { ShortcutsSection } from '@/ui/settings/ShortcutsSection';
+import { SleepModeSection } from '@/ui/settings/SleepModeSection';
 import { Toggle } from '@/ui/settings/Toggle';
 import { WatchSection } from '@/ui/settings/WatchSection';
 import { UpdatesSection } from '@/ui/settings/UpdatesSection';
@@ -207,7 +209,11 @@ export default function SettingsScreen() {
 
       <NotificationsSection />
 
+      <SleepModeSection />
+
       <WatchSection />
+
+      <ShortcutsSection />
 
       <LearningSection />
 

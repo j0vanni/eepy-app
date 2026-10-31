@@ -291,6 +291,20 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | 🧪 | **Screens-off reminder** at that time |
 | 🧪 | **Phone brightness slider** in the Phone light card: sets the phone's own brightness (after allowing "Modify system settings" once), with the current target marked, "Set to target" and auto-brightness on/off. Targets now match the position of Android's brightness slider (evening ≤ 50%, wind-down ≤ 30%, night ≤ 15%) |
 
+## 22. New in 0.7 — shortcuts and bedtime autopilot
+
+| | Feature |
+| --- | --- |
+| 🧪 | **App-icon shortcuts** (long-press the eepy icon): *Log my usual coffee*, *Start a nap*, *Running late* (Adjust tonight) and *Check in* — Android dynamic shortcuts set when eepy starts, so no setup; drag one to the home screen to pin it |
+| 🧪 | **"Log coffee" Quick Settings tile**: logs your usual drink at its usual time from anywhere and collapses the shade. Settings → Shortcuts → *Add "Log coffee" to Quick Settings* (Android 13+ asks in one tap; older: edit Quick Settings and drag it in) |
+| ✅ | **One-tap sheet** (`eepy://quick/coffee · nap · late · checkin · sounds`): coffee is logged with the same per-day id as every other "usual" button (can't double-log; a same drink logged by hand near the usual time counts too), with **Undo**, **Change time** and *Log another now*; no usual drink yet → the drink editor. Nap offers the recommended nap with its alarm time (**Start nap**) or opens the Nap coach |
+| 🧪 | **Bedtime autopilot**: eepy owns an Android mode, **"eepy sleep"**, and switches it on at lights-out (or the start of wind-down — your choice) and off when your morning alarm starts (the first watch buzz in watch-first mode; the planned wake-up when the alarm is off or skipped). Follows "Adjust tonight". Exact alarms switch it **while eepy is closed** and survive reboots |
+| 🧪 | **Android 15+**: the phone's own sleep mode — grayscale, dimmed wallpaper, dark theme, no always-on display, notifications silenced; it appears with your phone's modes, where you choose who may still call. **Android 10–14**: a Do Not Disturb rule that only silences notifications. Alarms (eepy's included) and media (sleep sounds) always get through |
+| 🧪 | **Stop now** keeps it off for the rest of that night (also when you switch the mode off yourself); **Start now** from 3 h before. Status and controls in Settings → Bedtime autopilot and on Today's evening countdown |
+| 🧪 | Optional **"Sleep mode on 🌙 — play sleep sounds?"** notification when it switches on; *Play sounds* starts your default sound with its timer |
+| ℹ️ | **Allow once**: Settings → Bedtime autopilot → *Allow access* opens Android's "Do Not Disturb access" (on Android 15+ "Modes" access) list — turn eepy on. Every mode call needs it; without it eepy shows the status and nothing is switched |
+| ℹ️ | Android reserves the "Bedtime" mode type for the system's Digital Wellbeing app, so "eepy sleep" is a time-based mode (eepy tries Bedtime first and falls back) |
+
 ---
 
 ## Science behind it

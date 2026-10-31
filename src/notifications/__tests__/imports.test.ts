@@ -15,6 +15,7 @@ const ENTRY_POINTS = [
   '../features/morningReport',
   '../features/missingNight',
   '../features/appUpdates',
+  '../sleepMode',
 ];
 
 describe('notification module graph', () => {

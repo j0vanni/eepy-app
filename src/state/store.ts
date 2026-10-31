@@ -100,6 +100,15 @@ export interface UpdateSettings {
   authProblem?: 'auth' | 'private' | 'no-access';
 }
 
+/** Bedtime autopilot: the phone's own sleep mode ("eepy sleep", an Android mode) from tonight's plan. */
+export interface SleepModeSettings {
+  enabled: boolean;
+  /** Switch on at the start of wind-down, or at lights-out. */
+  startAt: 'winddown' | 'lightsout';
+  /** "Sleep mode on 🌙 — play sleep sounds?" when it switches on. */
+  offerSounds: boolean;
+}
+
 export interface NapTimer {
   start: number;
   alarmAt: number;
@@ -138,6 +147,7 @@ export interface Settings {
   audio: AudioSettings;
   watch: WatchSettings;
   updates: UpdateSettings;
+  sleepMode: SleepModeSettings;
   /** Small bookkeeping values for features (e.g. last morning report sent). */
   marks: Record<string, string | number | undefined>;
 }
@@ -183,6 +193,7 @@ export interface AppState extends SleepDataset {
   setAudioSettings(patch: Partial<AudioSettings>): void;
   setWatchSettings(patch: Partial<WatchSettings>): void;
   setUpdateSettings(patch: Partial<UpdateSettings>): void;
+  setSleepModeSettings(patch: Partial<SleepModeSettings>): void;
   setMark(key: string, value: string | number | undefined): void;
 }
 
@@ -221,6 +232,7 @@ const DEFAULT_SETTINGS: Settings = {
   audio: { sound: 'brown', volume: 0.6, timerMin: 45 },
   watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
   updates: { autoCheck: true },
+  sleepMode: { enabled: false, startAt: 'lightsout', offerSounds: true },
   marks: {},
 };
 
@@ -340,6 +352,7 @@ export const useStore = create<AppState>()(
       setAudioSettings: (patch) => set((s) => ({ settings: { ...s.settings, audio: { ...s.settings.audio, ...patch } } })),
       setWatchSettings: (patch) => set((s) => ({ settings: { ...s.settings, watch: { ...s.settings.watch, ...patch } } })),
       setUpdateSettings: (patch) => set((s) => ({ settings: { ...s.settings, updates: { ...s.settings.updates, ...patch } } })),
+      setSleepModeSettings: (patch) => set((s) => ({ settings: { ...s.settings, sleepMode: { ...s.settings.sleepMode, ...patch } } })),
       setMark: (key, value) => set((s) => ({ settings: { ...s.settings, marks: { ...s.settings.marks, [key]: value } } })),
     }),
     {
@@ -381,6 +394,7 @@ export const useStore = create<AppState>()(
             audio: { ...DEFAULT_SETTINGS.audio, ...ps?.audio },
             watch: { ...DEFAULT_SETTINGS.watch, ...ps?.watch },
             updates: { ...DEFAULT_SETTINGS.updates, ...ps?.updates },
+            sleepMode: { ...DEFAULT_SETTINGS.sleepMode, ...ps?.sleepMode },
             marks: { ...ps?.marks },
           },
         };
