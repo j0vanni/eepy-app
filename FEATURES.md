@@ -265,6 +265,20 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 
 ---
 
+## 20. New in 0.5 — real-life nights and phone light
+
+| | Feature |
+| --- | --- |
+| ✅ | **Adjust tonight**: can't make the planned lights-out? Pick your own (Plan / +30 min / +1 h / +1½ h / +2 h / fine-tune) and, if you can, a later wake-up. A live preview shows expected sleep, the re-timed cycle-aligned alarm, tomorrow's energy, focus time and debt vs the plan, plus recovery tips (nap time tomorrow, coffee, sleeping in). Only that night changes |
+| ✅ | Everything follows an adjusted night: wind-down and lights-out reminders, the live wind-down card, the alarm, the caffeine cut-off, the energy forecast and Today's phases. Reach it from Today's countdown, the Tonight card, Plan, the late-night view ("Still up? Re-plan") and a 🧪 **Running late** button on the wind-down / lights-out notifications |
+| ✅ | **Phone light**: a personal screen-light schedule from your plan — evening (~3 h before lights-out, when melatonin rises): Night Light on, brightness ≤ 40%; wind-down: warmest + Extra dim, ≤ 15%; night: screen away; morning: bright is fine but get daylight. Shown on Today in the evening, in the wind-down routine and on Plan, with the Night Light custom schedule to set |
+| 🧪 | Live **brightness check** against the target (reads the phone's brightness, no permission needed) and shortcuts to Android's **Night Light** and **Extra dim** settings; **Dim eepy now** |
+| 🧪 | **Phone-light reminder** when the evening limits start (button opens Night Light settings) |
+| 🧪 | **eepy dims and warms itself** in the evening (warm tint; its own window dimmed from wind-down) — Settings → Wind-down |
+| ℹ️ | Android doesn't let apps switch Night Light or change system brightness without a special permission, so eepy guides and links rather than changing them |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

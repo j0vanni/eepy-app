@@ -5,12 +5,16 @@ import { Text, View } from 'react-native';
 import { soundPlayer } from '@/audio/player';
 import { PlayButton, SoundPicker, TimerPicker, VolumeSlider } from '@/audio/ui/SoundControls';
 import { useSoundPlayer } from '@/audio/useSoundPlayer';
+import { useStore } from '@/state/store';
 import { Card, CardTitle, ListRow, Section } from '@/ui/components';
+import { Toggle } from '@/ui/settings/Toggle';
 import { colors, font, space } from '@/ui/theme';
 
 export function WindDownSection() {
   const sound = useSoundPlayer();
   const { settings } = sound;
+  const screenDim = useStore((s) => s.settings.screenDim);
+  const setSettings = useStore((s) => s.setSettings);
   return (
     <Section title="Wind-down">
       <Card>
@@ -23,6 +27,12 @@ export function WindDownSection() {
         <VolumeSlider value={settings.volume} onChange={(v) => soundPlayer.setVolume(v)} onCommit={sound.setVolume} />
         <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>SLEEP TIMER</Text>
         <TimerPicker value={settings.timerMin} onChange={sound.setTimer} />
+        <Toggle
+          label="Dim & warm eepy in the evening"
+          sub="A warm tint from the evening, and eepy's own screen dimmed from wind-down (your phone's settings stay as they are)"
+          value={screenDim}
+          onChange={(v) => setSettings({ screenDim: v })}
+        />
         <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <ListRow icon="weather-night" title="Open wind-down routine" sub="Countdown, checklist, breathing and a light check" onPress={() => router.push('/winddown')} />
         </View>

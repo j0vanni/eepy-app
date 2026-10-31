@@ -70,6 +70,16 @@ export interface TonightPlan {
   rationale: string[];
   /** How tomorrow's first calendar event shaped the plan (only when an event was passed in). */
   calendar?: CalendarAdjustment;
+  /** Set when the user moved tonight's times ("Adjust tonight"): what the plan had been. */
+  adjusted?: { plannedBedtime: number; plannedWake: number };
+}
+
+/** "I can't make it tonight": the user's own bedtime (and optionally wake-up) for one night. */
+export interface TonightOverride {
+  /** The morning this applies to (TonightPlan.wakeDate); ignored for any other night. */
+  wakeDate: string;
+  bedtime?: number;
+  wake?: number;
 }
 
 export interface CalendarAdjustment {
@@ -278,6 +288,41 @@ export function planTonight(input: PlanInput): TonightPlan {
     gradual,
     rationale,
     ...(calendar ? { calendar } : {}),
+  };
+}
+
+/** Minimum time between an adjusted bedtime and wake-up that still counts as a night. */
+const MIN_ADJUSTED_NIGHT_MIN = 90;
+
+/**
+ * Applies the user's one-night adjustment to tonight's plan: bedtime (and with it wind-down, last
+ * meal and exercise) and/or wake-up move; everything downstream — alarm, caffeine cut-off,
+ * reminders, energy forecast — follows because it is computed from the adjusted plan. A stale
+ * override (another night) or an impossible one (wake before bedtime) leaves the plan unchanged.
+ */
+export function applyTonightOverride(plan: TonightPlan, override: TonightOverride | undefined, windDownMin: number): TonightPlan {
+  if (!override || override.wakeDate !== plan.wakeDate) return plan;
+  const bedtime = override.bedtime ?? plan.bedtime;
+  const wake = override.wake ?? plan.wake;
+  if (wake - bedtime < MIN_ADJUSTED_NIGHT_MIN * MINUTE) return plan;
+  if (bedtime === plan.bedtime && wake === plan.wake) return plan;
+  const shift = bedtime - plan.bedtime;
+  const note = [
+    bedtime !== plan.bedtime ? `lights out ${formatTime(bedtime)} instead of ${formatTime(plan.bedtime)}` : '',
+    wake !== plan.wake ? `up at ${formatTime(wake)} instead of ${formatTime(plan.wake)}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return {
+    ...plan,
+    bedtime,
+    wake,
+    windDownStart: bedtime - windDownMin * MINUTE,
+    lastMeal: plan.lastMeal + shift,
+    lastExercise: plan.lastExercise + shift,
+    inBedMin: Math.round((wake - bedtime) / MINUTE),
+    rationale: [`Adjusted for tonight: ${note}.`, ...plan.rationale],
+    adjusted: { plannedBedtime: plan.bedtime, plannedWake: plan.wake },
   };
 }
 

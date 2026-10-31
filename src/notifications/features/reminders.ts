@@ -16,7 +16,7 @@ import type { Analysis } from '../../engine/analysis';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
 import { cancelFullScreenAlarm, hasFullScreenAlarm, nextWakeAlarm, WAKE_ALARM_ID, WAKE_DONE_MARK, WRIST_BUZZ_OFFSETS_MIN } from '../fullScreenAlarm';
-import { plannedId } from '../ids';
+import { plannedId, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
@@ -90,6 +90,7 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
       id: 'winddown',
       at: t.windDownStart,
       channel: 'reminders',
+      categoryId: RUNNING_LATE_CATEGORY,
       title: 'Time to wind down 🌙',
       body: windDownBody(day),
     });
@@ -100,6 +101,7 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
       id: 'bedtime',
       at: day.lightsOut,
       channel: 'reminders',
+      categoryId: RUNNING_LATE_CATEGORY,
       title: 'Lights out',
       body: bedtimeBody(a, day),
     });
@@ -201,6 +203,7 @@ export const reminders: NotificationFeature = {
     },
     { id: NAP_ALARM_CATEGORY, actions: [{ id: 'nap-done', title: "I'm up — log nap" }] },
     { id: WRIST_WAKE_CATEGORY, actions: [{ id: 'wrist-up', title: "I'm up" }] },
+    { id: RUNNING_LATE_CATEGORY, actions: [{ id: RUNNING_LATE_ACTION, title: 'Running late' }] },
   ],
   async onResponse(r, state: AppState) {
     markResponseHandled();
@@ -224,6 +227,10 @@ export const reminders: NotificationFeature = {
         await stopWristWake(state, base);
       }
       openFromNotification('/checkin');
+      return;
+    }
+    if (r.actionId === RUNNING_LATE_ACTION) {
+      openFromNotification('/tonight');
       return;
     }
     if (r.actionId === 'default' && typeof r.data.route === 'string' && ROUTES.has(r.data.route)) {

@@ -6,7 +6,7 @@ import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
 import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
 import { analyzeRegularity, RegularityResult } from './regularity';
-import { planTonight, smartAlarm, TonightPlan, wakeTargetFor } from './schedule';
+import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import {
   analyzeSessions,
   buildNights,
@@ -78,6 +78,8 @@ export interface AnalyzeOptions {
   firstEventPrepMin?: number;
   /** Active CBT-I programme, which prescribes the sleep window. */
   cbti?: CbtiProgram;
+  /** The user's own bedtime / wake-up for tonight ("Adjust tonight"). */
+  tonightOverride?: TonightOverride;
 }
 
 function sleepIntervals(metrics: SessionMetrics[], since: number): Interval[] {
@@ -116,7 +118,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   }
   const regularity = analyzeRegularity(metrics, nights, day, chronotype.habitual?.midSleepSdMin);
 
-  const tonight = planTonight({
+  const planned = planTonight({
     profile,
     today: day,
     needMin: need.needMin,
@@ -130,6 +132,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     firstEventPrepMin: opts.firstEventPrepMin,
     sleepWindow: currentCbtiWindow(opts.cbti, nights, day),
   });
+  // Everything below (alarm, caffeine cut-off, forecast, nap advice) follows an adjusted night.
+  const tonight = applyTonightOverride(planned, opts.tonightOverride, profile.windDownMin);
   const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
 
   // Today's wake-up. If last night hasn't synced yet, assume a habitual night so the model stays sane.

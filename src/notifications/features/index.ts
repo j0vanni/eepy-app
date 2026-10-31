@@ -8,7 +8,8 @@ import { morningReport } from './morningReport';
 import { naturalWake } from './naturalWake';
 import { pings } from './pings';
 import { reminders } from './reminders';
+import { screenLight } from './screenLight';
 import { weeklyReview } from './weeklyReview';
 
 /** Every notification feature. The scheduler plans, de-duplicates and routes responses for these. */
-export const FEATURES: NotificationFeature[] = [reminders, morningReport, missingNight, liveWindDown, pings, naturalWake, weeklyReview, experiments, caffeineNudge, appUpdates];
+export const FEATURES: NotificationFeature[] = [reminders, morningReport, missingNight, liveWindDown, pings, naturalWake, weeklyReview, experiments, caffeineNudge, appUpdates, screenLight];

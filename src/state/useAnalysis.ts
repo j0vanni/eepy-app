@@ -42,7 +42,7 @@ export function useAnalysis(): Analysis | undefined {
   return useMemo(
     () =>
       sharedAnalysis(
-        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, data.checkins, data.workouts, settings.preferredOrigins, settings.upcoming, settings.clock, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
+        [data.sessions, data.vitals, data.daily, data.dayLogs, data.caffeine, data.profile, data.checkins, data.workouts, settings.preferredOrigins, settings.upcoming, settings.clock, settings.tonight, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
         () => {
           if (data.sessions.length === 0) return undefined;
           const t = Date.now();
@@ -51,6 +51,6 @@ export function useAnalysis(): Analysis | undefined {
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // settings.clock: the analysis holds pre-formatted times (plan rationale, nap headline).
-    [data, settings.preferredOrigins, settings.upcoming, settings.clock, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
+    [data, settings.preferredOrigins, settings.upcoming, settings.clock, settings.tonight, calibration, cbti, firstEvent, firstEventTitle, prepMin, bucket],
   );
 }

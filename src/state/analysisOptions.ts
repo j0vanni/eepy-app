@@ -13,5 +13,6 @@ export function analyzeOptionsFor(state: AppState, extras: { now: number; firstE
     firstEventTitle: extras.firstEventTitle,
     firstEventPrepMin: state.settings.calendar.prepMin,
     cbti: state.cbti?.active ? state.cbti : undefined,
+    tonightOverride: state.settings.tonight,
   };
 }

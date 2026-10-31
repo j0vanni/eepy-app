@@ -413,6 +413,11 @@ export function TonightCard({ a, now, detailed }: A & { now: number; detailed?: 
           sub={skipped ? 'sleep in' : a.alarm.onBoundary ? 'cycle-timed' : undefined}
         />
       </Row>
+      <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
+        <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>
+          {a.tonight.adjusted ? `Adjusted for tonight · plan was ${formatTime(a.tonight.adjusted.plannedBedtime)} — change` : "Can't make it tonight? Adjust"}
+        </Text>
+      </Pressable>
       <View style={{ marginTop: space.md, gap: 4 }}>
         {a.caffeine.cutoff.cutoff ? (
           <Text style={font.small}>

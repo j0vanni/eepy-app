@@ -8,6 +8,7 @@ import { addDays, atMinutes, formatClock, formatDuration, formatTime, HOUR, norm
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
+import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { PlanCalendarLines } from '@/ui/cards/CalendarNote';
 import { LineChart } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Icon, ListRow, Note, Row, Screen, Section, Segmented, Stat, Stepper } from '@/ui/components';
@@ -72,6 +73,15 @@ export default function PlanScreen() {
           <Stat label="Lights out" value={formatTime(a.tonight.bedtime)} color={colors.accent} />
           <Stat label="Wake" value={formatTime(a.tonight.wake)} sub={a.tonight.calendar?.drove ? `usually ${formatTime(a.tonight.calendar.usualWake)}` : undefined} />
         </Row>
+        <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
+          <Button
+            small
+            kind="secondary"
+            icon="clock-edit-outline"
+            label={a.tonight.adjusted ? `Adjusted · plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}` : "Can't make it? Adjust tonight"}
+            onPress={() => router.push('/tonight')}
+          />
+        </View>
         <Text style={[font.small, { marginTop: space.md }]}>Time in bed: {formatDuration(a.tonight.inBedMin)}</Text>
         <Text style={font.small}>
           Last big meal by {formatTime(a.tonight.lastMeal)} · hard exercise done by {formatTime(a.tonight.lastExercise)}
@@ -100,6 +110,8 @@ export default function PlanScreen() {
         </Text>
         <AlarmControl a={a} />
       </Card>
+
+      <ScreenLightCard a={a} full />
 
       <Section title="Bedtime calculator">
         <Card>

@@ -8,6 +8,7 @@ import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
 import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { CalendarNote } from '@/ui/cards/CalendarNote';
+import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
@@ -63,6 +64,11 @@ function CountdownCard({ a }: { a: Analysis }) {
         at {formatTime(bedtime)}
         {a.alarm.onBoundary ? ` · ${a.alarm.cycles} sleep cycles to your alarm` : ''}
       </Text>
+      <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: 4 }}>
+        <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>
+          {a.tonight.adjusted ? `Adjusted for tonight (plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}) · change` : `Can't make ${formatTime(bedtime)}? Adjust tonight`}
+        </Text>
+      </Pressable>
       <View style={{ marginTop: space.md }}>
         <Meter value={progress} max={1} color={colors.light} height={6} />
       </View>
@@ -95,6 +101,7 @@ export function EveningHero({ a, now }: HeroProps) {
       <CountdownCard a={a} />
       {/* Links to the wind-down routine and plays the default sound (same evening window as this hero). */}
       <WindDownCard analysis={a} />
+      <ScreenLightCard a={a} />
       <Card>
         <CardTitle icon="gauge" title="Sleep pressure" color={colors.light} />
         <SleepPressureCard a={a} now={now} embedded />
@@ -127,6 +134,11 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
           It's {formatTime(now)}
           {afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm {formatTime(alarm)}
         </Text>
+        {afterBedtime ? (
+          <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
+            <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Still up? Re-plan the rest of the night</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Card style={NIGHT_CARD} animate={false}>
         <Text style={[font.small, { color: colors.textDim }]}>If you fall asleep now (≈{Math.round(a.latencyMin)} min to drift off), wake at the end of a cycle:</Text>

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { DrinkPreset } from '../engine/caffeine';
+import type { TonightOverride } from '../engine/schedule';
 import type { CalibrationResult } from '../engine/calibration';
 import type { CbtiProgram } from '../engine/cbti';
 import { generateDemoData } from '../engine/demo';
@@ -46,6 +47,8 @@ export interface NotificationPrefs {
   experimentNudges: boolean;
   /** "Had your usual coffee?" when the usual morning drink hasn't been logged. */
   caffeineNudge: boolean;
+  /** Evening "Night Light on, dim your screen" reminder (phone light). */
+  screenLight: boolean;
 }
 
 export interface BackgroundSettings {
@@ -109,6 +112,10 @@ export interface Settings {
   clock: 'system' | '12h' | '24h';
   /** Your own drinks (name + mg), offered before the built-in presets. */
   customDrinks: DrinkPreset[];
+  /** "Adjust tonight": this night's own bedtime / wake-up (ignored once that night is over). */
+  tonight?: TonightOverride;
+  /** Dim and warm eepy itself in the evening (its own window only). */
+  screenDim: boolean;
   dataMode: 'live' | 'demo';
   /** Health Connect data origins (apps) to trust for sleep, most preferred first. */
   preferredOrigins: string[];
@@ -191,11 +198,13 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   weeklyReview: true,
   experimentNudges: true,
   caffeineNudge: true,
+  screenLight: true,
 };
 
 const DEFAULT_SETTINGS: Settings = {
   clock: 'system',
   customDrinks: [],
+  screenDim: true,
   dataMode: 'live',
   preferredOrigins: [],
   historyDays: 60,

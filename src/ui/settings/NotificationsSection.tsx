@@ -137,6 +137,12 @@ export function NotificationsSection() {
         <Toggle label="Bedtime" value={settings.notifications.bedtime} onChange={(v) => setNotif('bedtime', v)} />
         <Toggle label="Caffeine cut-off" value={settings.notifications.caffeine} onChange={(v) => setNotif('caffeine', v)} />
         <Toggle
+          label="Phone-light reminder"
+          sub="When melatonin starts rising (~3 h before lights-out): Night Light on, screen dimmer"
+          value={settings.notifications.screenLight}
+          onChange={(v) => setNotif('screenLight', v)}
+        />
+        <Toggle
           label="Forgot your coffee?"
           sub={'An hour after your usual morning drink, if nothing is logged: "Yes" logs it at your usual time'}
           value={settings.notifications.caffeineNudge}

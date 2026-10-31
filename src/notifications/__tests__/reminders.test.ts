@@ -3,6 +3,7 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 import { router } from 'expo-router';
 
+import { analyze } from '../../engine/analysis';
 import { formatTime, MINUTE, startOfDateKey } from '../../engine/time';
 import type { SleepDataset } from '../../engine/types';
 import { MAX_NAP_SHIFT_MIN } from '../features/dayContext';
@@ -142,5 +143,23 @@ describe('adaptive reminders', () => {
     (router.push as jest.Mock).mockClear();
     await reminders.onResponse!({ actionId: 'default', data: { route: '/somewhere-else' } }, ctx.state);
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('adjusted night', () => {
+  it('moves wind-down and lights-out with "Adjust tonight", and offers "Running late"', () => {
+    const ctx = scenario(at(WORKDAY, 12), { prefs: { windDown: true, bedtime: true, liveWindDown: false } });
+    const late = ctx.analysis.tonight.bedtime + 60 * MINUTE;
+    const analysis = analyze({ ...ctx.state, sessions: ctx.state.sessions }, ctx.now, { tonightOverride: { wakeDate: ctx.analysis.tonight.wakeDate, bedtime: late } });
+    const planned = planReminders({ ...ctx, analysis });
+    expect(byId(planned, 'bedtime')).toMatchObject({ at: late, categoryId: 'tonight-late' });
+    expect(byId(planned, 'winddown')?.at).toBe(analysis.tonight.windDownStart);
+    expect(byId(planned, 'winddown')?.at).toBe(ctx.analysis.tonight.windDownStart + 60 * MINUTE);
+  });
+
+  it('"Running late" opens Adjust tonight', async () => {
+    const ctx = scenario(at(WORKDAY, 12));
+    await reminders.onResponse!({ actionId: 'late', data: {} }, ctx.state);
+    expect(router.push).toHaveBeenCalledWith('/tonight');
   });
 });

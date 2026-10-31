@@ -18,6 +18,7 @@ import { Platform } from 'react-native';
 import type { Analysis } from '../../engine/analysis';
 import { formatDuration, formatTime, MINUTE } from '../../engine/time';
 import type { AppState } from '../../state/store';
+import { RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
 import { DayContext, dayContext, duringNap } from './dayContext';
@@ -72,6 +73,7 @@ export function planLiveWindDown({ analysis: a, state, now }: PlannerContext): P
         // The card replaces the plain wind-down reminder, so it alerts only if that reminder is on.
         channel: prefs.windDown ? 'reminders' : 'live',
         sticky: true,
+        categoryId: RUNNING_LATE_CATEGORY,
         title: `Wind-down · lights out at ${formatTime(day.lightsOut)}`,
         body: checklist(a, state, day),
         data: { route: '/winddown' },
@@ -86,6 +88,7 @@ export function planLiveWindDown({ analysis: a, state, now }: PlannerContext): P
         at: day.lightsOut,
         // Same identifier: replaces the pinned card in place. Carries the bedtime reminder too.
         channel: prefs.bedtime ? 'reminders' : 'live',
+        categoryId: RUNNING_LATE_CATEGORY,
         title: `Lights out · ${formatTime(day.lightsOut)}`,
         body: lightsOutBody(a, day),
       },
@@ -119,6 +122,7 @@ export const liveWindDown: NotificationFeature = {
   },
   onResponse(r) {
     markResponseHandled();
-    if (r.actionId === 'default' && r.data.route === '/winddown') openFromNotification('/winddown');
+    if (r.actionId === RUNNING_LATE_ACTION) openFromNotification('/tonight');
+    else if (r.actionId === 'default' && r.data.route === '/winddown') openFromNotification('/winddown');
   },
 };

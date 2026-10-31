@@ -7,6 +7,7 @@ import { Checklist, CountdownHero } from '@/audio/ui/WindDownParts';
 import { lightContextAt } from '@/audio/light';
 import { dateKey } from '@/engine/time';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
+import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { Screen } from '@/ui/components';
 import { font, space } from '@/ui/theme';
 
@@ -28,6 +29,7 @@ export default function WindDownScreen() {
       <BreathingCard />
       <SoundsCard />
       <LightCheckCard context={lightContext} />
+      {analysis ? <ScreenLightCard a={analysis} full /> : null}
       <View style={{ marginTop: space.sm, paddingHorizontal: space.sm }}>
         <Text style={[font.tiny, { textAlign: 'center' }]}>
           Same time, same steps, every night — the routine itself becomes a cue for sleep.
