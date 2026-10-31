@@ -40,6 +40,8 @@ export interface UpcomingNight {
   preShiftFor?: string;
   /** Projected sleep debt the morning after (approximate: assumes the plan is followed). */
   debtAfterMin: number;
+  /** Lights-out held later than the need-based time: earlier would mean lying awake (body clock). */
+  heldBack: boolean;
 }
 
 export interface UpcomingInput {
@@ -118,6 +120,7 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
       extraForDebtMin: extra,
       preShiftMin: 0,
       debtAfterMin: 0,
+      heldBack: held,
     });
   }
 

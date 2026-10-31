@@ -51,6 +51,9 @@ export default function Today() {
 
   const header = (
     <Row gap={space.md}>
+      <Pressable onPress={() => router.push('/calendar')} accessibilityLabel="Calendar" hitSlop={8}>
+        <Icon name="calendar-month-outline" size={24} color={colors.textDim} />
+      </Pressable>
       <Pressable onPress={() => router.push('/journal')} accessibilityLabel="Journal" hitSlop={8}>
         <Icon name="notebook-edit-outline" size={24} color={colors.textDim} />
       </Pressable>

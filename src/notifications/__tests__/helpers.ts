@@ -21,6 +21,7 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     clock: '24h',
     customDrinks: [],
     screenDim: false,
+    screensOffMin: 45,
     dataMode: 'live',
     preferredOrigins: [],
     historyDays: 60,

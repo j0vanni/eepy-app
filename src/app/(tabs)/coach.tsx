@@ -18,6 +18,7 @@ interface Tool {
 }
 
 const TOOLS: Tool[] = [
+  { href: '/calendar', icon: 'calendar-month-outline', title: 'Calendar', sub: 'Nights & planned mornings', color: colors.accent },
   { href: '/experiments', icon: 'flask-outline', title: 'Experiments', sub: 'Test what changes your sleep', color: colors.accent },
   { href: '/goals', icon: 'flag-checkered', title: 'Goals', sub: 'Streaks, one day at a time', color: colors.good },
   { href: '/review', icon: 'calendar-week', title: 'Weekly review', sub: 'Your week in sleep', color: colors.info },

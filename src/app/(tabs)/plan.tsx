@@ -66,6 +66,9 @@ export default function PlanScreen() {
 
   return (
     <Screen title="Plan" subtitle="Tonight, tomorrow, and beyond">
+      <View style={{ marginBottom: space.md, alignItems: 'flex-start' }}>
+        <Button small kind="secondary" icon="calendar-month-outline" label="Calendar: plan your mornings" onPress={() => router.push('/calendar')} />
+      </View>
       <Card>
         <CardTitle icon="moon-waning-crescent" title={`Tonight → ${dayLabel(a.tonight.wakeDate)} ${a.tonight.isWorkday ? '(workday)' : '(free day)'}`} />
         <Row>

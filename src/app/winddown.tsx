@@ -8,6 +8,7 @@ import { lightContextAt } from '@/audio/light';
 import { dateKey } from '@/engine/time';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
+import { WindDownTimelineCard } from '@/ui/cards/WindDownTimeline';
 import { Screen } from '@/ui/components';
 import { font, space } from '@/ui/theme';
 
@@ -25,6 +26,7 @@ export default function WindDownScreen() {
   return (
     <Screen>
       <CountdownHero analysis={analysis} now={now} />
+      {analysis ? <WindDownTimelineCard a={analysis} /> : null}
       <Checklist key={nightKey} nightKey={nightKey} />
       <BreathingCard />
       <SoundsCard />

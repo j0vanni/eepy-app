@@ -49,6 +49,8 @@ export interface NotificationPrefs {
   caffeineNudge: boolean;
   /** Evening "Night Light on, dim your screen" reminder (phone light). */
   screenLight: boolean;
+  /** "Screens off" reminder from the wind-down timeline. */
+  screensOff: boolean;
 }
 
 export interface BackgroundSettings {
@@ -116,6 +118,8 @@ export interface Settings {
   tonight?: TonightOverride;
   /** Dim and warm eepy itself in the evening (its own window only). */
   screenDim: boolean;
+  /** Wind-down timeline: screens off this many minutes before lights-out. */
+  screensOffMin: number;
   dataMode: 'live' | 'demo';
   /** Health Connect data origins (apps) to trust for sleep, most preferred first. */
   preferredOrigins: string[];
@@ -199,12 +203,14 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   experimentNudges: true,
   caffeineNudge: true,
   screenLight: true,
+  screensOff: true,
 };
 
 const DEFAULT_SETTINGS: Settings = {
   clock: 'system',
   customDrinks: [],
   screenDim: true,
+  screensOffMin: 45,
   dataMode: 'live',
   preferredOrigins: [],
   historyDays: 60,

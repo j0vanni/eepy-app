@@ -9,6 +9,7 @@ import { AppState, Switch, Text, View } from 'react-native';
 import type { Analysis } from '@/engine/analysis';
 import { judgeScreenBrightness, nightLightSchedule, ScreenPlanInput, screenLightSchedule, screenTargetAt } from '@/engine/screenLight';
 import { formatTime } from '@/engine/time';
+import { screensOffAt } from '@/engine/windDownPlan';
 import {
   askPhoneBrightnessPermission,
   canSetPhoneBrightness,
@@ -22,14 +23,21 @@ import {
   setPhoneBrightness,
 } from '@/integrations/screen';
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
+import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { Button, Card, CardTitle, Note, Row } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 const FILTER_LABEL = { off: 'No filter needed', warm: 'Night Light on', warmest: 'Night Light warmest + Extra dim' } as const;
 
-export function screenPlanFor(a: Analysis): ScreenPlanInput {
-  return { wakeTime: a.wakeTime, windDownStart: a.tonight.windDownStart, bedtime: a.tonight.bedtime, nextWake: a.tonight.wake };
+export function screenPlanFor(a: Analysis, screensOffMin?: number): ScreenPlanInput {
+  return {
+    wakeTime: a.wakeTime,
+    windDownStart: a.tonight.windDownStart,
+    bedtime: a.tonight.bedtime,
+    nextWake: a.tonight.wake,
+    screensOff: screensOffAt(a.tonight, screensOffMin),
+  };
 }
 
 interface PhoneScreen {
@@ -136,7 +144,8 @@ function BrightnessCheck({ target, brightness }: { target: ReturnType<typeof scr
 export function ScreenLightCard({ a, full }: { a: Analysis; full?: boolean }) {
   const now = useNow(30_000);
   const [phone, patchPhone, refreshPhone] = usePhoneScreen();
-  const plan = screenPlanFor(a);
+  const screensOffMin = useStore((st) => st.settings.screensOffMin);
+  const plan = screenPlanFor(a, screensOffMin);
   const target = screenTargetAt(plan, now);
   const evening = target.phase === 'evening' || target.phase === 'winddown' || target.phase === 'night';
   const upcoming = screenLightSchedule(plan).filter((t) => t.until > now && (t.phase === 'evening' || t.phase === 'winddown' || t.phase === 'night'));

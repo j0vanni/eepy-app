@@ -9,6 +9,7 @@ import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { CalendarNote } from '@/ui/cards/CalendarNote';
 import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
+import { WindDownTimelineCard } from '@/ui/cards/WindDownTimeline';
 import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
@@ -99,6 +100,7 @@ export function EveningHero({ a, now }: HeroProps) {
   return (
     <>
       <CountdownCard a={a} />
+      <WindDownTimelineCard a={a} compact />
       {/* Links to the wind-down routine and plays the default sound (same evening window as this hero). */}
       <WindDownCard analysis={a} />
       <ScreenLightCard a={a} />

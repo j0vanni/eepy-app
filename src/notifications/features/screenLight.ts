@@ -5,6 +5,7 @@
  */
 import { screenLightSchedule } from '../../engine/screenLight';
 import { formatTime } from '../../engine/time';
+import { screensOffAt } from '../../engine/windDownPlan';
 import { openNightLightSettings } from '../../integrations/screen';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import type { NotificationFeature } from '../types';
@@ -17,7 +18,7 @@ export const screenLight: NotificationFeature = {
 
   plan({ analysis: a, state }) {
     if (!state.settings.notifications.screenLight) return [];
-    const plan = { wakeTime: a.wakeTime, windDownStart: a.tonight.windDownStart, bedtime: a.tonight.bedtime, nextWake: a.tonight.wake };
+    const plan = { wakeTime: a.wakeTime, windDownStart: a.tonight.windDownStart, bedtime: a.tonight.bedtime, nextWake: a.tonight.wake, screensOff: screensOffAt(a.tonight, state.settings.screensOffMin) };
     const evening = screenLightSchedule(plan).find((t) => t.phase === 'evening');
     if (!evening) return [];
     return [

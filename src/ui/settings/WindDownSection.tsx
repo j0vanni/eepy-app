@@ -6,7 +6,8 @@ import { soundPlayer } from '@/audio/player';
 import { PlayButton, SoundPicker, TimerPicker, VolumeSlider } from '@/audio/ui/SoundControls';
 import { useSoundPlayer } from '@/audio/useSoundPlayer';
 import { useStore } from '@/state/store';
-import { Card, CardTitle, ListRow, Section } from '@/ui/components';
+import { SCREENS_OFF_OPTIONS } from '@/engine/windDownPlan';
+import { Card, CardTitle, ListRow, Section, Segmented } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
 import { colors, font, space } from '@/ui/theme';
 
@@ -14,6 +15,7 @@ export function WindDownSection() {
   const sound = useSoundPlayer();
   const { settings } = sound;
   const screenDim = useStore((s) => s.settings.screenDim);
+  const screensOffMin = useStore((s) => s.settings.screensOffMin);
   const setSettings = useStore((s) => s.setSettings);
   return (
     <Section title="Wind-down">
@@ -27,6 +29,12 @@ export function WindDownSection() {
         <VolumeSlider value={settings.volume} onChange={(v) => soundPlayer.setVolume(v)} onCommit={sound.setVolume} />
         <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>SLEEP TIMER</Text>
         <TimerPicker value={settings.timerMin} onChange={sound.setTimer} />
+        <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>SCREENS OFF BEFORE LIGHTS-OUT</Text>
+        <Segmented
+          value={screensOffMin}
+          onChange={(v) => setSettings({ screensOffMin: v })}
+          options={SCREENS_OFF_OPTIONS.map((m) => ({ label: `${m} min`, value: m as number }))}
+        />
         <Toggle
           label="Dim & warm eepy in the evening"
           sub="A warm tint from the evening, and eepy's own screen dimmed from wind-down (your phone's settings stay as they are)"

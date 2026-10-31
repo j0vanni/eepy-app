@@ -41,11 +41,14 @@ export interface ScreenPlanInput {
   bedtime: number;
   /** Tomorrow's wake-up. */
   nextWake: number;
+  /** When screens go off (wind-down timeline); the "screen away" phase starts here. Defaults to lights-out. */
+  screensOff?: number;
 }
 
 /** Today's phases from this morning's wake-up to tomorrow's, in order. */
 export function screenLightSchedule(p: ScreenPlanInput): ScreenTarget[] {
   const morningEnd = Math.min(p.wakeTime + MORNING_MIN * MINUTE, p.windDownStart);
+  const screensOff = Math.min(p.bedtime, Math.max(p.windDownStart, p.screensOff ?? p.bedtime));
   const eveningStart = Math.max(morningEnd, Math.min(p.bedtime - EVENING_LEAD_MIN * MINUTE, p.windDownStart));
   const out: ScreenTarget[] = [
     {
@@ -78,7 +81,7 @@ export function screenLightSchedule(p: ScreenPlanInput): ScreenTarget[] {
     {
       phase: 'winddown',
       from: p.windDownStart,
-      until: p.bedtime,
+      until: screensOff,
       maxBrightness: 0.3,
       filter: 'warmest',
       title: 'Wind-down: as dim as you can read',
@@ -86,12 +89,12 @@ export function screenLightSchedule(p: ScreenPlanInput): ScreenTarget[] {
     },
     {
       phase: 'night',
-      from: p.bedtime,
+      from: screensOff,
       until: p.nextWake,
       maxBrightness: 0.15,
       filter: 'warmest',
-      title: 'Night: screen away',
-      advice: 'If you must look: lowest brightness, Extra dim, warmest filter, and only for a moment — no scrolling in bed.',
+      title: screensOff < p.bedtime ? 'Screens off' : 'Night: screen away',
+      advice: 'Phone on the charger, face down. If you must look: lowest brightness, Extra dim, warmest filter, and only for a moment — no scrolling in bed.',
     },
   ];
   return out.filter((t) => t.until > t.from);

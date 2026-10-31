@@ -143,6 +143,12 @@ export function NotificationsSection() {
           onChange={(v) => setNotif('screenLight', v)}
         />
         <Toggle
+          label="Screens-off reminder"
+          sub="From the wind-down timeline: phone on the charger, face down"
+          value={settings.notifications.screensOff}
+          onChange={(v) => setNotif('screensOff', v)}
+        />
+        <Toggle
           label="Forgot your coffee?"
           sub={'An hour after your usual morning drink, if nothing is logged: "Yes" logs it at your usual time'}
           value={settings.notifications.caffeineNudge}

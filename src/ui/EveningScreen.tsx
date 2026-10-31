@@ -18,7 +18,8 @@ export function EveningScreen() {
   const enabled = useStore((s) => s.settings.screenDim);
   const a = useAnalysis();
   const now = useNow(60_000);
-  const phase = enabled && a ? screenTargetAt(screenPlanFor(a), now).phase : undefined;
+  const screensOffMin = useStore((s) => s.settings.screensOffMin);
+  const phase = enabled && a ? screenTargetAt(screenPlanFor(a, screensOffMin), now).phase : undefined;
   const dimTo = phase === 'winddown' ? 0.3 : phase === 'night' ? 0.15 : undefined;
 
   useEffect(() => {

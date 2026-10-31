@@ -95,6 +95,7 @@ export default function RootLayout() {
         <Stack.Screen name="checkin" options={{ title: 'Quick check-in', presentation: 'modal' }} />
         <Stack.Screen name="caffeine" options={{ title: 'Drink', presentation: 'modal' }} />
         <Stack.Screen name="tonight" options={{ title: 'Adjust tonight', presentation: 'modal' }} />
+        <Stack.Screen name="calendar" options={{ title: 'Calendar' }} />
         <Stack.Screen name="simulate" options={{ title: 'What if?' }} />
         <Stack.Screen name="learning" options={{ title: 'Your body clock' }} />
         <Stack.Screen name="experiments/index" options={{ title: 'Experiments' }} />
