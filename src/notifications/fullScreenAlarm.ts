@@ -113,8 +113,10 @@ export interface WakeAlarmPlan extends WakeAlarmContent {
   wrist: number[];
   /** This morning's alarm, kept although "tonight" has moved on to tomorrow. */
   held: boolean;
-  /** Skipped for that morning by the user. */
+  /** Skipped for that morning by the user ("Skip") or a free day in the calendar. */
   skipped: boolean;
+  /** The calendar marks that morning as a free day (no alarm). */
+  calendarFree: boolean;
   /** Nothing left to ring: stopped from the watch already, or skipped. */
   done: boolean;
 }
@@ -141,6 +143,8 @@ export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number):
     held > now - 24 * HOUR &&
     now < held + backupMs + RINGING_GRACE_MIN * MINUTE;
   const base = holding ? held : planned.at;
+  const skippedByUser = settings.marks[WAKE_SKIP_MARK] === dateKey(base);
+  const calendarFree = !!a.tonight.noAlarm && dateKey(base) === a.tonight.wakeDate;
   return {
     title: planned.title,
     body: holding ? 'Time to get up.' : planned.body,
@@ -148,8 +152,9 @@ export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number):
     at: base + backupMs,
     wrist: wristMode ? WRIST_BUZZ_OFFSETS_MIN.map((m) => base + m * MINUTE) : [],
     held: holding,
-    skipped: settings.marks[WAKE_SKIP_MARK] === dateKey(base),
-    done: base === done || settings.marks[WAKE_SKIP_MARK] === dateKey(base),
+    skipped: skippedByUser || calendarFree,
+    calendarFree,
+    done: base === done || skippedByUser || calendarFree,
   };
 }
 

@@ -7,6 +7,7 @@ import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
 import { analyzeRegularity, RegularityResult } from './regularity';
 import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
+import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
 import {
   analyzeSessions,
   buildNights,
@@ -37,6 +38,8 @@ export interface Analysis {
   lastNightIsCurrent: boolean;
   scores: Record<string, SleepScore>;
   need: SleepNeedEstimate;
+  /** Tonight and the following nights (calendar, recovery plan); [0] matches `tonight`. */
+  upcoming: UpcomingNight[];
   debt: SleepDebtResult;
   chronotype: ChronotypeResult;
   regularity: RegularityResult;
@@ -91,6 +94,9 @@ function sleepIntervals(metrics: SessionMetrics[], since: number): Interval[] {
   return out;
 }
 
+/** Nights planned ahead for the calendar (tonight + 13). */
+const UPCOMING_DAYS = 14;
+
 export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = {}): Analysis {
   const { profile, dayLogs } = data;
   const day = minutesOfDay(now) < 240 ? addDays(dateKey(now), -1) : dateKey(now);
@@ -118,7 +124,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   }
   const regularity = analyzeRegularity(metrics, nights, day, chronotype.habitual?.midSleepSdMin);
 
-  const planned = planTonight({
+  const planInput = {
     profile,
     today: day,
     needMin: need.needMin,
@@ -131,10 +137,45 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     firstEventTitle: opts.firstEventTitle,
     firstEventPrepMin: opts.firstEventPrepMin,
     sleepWindow: currentCbtiWindow(opts.cbti, nights, day),
-  });
+  };
+  const planned = planTonight(planInput);
+  // Coming nights: an early morning later this week can pull tonight's lights-out earlier.
+  const nightPlan = {
+    profile,
+    needMin: need.needMin,
+    latencyMin,
+    efficiency,
+    cycleMin,
+    debtMin: debt.debtMin,
+    days: UPCOMING_DAYS,
+    fixedWindow: !!planInput.sleepWindow,
+    // Future nights: same planner, without tomorrow's calendar event (it only shapes tonight).
+    planNight: (wakeDate: string, debtMin: number, payoffExtraMin: number) =>
+      planTonight({
+        ...planInput,
+        today: addDays(wakeDate, -1),
+        debtMin,
+        payoffExtraMin,
+        firstEventStart: undefined,
+        firstEventTitle: undefined,
+        sleepWindow: currentCbtiWindow(opts.cbti, nights, addDays(wakeDate, -1)),
+      }),
+  };
+  const draft = planUpcomingNights({ ...nightPlan, first: planned });
+  const eased = draft[0].preShiftFor
+    ? preShiftTonight(planned, draft[0].preShiftMin, draft[0].preShiftFor, draft.find((n) => n.wakeDate === draft[0].preShiftFor)?.wake ?? planned.wake)
+    : planned;
   // Everything below (alarm, caffeine cut-off, forecast, nap advice) follows an adjusted night.
-  const tonight = applyTonightOverride(planned, opts.tonightOverride, profile.windDownMin);
+  const tonight = applyTonightOverride(eased, opts.tonightOverride, profile.windDownMin);
   const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
+  const upcoming = planUpcomingNights({ ...nightPlan, first: tonight, lockFirst: true });
+  upcoming[0] = {
+    ...upcoming[0],
+    alarm: tonight.noAlarm ? undefined : alarm.alarm,
+    cycles: tonight.noAlarm ? undefined : alarm.cycles,
+    preShiftMin: tonight.preShift?.minutes ?? 0,
+    preShiftFor: tonight.preShift?.forDate,
+  };
 
   // Today's wake-up. If last night hasn't synced yet, assume a habitual night so the model stays sane.
   const currentNight = nights.find((n) => n.wakeDate === day && n.main);
@@ -232,6 +273,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     age,
     metrics,
     nights,
+    upcoming,
     lastNight,
     lastNightIsCurrent: !!currentNight,
     scores,

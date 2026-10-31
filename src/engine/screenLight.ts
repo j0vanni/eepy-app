@@ -18,7 +18,10 @@ export interface ScreenTarget {
   phase: ScreenPhase;
   from: number;
   until: number;
-  /** Highest screen brightness to aim for (0–1). */
+  /**
+   * Highest brightness to aim for, as a position of Android's brightness slider (0–1) — what the
+   * user sees and drags. The slider is perceptual: 50% is only ~8% of the panel's light output.
+   */
   maxBrightness: number;
   /** Blue-light filter: off, Night Light on, or Night Light at its warmest (+ Extra dim). */
   filter: 'off' | 'warm' | 'warmest';
@@ -67,25 +70,25 @@ export function screenLightSchedule(p: ScreenPlanInput): ScreenTarget[] {
       phase: 'evening',
       from: eveningStart,
       until: p.windDownStart,
-      maxBrightness: 0.4,
+      maxBrightness: 0.5,
       filter: 'warm',
       title: 'Evening: warm and dimmer',
-      advice: 'Night Light on (blue-light filter), dark mode, brightness at or under 40%. Melatonin is starting to rise.',
+      advice: 'Night Light on (blue-light filter), dark mode, brightness slider at or under half. Melatonin is starting to rise.',
     },
     {
       phase: 'winddown',
       from: p.windDownStart,
       until: p.bedtime,
-      maxBrightness: 0.15,
+      maxBrightness: 0.3,
       filter: 'warmest',
       title: 'Wind-down: as dim as you can read',
-      advice: 'Night Light at its warmest plus Extra dim, brightness at or under 15%, phone at arm’s length — or put it down.',
+      advice: 'Night Light at its warmest plus Extra dim, brightness at or under 30%, phone at arm’s length — or put it down.',
     },
     {
       phase: 'night',
       from: p.bedtime,
       until: p.nextWake,
-      maxBrightness: 0.05,
+      maxBrightness: 0.15,
       filter: 'warmest',
       title: 'Night: screen away',
       advice: 'If you must look: lowest brightness, Extra dim, warmest filter, and only for a moment — no scrolling in bed.',
@@ -106,13 +109,14 @@ export function screenTargetAt(p: ScreenPlanInput, now: number): ScreenTarget {
 
 export type ScreenVerdict = { tone: 'good' | 'warn' | 'bad'; text: string };
 
-/** How the current screen brightness (0–1, if known) compares with the target. */
+/** How the current brightness (slider position 0–1, if known) compares with the target. */
 export function judgeScreenBrightness(brightness: number | undefined, target: ScreenTarget): ScreenVerdict | undefined {
   if (brightness === undefined || target.maxBrightness >= 1) return undefined;
   const pct = Math.round(brightness * 100);
   const max = Math.round(target.maxBrightness * 100);
   if (brightness <= target.maxBrightness + 0.02) return { tone: 'good', text: `Screen at ${pct}% — within the ${max}% target.` };
-  if (brightness <= target.maxBrightness * 2) return { tone: 'warn', text: `Screen at ${pct}% — a little bright; aim for ${max}% or less.` };
+  // Slider positions are perceptual, so 'a little over' is a fixed step rather than a multiple.
+  if (brightness <= target.maxBrightness + 0.2) return { tone: 'warn', text: `Screen at ${pct}% — a little bright; aim for ${max}% or less.` };
   return { tone: 'bad', text: `Screen at ${pct}% — too bright for now; aim for ${max}% or less.` };
 }
 
@@ -120,4 +124,23 @@ export function judgeScreenBrightness(brightness: number | undefined, target: Sc
 export function nightLightSchedule(p: ScreenPlanInput): { on: number; off: number } {
   const evening = screenLightSchedule(p).find((t) => t.phase === 'evening' || t.phase === 'winddown');
   return { on: evening?.from ?? p.windDownStart, off: p.nextWake };
+}
+
+// Android's brightness slider is perceptual: AOSP maps the panel's linear brightness to the slider
+// with an HLG-style curve (frameworks/base BrightnessUtils). Matching it means "30%" in eepy is
+// the same as 30% on the phone's own slider.
+const HLG = { r: 0.5, a: 0.17883277, b: 0.28466892, c: 0.55991073 };
+
+/** Linear panel brightness (0–1, as Android stores it) → slider position (0–1). */
+export function linearToSlider(linear: number): number {
+  const v = Math.max(0, Math.min(1, linear)) * 12;
+  const g = v <= 1 ? HLG.r * Math.sqrt(v) : HLG.a * Math.log(v - HLG.b) + HLG.c;
+  return Math.max(0, Math.min(1, g));
+}
+
+/** Slider position (0–1) → linear panel brightness (0–1). */
+export function sliderToLinear(slider: number): number {
+  const g = Math.max(0, Math.min(1, slider));
+  const v = g <= HLG.r ? (g / HLG.r) ** 2 : Math.exp((g - HLG.c) / HLG.a) + HLG.b;
+  return Math.max(0, Math.min(1, v / 12));
 }

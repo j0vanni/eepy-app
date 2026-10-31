@@ -1,4 +1,4 @@
-import { judgeScreenBrightness, nightLightSchedule, screenLightSchedule, screenTargetAt } from '../screenLight';
+import { judgeScreenBrightness, linearToSlider, nightLightSchedule, screenLightSchedule, screenTargetAt, sliderToLinear } from '../screenLight';
 import { atMinutes, formatTime } from '../time';
 
 const D = '2026-10-29';
@@ -20,8 +20,8 @@ describe('phone screen light', () => {
       ['winddown', '22:15', '23:15'],
       ['night', '23:15', '07:00'],
     ]);
-    expect(s.find((t) => t.phase === 'evening')).toMatchObject({ maxBrightness: 0.4, filter: 'warm' });
-    expect(s.find((t) => t.phase === 'winddown')).toMatchObject({ maxBrightness: 0.15, filter: 'warmest' });
+    expect(s.find((t) => t.phase === 'evening')).toMatchObject({ maxBrightness: 0.5, filter: 'warm' });
+    expect(s.find((t) => t.phase === 'winddown')).toMatchObject({ maxBrightness: 0.3, filter: 'warmest' });
   });
 
   it('knows the target right now, including before this morning’s wake-up', () => {
@@ -39,11 +39,25 @@ describe('phone screen light', () => {
 
   it('judges brightness against the target, and suggests a Night Light schedule', () => {
     const evening = screenTargetAt(plan, at(21));
-    expect(judgeScreenBrightness(0.3, evening)?.tone).toBe('good');
-    expect(judgeScreenBrightness(0.7, evening)?.tone).toBe('warn');
+    expect(judgeScreenBrightness(0.4, evening)?.tone).toBe('good');
+    expect(judgeScreenBrightness(0.65, evening)?.tone).toBe('warn');
     expect(judgeScreenBrightness(1, evening)?.tone).toBe('bad');
     expect(judgeScreenBrightness(1, screenTargetAt(plan, at(13)))).toBeUndefined();
     const nl = nightLightSchedule(plan);
     expect([formatTime(nl.on), formatTime(nl.off)]).toEqual(['20:15', '07:00']);
+  });
+});
+
+describe('brightness slider curve (AOSP)', () => {
+  it('matches Android: half the slider is ~8% of the light, full is full', () => {
+    expect(linearToSlider(0)).toBe(0);
+    expect(linearToSlider(1)).toBeCloseTo(1, 3);
+    expect(linearToSlider(1 / 12)).toBeCloseTo(0.5, 5);
+    expect(sliderToLinear(0.5)).toBeCloseTo(1 / 12, 5);
+    expect(linearToSlider(0.4)).toBeCloseTo(0.83, 2);
+  });
+
+  it('round-trips', () => {
+    for (const g of [0.05, 0.15, 0.3, 0.5, 0.7, 0.95]) expect(linearToSlider(sliderToLinear(g))).toBeCloseTo(g, 6);
   });
 });

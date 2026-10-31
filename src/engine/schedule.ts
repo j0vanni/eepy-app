@@ -72,6 +72,10 @@ export interface TonightPlan {
   calendar?: CalendarAdjustment;
   /** Set when the user moved tonight's times ("Adjust tonight"): what the plan had been. */
   adjusted?: { plannedBedtime: number; plannedWake: number };
+  /** The morning is a free day in the calendar: no alarm. */
+  noAlarm?: boolean;
+  /** Lights-out was moved earlier to ease into an early morning later this week (calendar). */
+  preShift?: { minutes: number; forDate: string };
 }
 
 /** "I can't make it tonight": the user's own bedtime (and optionally wake-up) for one night. */
@@ -120,11 +124,25 @@ export interface PlanInput {
   sleepWindow?: { bedMin: number; wakeMin: number; reason: string };
 }
 
-export function wakeTargetFor(profile: Profile, dateKey: string): { wakeMin: number; isWorkday: boolean } {
+export interface WakeTarget {
+  wakeMin: number;
+  /** A morning with a fixed wake-up (a workday, or a time set in the calendar). */
+  isWorkday: boolean;
+  /** Set for this date in the calendar. */
+  custom?: boolean;
+  /** Calendar free day: no alarm that morning. */
+  noAlarm?: boolean;
+}
+
+export function wakeTargetFor(profile: Profile, dateKey: string): WakeTarget {
+  const plan = profile.wakePlan?.[dateKey];
+  if (plan?.wakeMin !== undefined) return { wakeMin: plan.wakeMin, isWorkday: true, custom: true };
+  const freeWakeMin = profile.freeWakeMin ?? profile.workWakeMin + 60;
+  if (plan?.free) return { wakeMin: freeWakeMin, isWorkday: false, custom: true, noAlarm: true };
   const isWorkday = profile.workdays.includes(weekdayOfKey(dateKey));
   if (isWorkday) return { wakeMin: profile.workWakeMin, isWorkday };
   // Free days: sleep in by at most an hour to limit social jet lag, unless the user set a time.
-  return { wakeMin: profile.freeWakeMin ?? profile.workWakeMin + 60, isWorkday };
+  return { wakeMin: freeWakeMin, isWorkday };
 }
 
 /** Default minutes between waking and tomorrow's first event. */
@@ -152,7 +170,7 @@ function prepPhrase(min: number): string {
 export function planTonight(input: PlanInput): TonightPlan {
   const { profile, needMin, debtMin, efficiency, latencyMin } = input;
   const wakeDate = addDays(input.today, 1);
-  const { wakeMin, isWorkday } = wakeTargetFor(profile, wakeDate);
+  const { wakeMin, isWorkday, noAlarm } = wakeTargetFor(profile, wakeDate);
   const usualWake = atMinutes(wakeDate, wakeMin);
   // Tomorrow's first event can only bring the wake-up earlier, never later (free days keep their rule).
   const eventStart = input.firstEventStart;
@@ -288,6 +306,7 @@ export function planTonight(input: PlanInput): TonightPlan {
     gradual,
     rationale,
     ...(calendar ? { calendar } : {}),
+    ...(noAlarm ? { noAlarm } : {}),
   };
 }
 

@@ -147,6 +147,14 @@ export interface Profile {
   insomniaMode: boolean;
   screenings: Record<string, ScreeningResult | undefined>;
   onboarded: boolean;
+  /** Calendar: per-morning wake plans (YYYY-MM-DD of the morning) that override the weekly pattern. */
+  wakePlan?: Record<string, DayWakePlan>;
+}
+
+/** One morning in the calendar: a fixed wake-up time, or a free day with no alarm. */
+export interface DayWakePlan {
+  wakeMin?: number;
+  free?: boolean;
 }
 
 export const DEFAULT_PROFILE: Profile = {
