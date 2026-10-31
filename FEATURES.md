@@ -279,6 +279,20 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 
 ---
 
+## 21. New in 0.6 — calendar, recovery plan, wind-down timeline
+
+| | Feature |
+| --- | --- |
+| ✅ | **Calendar** (Today's header, Plan, Coach): month grid where each day shows the night that ended that morning — sleep vs your need (purple met / amber short) and duration — and coming mornings with their planned wake-up; month stats (average sleep and score, nights that met your need, usual sleep and wake times) |
+| ✅ | **Plan single mornings**: tap a coming day → usual wake-up, a set time ("up by 6:00 AM" for work, a flight…) or a free day with no alarm. eepy shows the optimal night before: wind-down, lights-out, cycle-timed alarm, expected sleep and any extra for sleep debt. Tonight's plan, reminders and alarm follow the calendar |
+| ✅ | **Eases into early mornings**: nights before an early start move earlier by at most 45 min a night (the body clock can't jump), which can pull tonight's lights-out earlier too; nights that can't move earlier than your body clock allows are flagged as short, with a nap tip |
+| ✅ | **Recovery autopilot**: sleep debt is paid back a little each night (at most +30 min) instead of one long lie-in, with wake-ups kept steady; a "Getting back on track" card shows the coming nights and when debt drops under an hour |
+| ✅ | **Wind-down timeline**: evening light, last big meal, hard exercise done, wind-down, **screens off** (30/45/60 min before lights-out, default 45 — Settings → Wind-down), screen-free routine, lights-out; on Today in the evening and in the wind-down routine, with what's happening now and a countdown to the next step; the phone-light "screen away" phase starts at screens-off |
+| 🧪 | **Screens-off reminder** at that time |
+| 🧪 | **Phone brightness slider** in the Phone light card: sets the phone's own brightness (after allowing "Modify system settings" once), with the current target marked, "Set to target" and auto-brightness on/off. Targets now match the position of Android's brightness slider (evening ≤ 50%, wind-down ≤ 30%, night ≤ 15%) |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation
