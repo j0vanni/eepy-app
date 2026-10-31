@@ -1,10 +1,15 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 
+import { assessBreathing, breathingSummaryFor } from '@/engine/breathing';
+import { buildNightStory } from '@/engine/nightStory';
 import { TAG_BY_ID } from '@/engine/tags';
 import { addDays, formatDuration, formatTime } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
+import { BreathingNightCard } from '@/ui/cards/BreathingCard';
+import { NightStoryCard } from '@/ui/cards/NightStoryCard';
 import { Hypnogram, LineChart, StageBar } from '@/ui/charts';
 import { Button, Card, CardTitle, Chip, Empty, Meter, Note, Ring, Row, Screen, Section, Stat } from '@/ui/components';
 import { confirm } from '@/ui/confirm';
@@ -15,10 +20,24 @@ import { NightTimelineCard } from '@/ui/WakeCheck';
 export default function NightScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const a = useAnalysis();
-  const vitals = useStore((s) => s.vitals[id]);
+  const allVitals = useStore((s) => s.vitals);
+  const vitals = allVitals[id];
   const dayLogs = useStore((s) => s.dayLogs);
+  const caffeine = useStore((s) => s.caffeine);
+  const profile = useStore((s) => s.profile);
+  const workouts = useStore((s) => s.workouts);
   const deleteSession = useStore((s) => s.deleteSession);
   const m = a?.metrics.find((x) => x.id === id);
+  const story = useMemo(
+    () =>
+      a && m
+        ? a.lastNightStory?.sessionId === m.id
+          ? a.lastNightStory
+          : buildNightStory({ night: m, nights: a.nights, vitals: allVitals, dayLogs, caffeine, profile, workouts, insights: a.insights, scores: a.scores })
+        : undefined,
+    [a, m, allVitals, dayLogs, caffeine, profile, workouts],
+  );
+  const breathing = useMemo(() => (m ? assessBreathing(breathingSummaryFor(allVitals, m.id)) : undefined), [m, allVitals]);
 
   if (!a || !m) {
     return (
@@ -35,6 +54,7 @@ export default function NightScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: m.isNap ? 'Nap' : nightLabel(m.wakeDate) }} />
+      {story ? <NightStoryCard story={story} /> : null}
       <Card>
         <Row gap={space.lg}>
           {score ? (
@@ -137,6 +157,12 @@ export default function NightScreen() {
             ) : null}
             {vitals.respRate ? <Text style={font.small}>Breathing rate {vitals.respRate}/min.</Text> : null}
           </Card>
+        </Section>
+      ) : null}
+
+      {breathing ? (
+        <Section title="Breathing check">
+          <BreathingNightCard night={breathing} curve={vitals?.spo2Curve} start={m.start} stopBang={profile.screenings.stopbang} />
         </Section>
       ) : null}
 

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { pruneSpo2Curves } from '../engine/breathing';
 import type { DrinkPreset } from '../engine/caffeine';
 import type { TonightOverride } from '../engine/schedule';
 import type { CalibrationResult } from '../engine/calibration';
@@ -291,9 +292,11 @@ export const useStore = create<AppState>()(
           const daily: Record<string, DailyStats> = { ...s.daily };
           for (const [date, d] of Object.entries(r.daily)) daily[date] = { ...daily[date], ...d };
           const keptWorkouts = s.workouts.filter((w) => !inWindow(w.start, w.end, windowStart, r.to));
+          const sessions = [...kept, ...r.sessions].sort((a, b) => a.start - b.start);
           return {
-            sessions: [...kept, ...r.sessions].sort((a, b) => a.start - b.start),
-            vitals,
+            sessions,
+            // SpO₂ chart curves only for the last ~30 nights; the breathing summary stays for all.
+            vitals: pruneSpo2Curves(vitals, sessions),
             daily,
             workouts: [...keptWorkouts, ...(r.workouts ?? [])].sort((a, b) => a.start - b.start),
             settings: { ...s.settings, lastSync: Date.now(), lastSyncError: undefined, lastSyncCounts: r.counts },

@@ -100,6 +100,8 @@ export interface WeeklyReview {
   focus: { title: string; detail: string; icon: string; templateId?: string; experimentId?: string };
   /** One-line summary for the notification / card. */
   headline: string;
+  /** Persistent overnight SpO₂ dips (breathing check, last 30 nights) — latest week only. */
+  breathing?: { title: string; detail: string };
 }
 
 interface Metric {
@@ -272,6 +274,7 @@ export function buildWeeklyReview(input: {
   }
 
   const changes = compareWeeks(week, prev3, a, data);
+  const breathing = a.breathing?.level === 'frequent' && ws === latestReviewWeek(today) ? { title: a.breathing.title, detail: a.breathing.detail } : undefined;
   const headlineParts = [
     avgSleepMin !== undefined ? `Avg ${formatDuration(avgSleepMin)}` : undefined,
     avgScore !== undefined ? `score ${Math.round(avgScore)}` : undefined,
@@ -297,12 +300,13 @@ export function buildWeeklyReview(input: {
     best,
     worst: worst && best && worst.date !== best.date ? worst : undefined,
     changes,
-    insights: a.insights.slice(0, 2),
+    insights: a.insights.filter((i) => !(breathing && i.id === 'physio:spo2-dips')).slice(0, 2),
     goals: goalRows,
     goalScore: gKnown > 0 ? Math.round((gMet / gKnown) * 100) : undefined,
     experiment,
     focus,
     headline: headlineParts.length ? headlineParts.join(' · ') : 'Not enough nights recorded this week',
+    breathing,
   };
 }
 

@@ -41,6 +41,33 @@ export interface SleepSession {
 export interface VitalSample {
   time: number;
   value: number;
+  /** App that wrote the reading (Health Connect data origin), when known. */
+  origin?: string;
+}
+
+/**
+ * Breathing-check summary of one night's SpO₂ readings, computed from the raw readings at sync
+ * time (see engine/breathing.ts). Counts cover the time asleep only (awake periods are skipped).
+ */
+export interface BreathingSummary {
+  /** Readings used (in range, during sleep, glitches removed). */
+  n: number;
+  /** Minutes asleep between sleep onset and final wake. */
+  sleepMin: number;
+  /** Minutes of that sleep with readings no more than 10 minutes apart. */
+  coveredMin: number;
+  /** Dips of ≥ 3 points below the local (preceding 15-minute) baseline. */
+  dips3: number;
+  /** The subset of those dips that reached ≥ 4 points. */
+  dips4: number;
+  lowest?: number;
+  avg?: number;
+  /** Readings below 90%. */
+  below90: number;
+  /** Isolated readings dropped as sensor glitches (≥ 10 points below both neighbours). */
+  glitches: number;
+  /** Minutes since session start of each dip's lowest point (first 60). */
+  dipAt?: number[];
 }
 
 /** Compact per-session physiology summary computed at sync time (raw samples are not stored). */
@@ -60,6 +87,10 @@ export interface NightVitals {
   /** Oxygen desaturation events (>= 3% drop vs. rolling baseline) per hour, if sampling is dense enough. */
   spo2DipsPerHour?: number;
   spo2Samples?: number;
+  /** Breathing-check summary (dips, lowest, time below 90%, coverage). */
+  breathing?: BreathingSummary;
+  /** Lowest SpO₂ per 5 minutes: [minutes since session start, %]. Kept for the most recent ~30 nights only. */
+  spo2Curve?: [number, number][];
   respRate?: number;
 }
 

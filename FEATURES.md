@@ -277,8 +277,6 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | 🧪 | **eepy dims and warms itself** in the evening (warm tint; its own window dimmed from wind-down) — Settings → Wind-down |
 | ℹ️ | Android doesn't let apps switch Night Light or change system brightness without a special permission, so eepy guides and links rather than changing them |
 
----
-
 ## 21. New in 0.6 — calendar, recovery plan, wind-down timeline
 
 | | Feature |
@@ -319,6 +317,21 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | ✅ | Evidence: eepy remembers when it was on screen in the evening, at night and in the morning (60 days), "I'm up" taps on the watch alarm, check-ins and journal ratings, plus a per-night **step curve** from Health Connect (10-min bins, to 30 min after the night). Heart rate and caffeine logs only add confidence |
 | ✅ | Settings → Data sources → **Detect when I'm actually up** (on by default) |
 | ℹ️ | Step records longer than 30 min (e.g. hourly totals) can't time anything and are ignored; heart-rate / SpO₂ summaries are still computed over the recorded window at sync time |
+
+## 24. New in 0.7 — night story and breathing check
+
+| | Feature |
+| --- | --- |
+| ✅ | **Night story** at the top of every night: a plain-English account built from the data eepy already has — *"Asleep in 12 min — quicker than usual. Deep sleep came early (1h 20m, your normal). You were awake 3:10–3:24 AM and your heart rate rose then. REM was short (14% vs your usual 21%). Likely factors: drinking alcohol and ~60 mg of caffeine still active at lights-out."* Numbers are bold (coloured by good/bad), causes are tappable (they open that evening's journal) |
+| ✅ | Compared with **your own usual** (median of up to 30 recent nights): time to fall asleep, total sleep, deep sleep (and whether it came early or late), awakenings with times (and whether heart rate rose then, from the 10-minute HR curve), REM share, lowest heart rate and when, HRV, oxygen dips, bedtime |
+| ✅ | **Likely factors only when they plausibly apply**: a journal tag, caffeine still active at lights-out (personal half-life), a late watch workout, a nap or an unusual bedtime is named only if an effect it's known to have showed up that night (e.g. alcohol → less REM, more time awake, higher / late-settling heart rate). Where the insights engine has measured *your* effect, it says so (*"On nights after drinking alcohol, your REM sleep is usually 5 percentage points lower"*). Logged but no visible effect → "also logged", never blamed; helpful habits are never blamed; at most three likely factors |
+| ✅ | One-line version on Today's last-night card and as the first line of the 🧪 morning-report notification (*"Restless (20m awake) and REM short (14% vs 21%) — likely drinking alcohol."*) |
+| ✅ | **Breathing check (SpO₂ dips)**: per night, dips of ≥ 3% and ≥ 4% below a local 15-minute baseline per hour of covered sleep (an ODI-like count), lowest reading, time below 90%, readings per hour, coverage and a confidence level; single-reading glitches and readings while awake are ignored |
+| ✅ | Conservative verdicts — *looks normal* (< 5 dips/h), *some dips* (≥ 5/h), *frequent dips* (≥ 15/h of 3%, ≥ 10/h of 4%, or ≥ 10% of the night below 90%) — and only the 30-night median over ≥ 5 dense nights can say *"frequent dips — worth mentioning to a doctor"*. Too few readings (< 1 every 5 min) → "too few readings to judge", never a guess. Always with the disclaimer that a wrist sensor is not a diagnostic test |
+| ✅ | Breathing card on the night screen (with a lowest-SpO₂-per-5-minutes chart) and a 30-night trend card in Trends → Recovery, both linking to the STOP-Bang check; persistent dips show up in the weekly review and as an insight. Demo data includes plausible SpO₂ (a reading every ~2 min, more dips after alcohol) |
+| 🧪 | Health Connect stores one OxygenSaturation record per reading; eepy keeps one app's readings per night (the watch's), summarises them at sync time and stores only the summary plus a compact 5-minute curve for the last ~30 nights. How often Nothing X writes SpO₂ overnight is still to be confirmed on a real CMF Watch 3 Pro — nights synced before this feature need a full re-sync |
+
+---
 
 ---
 

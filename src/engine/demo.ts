@@ -22,6 +22,7 @@ import {
   VitalSample,
   Workout,
 } from './types';
+import { pruneSpo2Curves } from './breathing';
 import { summarizeNightVitals } from './vitals';
 import { computeSessionMetrics } from './sessions';
 
@@ -103,6 +104,41 @@ function hrSamples(rand: () => number, segs: StageSegment[], start: number, end:
   return out;
 }
 
+/**
+ * Overnight SpO₂ like a wrist sensor reading every ~2 minutes: a steady ~96% baseline, slightly
+ * lower in REM, noisier while awake, a few short 3–6 point dips an hour (about 12 an hour after
+ * alcohol, which relaxes the airway), the odd single-reading glitch, sometimes a loose-strap gap
+ * of 1–2.5 h and, on ~5% of nights, only one reading every 15 minutes.
+ */
+function demoSpo2(rand: () => number, segs: StageSegment[], onset: number, wake: number, alcohol: boolean): VitalSample[] {
+  const sparse = rand() < 0.05;
+  const step = (sparse ? 15 : 2) * MINUTE;
+  const base = gaussian(rand, 96, 0.4);
+  const gap = rand() < 0.12 ? { start: onset + (0.2 + rand() * 0.5) * (wake - onset), dur: (60 + rand() * 90) * MINUTE } : undefined;
+  const perHour = alcohol ? 12 : 1.5;
+  const dips: { at: number; dur: number; depth: number }[] = [];
+  for (let t = onset; ; ) {
+    t += (-Math.log(Math.max(rand(), 1e-9)) / perHour) * HOUR;
+    if (t >= wake) break;
+    dips.push({ at: t, dur: (1 + rand() * 2.5) * MINUTE, depth: 3.2 + rand() * 2.6 });
+  }
+  const out: VitalSample[] = [];
+  for (let t = onset + rand() * step; t < wake; t += step + (rand() - 0.5) * 20_000) {
+    if (gap && t >= gap.start && t < gap.start + gap.dur) continue;
+    const stage = segs.find((s) => s.start <= t && t < s.end)?.stage;
+    let v = base + (stage === 'rem' ? -0.5 : 0) + gaussian(rand, 0, stage === 'awake' ? 1.4 : 0.5);
+    let drop = 0;
+    for (const d of dips) {
+      const x = (t - d.at) / d.dur;
+      if (x >= 0 && x <= 1) drop = Math.max(drop, d.depth * Math.min(1, 2.5 * (1 - Math.abs(2 * x - 1))));
+    }
+    v -= drop;
+    if (rand() < 0.002) v = 78 + rand() * 7; // sensor glitch
+    out.push({ time: Math.round(t), value: Math.round(clamp(v, 70, 100)), origin: DEMO_ORIGIN });
+  }
+  return out;
+}
+
 export function generateDemoData(now: number, opts: { days?: number; seed?: number } = {}): SleepDataset {
   const days = opts.days ?? 63;
   const rand = rng(opts.seed ?? 42);
@@ -125,6 +161,7 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   /** eepy on screen before bed / in the morning (wake-up detection evidence). */
   const appUse: [number, number][] = [];
   let debt = 0;
+  const spo2Rand = rng((opts.seed ?? 42) + 104729);
 
   for (let i = days; i >= 0; i--) {
     const wakeDate = addDays(today, -i);
@@ -191,8 +228,10 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
     const hrv: VitalSample[] = [
       { time: wake - 30 * MINUTE, value: Math.max(18, gaussian(rand, 52, 5) - (fx.alcohol ? 13 : 0) - (fx.stress ? 6 : 0) + (fx.exercise ? 3 : 0)) },
     ];
-    const spo2: VitalSample[] = [];
-    for (let t = onset; t < wake; t += 10 * MINUTE) spo2.push({ time: t, value: Math.round(clamp(gaussian(rand, 96.2, 0.9), 89, 100)) });
+    // SpO₂ comes from its own random stream; these draws keep the main stream (and so every other
+    // demo value) exactly as it was before the breathing check existed.
+    for (let t = onset; t < wake; t += 10 * MINUTE) gaussian(rand, 96.2, 0.9);
+    const spo2 = demoSpo2(spo2Rand, stages, onset, wake, fx.alcohol);
     const resp: VitalSample[] = [{ time: onset + 2 * 3600_000, value: Math.round(gaussian(rand, 14, 0.6) * 10) / 10 }];
     vitals[session.id] = summarizeNightVitals(m, { hr, hrv, spo2, resp });
     // Steps around the night and eepy before bed, without rand() calls so every other value is unchanged:
@@ -258,7 +297,7 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   const morningCoffee = atMinutes(today, 7 * 60 + 45);
   if (morningCoffee < now) caffeine.push({ id: `c-${today}-1`, time: morningCoffee, mg: 95, label: 'Coffee (8 oz / 240 ml)' });
 
-  const dataset: SleepDataset = { sessions, vitals, daily, dayLogs, caffeine, profile, workouts };
+  const dataset: SleepDataset = { sessions, vitals: pruneSpo2Curves(vitals, sessions), daily, dayLogs, caffeine, profile, workouts };
   // Separate random stream so adding check-ins leaves every other demo value unchanged.
   dataset.checkins = demoCheckins(dataset, now, rng((opts.seed ?? 42) + 7919));
   dataset.wakeLog = { detect: true, use: appUse, ups: [], fixes: {} };

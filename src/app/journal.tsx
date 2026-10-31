@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
@@ -16,7 +16,9 @@ const ENERGY = ['Exhausted', 'Tired', 'OK', 'Good', 'Energised'];
 
 export default function JournalScreen() {
   const today = dateKey(Date.now());
-  const [date, setDate] = useState(today);
+  // `date` opens a past day directly (e.g. the evening a night story points to).
+  const params = useLocalSearchParams<{ date?: string }>();
+  const [date, setDate] = useState(() => (params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today ? params.date : today));
   const log = useStore((s) => s.dayLogs[date]);
   const logDay = useStore((s) => s.logDay);
   const toggleTag = useStore((s) => s.toggleTag);

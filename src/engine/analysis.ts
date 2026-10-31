@@ -1,10 +1,12 @@
 import { CircadianParams, EnergyForecast, forecastEnergy, Interval, sleepPressureAt } from './alertness';
+import { assessBreathing, breathingSummaryFor, breathingTrend, BreathingTrend } from './breathing';
 import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
 import { CbtiProgram, currentCbtiWindow } from './cbti';
 import { analyzeChronotype, ChronotypeResult } from './chronotype';
 import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
 import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
+import { buildNightStory, NightStory } from './nightStory';
 import { analyzeRegularity, RegularityResult } from './regularity';
 import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
@@ -66,6 +68,10 @@ export interface Analysis {
   sleeps: Interval[];
   /** The personal circadian adjustment in effect (learned from check-ins), if any. */
   circadian?: CircadianParams;
+  /** Plain-English story of `lastNight` (nightStory.ts). */
+  lastNightStory?: NightStory;
+  /** 30-night breathing check from overnight SpO₂ (breathing.ts). */
+  breathing?: BreathingTrend;
 }
 
 export const ANALYSIS_WINDOW_DAYS = 120;
@@ -252,6 +258,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     regularityScore: regularity.consistencyScore,
   });
 
+  const breathing = breathingTrend({ nights, vitals: data.vitals, asOfDate: day });
   const rows: NightRow[] = nights
     .filter((n) => n.main)
     .slice(-90)
@@ -266,7 +273,21 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     chronotype,
     needMin: need.needMin,
     workouts: data.workouts ?? [],
+    breathing,
   });
+  const lastNightStory = lastNight?.main
+    ? buildNightStory({
+        night: lastNight.main,
+        nights,
+        vitals: data.vitals,
+        dayLogs,
+        caffeine: data.caffeine,
+        profile,
+        workouts: data.workouts,
+        insights,
+        scores,
+      })
+    : undefined;
 
   const plan = buildDailyPlan({ wakeTime, energy, nap, caffeine: cutoff, tonight, alarm });
   const tips = buildTips({ nights, debt, regularity, chronotype, caffeine: cutoff, profile, tonight, age });
@@ -304,6 +325,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     recoveryAlert: detectRecoveryAlert({ nights, vitals: data.vitals, daily: data.daily, asOfDate: day }),
     sleeps,
     circadian: opts.circadian,
+    lastNightStory,
+    breathing,
   };
 }
 
@@ -319,6 +342,8 @@ export interface TrendRow {
   remPct?: number;
   hrv?: number;
   hrMin?: number;
+  /** Breathing check: SpO₂ dips of ≥ 3% per hour (only nights dense enough to count them). */
+  spo2Dips?: number;
 }
 
 /** Per-day series for the Trends screen (debt is recomputed as of each morning). */
@@ -330,6 +355,7 @@ export function trendRows(a: Analysis, data: SleepDataset, days: number): TrendR
     const n = byDate.get(date);
     const m = n?.main;
     const v = m ? data.vitals[m.id] : undefined;
+    const b = m ? assessBreathing(breathingSummaryFor(data.vitals, m.id)) : undefined;
     rows.push({
       date,
       sleepMin: m ? n!.totalSleepMin : undefined,
@@ -342,6 +368,7 @@ export function trendRows(a: Analysis, data: SleepDataset, days: number): TrendR
       remPct: m?.stagePct?.rem,
       hrv: v?.hrvRmssd ?? data.daily[date]?.hrv,
       hrMin: v?.hrMin,
+      spo2Dips: b && (b.confidence === 'medium' || b.confidence === 'high') ? b.odi3 : undefined,
     });
   }
   return rows;

@@ -19,7 +19,10 @@ describe('morning report', () => {
     // "Last night: 5h 51m · score 61 · debt 6h ▲"
     expect(p.title).toMatch(/^Last night: \d+h \d\dm · score \d+ · (no debt|debt [\d.]+[hm]( [▲▼])?)$/);
     expect(p.title).toContain(`score ${a.scores[a.lastNight!.main!.id].total}`);
-    expect(p.body).toMatch(/^Today: /);
+    // The night story's one-liner first, then today's plan.
+    const [storyLine, today] = p.body.split('\n');
+    expect(storyLine).toBe(a.lastNightStory!.oneLiner);
+    expect(today).toMatch(/^Today: /);
     expect(p.body).toContain(`lights out ${formatTime(a.tonight.bedtime)}`);
     expect(a.nap.verdict).toBe('nap-later');
     expect(p.body).toContain(`Nap window ${formatTime(a.nap.window!.start)}–${formatTime(a.nap.window!.end)}`);

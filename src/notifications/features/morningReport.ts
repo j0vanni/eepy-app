@@ -1,6 +1,7 @@
 /**
  * Morning report as soon as last night syncs (`settings.notifications.morningReport`):
- * "Last night: 7h 12m · score 82 · debt 2h ▼" + a line about today (nap, caffeine, lights out).
+ * "Last night: 7h 12m · score 82 · debt 2h ▼" + the night story's one-liner ("REM short (14% vs
+ * 21%) — likely drinking alcohol.") + a line about today (nap, caffeine, lights out).
  * Sent once per night (`settings.marks.lastReportedWakeDate`), between waking and noon. If eepy is
  * open on screen when the night lands, the night is marked as reported without a notification —
  * the Today screen already shows it. Tapping the notification opens the night's details.
@@ -77,7 +78,7 @@ export function planMorningReport({ analysis: a, state, now }: PlannerContext): 
       immediate: true,
       channel: 'reports',
       title: reportTitle(a),
-      body: reportBody(a),
+      body: a.lastNightStory?.sessionId === main.id ? `${a.lastNightStory.oneLiner}\n${reportBody(a)}` : reportBody(a),
       data: { nightId: main.id, wakeDate: night.wakeDate },
     },
   ];

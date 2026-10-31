@@ -74,6 +74,15 @@ describe('weekly review', () => {
     expect(review.focus.title).toMatch(/^Try: /);
   });
 
+  it('mentions persistent oxygen dips only when the breathing check says they are frequent', () => {
+    expect(review.breathing).toBeUndefined(); // the demo person breathes normally
+    const frequent = { ...a, breathing: { ...a.breathing!, level: 'frequent' as const, title: 'Frequent dips — worth mentioning to a doctor', detail: 'x' } };
+    const r = buildWeeklyReview({ analysis: frequent, data: demo, goals, experiments: [], weekStart: week });
+    expect(r.breathing).toEqual({ title: 'Frequent dips — worth mentioning to a doctor', detail: 'x' });
+    // Older weeks don't repeat today's 30-night verdict.
+    expect(buildWeeklyReview({ analysis: frequent, data: demo, goals, experiments: [], weekStart: addDays(week, -7) }).breathing).toBeUndefined();
+  });
+
   it('keeps the focus on a running experiment', () => {
     const e = createExperiment(TEMPLATE_BY_ID['no-screens'], { startDate: addDays(a.day, -3), now });
     const r = buildWeeklyReview({ analysis: a, data: demo, goals, experiments: [e], weekStart: week });

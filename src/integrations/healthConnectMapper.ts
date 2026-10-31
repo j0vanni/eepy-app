@@ -118,6 +118,27 @@ export function instantSamples(records: HCInstantRecord[], field: string): Vital
     .sort((a, b) => a.time - b.time);
 }
 
+/**
+ * OxygenSaturation records: Health Connect stores one instantaneous record per reading
+ * (`time` + `percentage`, 0–100). Keeps the writing app so a night's readings come from one device.
+ * Readings outside 0–100 are dropped; the same reading written twice by the same app is kept once.
+ */
+export function mapSpo2Samples(records: HCInstantRecord[]): VitalSample[] {
+  const seen = new Set<string>();
+  const out: VitalSample[] = [];
+  for (const r of records) {
+    const time = ms(r.time);
+    const value = Number(r.percentage);
+    if (!Number.isFinite(time) || !Number.isFinite(value) || value <= 0 || value > 100) continue;
+    const origin = r.metadata?.dataOrigin;
+    const key = `${time}|${origin ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(origin ? { time, value, origin } : { time, value });
+  }
+  return out.sort((a, b) => a.time - b.time);
+}
+
 /** Sums step records per local day (records spanning midnight are split proportionally). */
 export function stepsPerDay(records: HCStepsRecord[]): Record<string, number> {
   const out: Record<string, number> = {};
