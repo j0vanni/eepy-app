@@ -1,6 +1,7 @@
-import { mean, median, sd } from './stats';
+import { assessBreathing, summarizeSpo2 } from './breathing';
+import { mean, sd } from './stats';
 import { addDays, clamp, MINUTE } from './time';
-import type { DailyStats, NightVitals, VitalSample } from './types';
+import type { DailyStats, NightVitals, SleepSession, StageSegment, VitalSample } from './types';
 import type { Night } from './sessions';
 
 interface SessionWindow {
@@ -9,13 +10,18 @@ interface SessionWindow {
   end: number;
   sleepOnset: number;
   finalWake: number;
+  /** Stage segments (SpO₂ readings taken while awake are skipped). */
+  segments?: StageSegment[];
+  /** The night's own app is preferred when several apps wrote SpO₂. */
+  session?: Pick<SleepSession, 'origin'>;
 }
 
 const within = (xs: VitalSample[], a: number, b: number) => xs.filter((x) => x.time >= a && x.time <= b);
 
 /**
- * Condenses raw watch samples into a per-night summary. Only the summary is stored, which keeps the
- * on-device database small even with minute-level heart-rate data.
+ * Condenses raw watch samples into a per-night summary. Only the summary is stored (plus compact
+ * 10-minute HR / 5-minute SpO₂ curves), which keeps the on-device database small even with
+ * minute-level data.
  */
 export function summarizeNightVitals(
   s: SessionWindow,
@@ -51,28 +57,15 @@ export function summarizeNightVitals(
   const hrvNear = hrvIn.length ? hrvIn : within(data.hrv ?? [], s.finalWake - 60 * MINUTE, s.finalWake + 120 * MINUTE);
   if (hrvNear.length) out.hrvRmssd = Math.round(mean(hrvNear.map((x) => x.value)));
 
-  const spo2 = within(data.spo2 ?? [], s.sleepOnset, s.finalWake)
-    .filter((x) => x.value >= 70 && x.value <= 100)
-    .sort((a, b) => a.time - b.time);
-  if (spo2.length) {
-    out.spo2Avg = Math.round(mean(spo2.map((x) => x.value)) * 10) / 10;
-    out.spo2Min = Math.min(...spo2.map((x) => x.value));
-    out.spo2Samples = spo2.length;
-    const hours = (s.finalWake - s.sleepOnset) / (60 * MINUTE);
-    // Desaturation index only when sampling is dense (≥ 1 reading per ~5 min).
-    if (hours > 0 && spo2.length / (hours * 12) >= 0.6) {
-      let dips = 0;
-      let inDip = false;
-      for (let i = 10; i < spo2.length; i++) {
-        const base = median(spo2.slice(i - 10, i).map((x) => x.value));
-        const drop = base - spo2[i].value;
-        if (drop >= 3 && !inDip) {
-          dips++;
-          inDip = true;
-        } else if (drop < 1.5) inDip = false;
-      }
-      out.spo2DipsPerHour = Math.round((dips / hours) * 10) / 10;
-    }
+  const { summary: breathing, curve } = summarizeSpo2(data.spo2 ?? [], s);
+  if (breathing) {
+    out.spo2Avg = breathing.avg;
+    out.spo2Min = breathing.lowest;
+    out.spo2Samples = breathing.n;
+    const night = assessBreathing(breathing);
+    if (night && (night.confidence === 'medium' || night.confidence === 'high')) out.spo2DipsPerHour = night.odi3;
+    out.breathing = breathing;
+    if (curve?.length) out.spo2Curve = curve;
   }
 
   const resp = within(data.resp ?? [], s.sleepOnset, s.finalWake);

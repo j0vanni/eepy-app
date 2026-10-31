@@ -29,6 +29,7 @@ import {
   HCStepsRecord,
   instantSamples,
   mapSleepRecord,
+  mapSpo2Samples,
   mapWorkout,
   stepsPerDay,
   toHealthConnectSleep,
@@ -146,7 +147,7 @@ export interface SyncResult {
 
 /**
  * Pulls everything in [from, to]. Raw heart-rate/SpO2 samples are reduced to per-night summaries
- * immediately so the local database stays small.
+ * (plus compact HR / SpO₂ curves) immediately so the local database stays small.
  */
 export async function syncHealthConnect(from: number, to: number = Date.now()): Promise<SyncResult> {
   if (!(await ensureInit())) throw new Error('Health Connect is not available on this device.');
@@ -170,7 +171,8 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
   ]);
   const hr = flattenHeartRate(hrRecs);
   const hrv: VitalSample[] = instantSamples(hrvRecs, 'heartRateVariabilityMillis');
-  const spo2 = instantSamples(spo2Recs, 'percentage');
+  // One OxygenSaturation record per reading; summarised per night (dips, lowest, time < 90%).
+  const spo2 = mapSpo2Samples(spo2Recs);
   const resp = instantSamples(respRecs, 'rate');
   const rhr = instantSamples(rhrRecs, 'beatsPerMinute');
 

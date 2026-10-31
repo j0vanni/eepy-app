@@ -6,6 +6,7 @@ import {
   flattenHeartRate,
   instantSamples,
   mapSleepRecord,
+  mapSpo2Samples,
   originLabel,
   stepsPerDay,
   summarizeOrigins,
@@ -68,6 +69,26 @@ describe('Health Connect mapping', () => {
     ]);
     expect(hr.map((s) => s.value)).toEqual([57, 55]);
     expect(instantSamples([{ time: '2026-10-21T05:00:00Z', percentage: 96 }, { time: 'bad', percentage: 'x' }], 'percentage')).toHaveLength(1);
+  });
+
+  it('maps OxygenSaturation records (one per reading) with their origin, dropping bad and duplicate ones', () => {
+    const rec = (time: string, percentage: unknown, dataOrigin = 'com.nothing.smartcenter') => ({ time, percentage, metadata: { dataOrigin } });
+    const out = mapSpo2Samples([
+      rec('2026-10-21T08:04:00.000Z', 95),
+      rec('2026-10-21T08:00:00.000Z', 96.5),
+      rec('2026-10-21T08:00:00.000Z', 96.5), // written twice
+      rec('2026-10-21T08:00:00.000Z', 93, 'com.other.app'), // another app, same moment: kept separately
+      rec('2026-10-21T08:08:00.000Z', 0),
+      rec('2026-10-21T08:12:00.000Z', 101),
+      rec('2026-10-21T08:16:00.000Z', 'n/a'),
+      { time: '2026-10-21T08:20:00.000Z', percentage: 94 },
+    ]);
+    expect(out).toEqual([
+      { time: Date.parse('2026-10-21T08:00:00.000Z'), value: 96.5, origin: 'com.nothing.smartcenter' },
+      { time: Date.parse('2026-10-21T08:00:00.000Z'), value: 93, origin: 'com.other.app' },
+      { time: Date.parse('2026-10-21T08:04:00.000Z'), value: 95, origin: 'com.nothing.smartcenter' },
+      { time: Date.parse('2026-10-21T08:20:00.000Z'), value: 94 },
+    ]);
   });
 
   it('splits step records across midnight', () => {

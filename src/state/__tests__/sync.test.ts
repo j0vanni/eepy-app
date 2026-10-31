@@ -83,3 +83,23 @@ describe('runSync', () => {
     expect(useStore.getState().settings.lastSyncError).toBeUndefined();
   });
 });
+
+describe('mergeSync', () => {
+  it('keeps SpO₂ chart curves for the most recent 30 nights only (the breathing summary stays)', () => {
+    const old = Array.from({ length: 40 }, (_, i) => session(`hc:n${i}`, NOW - (60 - i) * DAY));
+    const curve: [number, number][] = [[0, 96]];
+    const summary = { n: 200, sleepMin: 420, coveredMin: 410, dips3: 5, dips4: 2, below90: 0, glitches: 0 };
+    useStore.setState({
+      sessions: old,
+      vitals: Object.fromEntries(old.map((s) => [s.id, { sessionId: s.id, breathing: summary, spo2Curve: curve }])),
+    });
+    const fresh = session('hc:fresh', NOW - 6 * HOUR);
+    useStore.getState().mergeSync({ ...result([fresh]), vitals: { [fresh.id]: { sessionId: fresh.id, breathing: summary, spo2Curve: curve } } });
+    const { vitals } = useStore.getState();
+    const withCurve = Object.keys(vitals).filter((id) => vitals[id].spo2Curve);
+    expect(withCurve).toHaveLength(30);
+    expect(withCurve).toContain('hc:fresh');
+    expect(withCurve).not.toContain('hc:n0');
+    expect(vitals['hc:n0'].breathing).toEqual(summary);
+  });
+});

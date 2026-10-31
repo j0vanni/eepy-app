@@ -9,6 +9,7 @@ import { mean } from '@/engine/stats';
 import { formatClock, formatDuration } from '@/engine/time';
 import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
+import { BreathingTrendCard } from '@/ui/cards/BreathingCard';
 import { DurationBars, LineChart, SleepTimeline } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Row, Screen, Section, Segmented, Stat } from '@/ui/components';
 import { dayLabel, shortDate, weekdayInitial } from '@/ui/format';
@@ -161,6 +162,15 @@ export default function TrendsScreen() {
           <LineChart values={rows.map((r) => r.hrMin)} labels={rows.map((r) => label(r.date))} tooltipLabels={tips} tooltipFormat={(v) => `${Math.round(v)} bpm`} color={colors.bad} height={120} />
           <Text style={[font.tiny, { marginTop: 6 }]}>Shaded band = your normal HRV range (30-day baseline ± 1 SD).</Text>
         </Card>
+        {a.breathing ? (
+          <BreathingTrendCard
+            trend={a.breathing}
+            values={rows.map((r) => r.spo2Dips)}
+            labels={rows.map((r) => label(r.date))}
+            tooltipLabels={tips}
+            stopBang={data.profile.screenings.stopbang}
+          />
+        ) : null}
       </Section>
 
       <Section title="Insights" action={<Button small kind="ghost" label="How need is estimated" onPress={() => router.push('/need')} />}>

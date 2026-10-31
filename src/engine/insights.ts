@@ -1,3 +1,4 @@
+import type { BreathingTrend } from './breathing';
 import { caffeineDuringEarlySleep } from './caffeine';
 import type { ChronotypeResult } from './chronotype';
 import type { Night } from './sessions';
@@ -16,6 +17,27 @@ export interface Insight {
   evidence?: string;
   /** 0–1, used for ranking. */
   strength: number;
+  /** The personal effect behind a group comparison (tags, caffeine, workouts), for other features to reuse. */
+  effect?: InsightEffect;
+}
+
+/** "On nights with X, your {label} is {amount} {higher|lower}" in structured form. */
+export interface InsightEffect {
+  /** Metric key: score, tst, deep, rem, latency, waso, hrv, hr. */
+  metric: string;
+  label: string;
+  /** With minus without, in the metric's own units (minutes, 0–1 shares, ms, bpm, points). */
+  diff: number;
+  /** Display amount without direction, e.g. "14 min", "5 percentage points". */
+  amount: string;
+  /** Whether the "with" nights were better on this metric. */
+  better: boolean;
+  p: number;
+}
+
+function effectOf(best: { metric: MetricDef; diff: number; p: number }): InsightEffect {
+  const m = best.metric;
+  return { metric: m.key, label: m.label, diff: best.diff, amount: m.fmt(best.diff), better: m.higherIsBetter ? best.diff > 0 : best.diff < 0, p: best.p };
 }
 
 interface MetricDef {
@@ -101,6 +123,7 @@ export function tagInsights(rows: NightRow[], dayLogs: Record<string, DayLog>): 
       detail: `Your ${best.metric.label} averaged ${fmtMetric(best.metric, best.mA)} on nights after ${label} vs ${fmtMetric(best.metric, best.mB)} otherwise.`,
       evidence: evidenceText(best.nA, best.nB, best.p),
       strength: (1 - best.p) * Math.min(1, Math.abs(best.d)),
+      effect: effectOf(best),
     });
   }
   return out;
@@ -194,6 +217,7 @@ export function caffeineInsight(rows: NightRow[], doses: CaffeineDose[], profile
     detail: `On nights with more than ${profile.caffeineBedtimeLimitMg} mg of caffeine left at bedtime, your ${best.metric.label} was ${fmtMetric(best.metric, best.mA)} vs ${fmtMetric(best.metric, best.mB)}.`,
     evidence: evidenceText(best.nA, best.nB, best.p),
     strength: (1 - best.p) * Math.min(1, Math.abs(best.d)),
+    effect: effectOf(best),
   };
 }
 
@@ -218,7 +242,7 @@ export function activityInsight(rows: NightRow[], daily: Record<string, DailySta
   };
 }
 
-export function physiologyInsights(rows: NightRow[]): Insight[] {
+export function physiologyInsights(rows: NightRow[], breathing?: BreathingTrend): Insight[] {
   const out: Insight[] = [];
   const nadirs = rows
     .filter((r) => r.night.main && r.vitals?.hrNadirOffsetMin !== undefined)
@@ -237,14 +261,15 @@ export function physiologyInsights(rows: NightRow[]): Insight[] {
       });
     }
   }
-  const spo2 = rows.map((r) => r.vitals?.spo2DipsPerHour).filter((x): x is number => x !== undefined);
-  if (spo2.length >= 5 && median(spo2) >= 5) {
+  // Breathing check (breathing.ts): only its conservative "frequent dips" verdict becomes an insight.
+  if (breathing?.level === 'frequent') {
     out.push({
       id: 'physio:spo2-dips',
       kind: 'negative',
       category: 'physiology',
       title: 'Frequent overnight blood-oxygen dips',
-      detail: `Your watch recorded a median of ${median(spo2).toFixed(1)} oxygen dips per hour. Wrist sensors are noisy, but combined with snoring or daytime sleepiness this is worth raising with a doctor (take the apnoea screen in Settings).`,
+      detail: `${breathing.detail} The STOP-Bang check in Settings is a quick next step.`,
+      evidence: `${breathing.analysable} nights with dense SpO₂ readings · median ${breathing.medianOdi3}/h`,
       strength: 0.7,
     });
   }
@@ -353,6 +378,7 @@ export function workoutInsights(rows: NightRow[], workouts: Workout[] = []): Ins
         : `On nights when a workout ended less than 2 hours before you fell asleep, your ${m.label} averaged ${fmtMetric(m, lateBest.mA)} vs ${fmtMetric(m, lateBest.mB)} after earlier workouts or rest days. Hard exercise keeps heart rate and body temperature up for a while — if you can, finish intense sessions 2–3 hours before bed, or keep late ones easy.`,
       evidence: evidenceText(lateBest.nA, lateBest.nB, lateBest.p),
       strength: (1 - lateBest.p) * Math.min(1, Math.abs(lateBest.d)),
+      effect: effectOf(lateBest),
     });
   } else if (!lateBest) {
     // Only claim "no effect" when there was enough data to see one.
@@ -391,6 +417,7 @@ export function workoutInsights(rows: NightRow[], workouts: Workout[] = []): Ins
           : `${avg} This is often temporary after hard or unusually long sessions — worth watching if you've recently stepped up training.`,
       evidence: evidenceText(dayBest.nA, dayBest.nB, dayBest.p),
       strength: (1 - dayBest.p) * Math.min(1, Math.abs(dayBest.d)),
+      effect: effectOf(dayBest),
     });
   }
   return out;
@@ -407,6 +434,8 @@ export function generateInsights(input: {
   needMin: number;
   /** Watch-recorded workouts (used by workout-timing insights). */
   workouts?: Workout[];
+  /** 30-night breathing check (SpO₂ dips). */
+  breathing?: BreathingTrend;
 }): Insight[] {
   const list: (Insight | undefined)[] = [
     durationInsight(input.nights, input.needMin),
@@ -416,7 +445,7 @@ export function generateInsights(input: {
     caffeineInsight(input.rows, input.caffeine, input.profile),
     activityInsight(input.rows, input.daily),
     socialJetlagInsight(input.chronotype),
-    ...physiologyInsights(input.rows),
+    ...physiologyInsights(input.rows, input.breathing),
     ...workoutInsights(input.rows, input.workouts),
   ];
   return list.filter((x): x is Insight => !!x).sort((a, b) => b.strength - a.strength);

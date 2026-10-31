@@ -62,6 +62,11 @@ export function LastNightCard({ a, hero }: A & { hero?: boolean }) {
           ) : null}
         </View>
       </Row>
+      {a.lastNightStory?.sessionId === last.id ? (
+        <Text style={[font.small, { color: colors.text, marginTop: space.md }]} numberOfLines={2}>
+          {a.lastNightStory.oneLiner}
+        </Text>
+      ) : null}
       <View style={{ marginTop: space.md }}>
         <Hypnogram segments={last.segments} start={last.start} end={last.end} height={hero ? 120 : 96} />
       </View>

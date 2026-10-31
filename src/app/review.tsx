@@ -187,6 +187,18 @@ export default function ReviewScreen() {
         </Section>
       ) : null}
 
+      {review.breathing ? (
+        <Section title="Breathing">
+          <Card accent={colors.warn}>
+            <CardTitle icon="lungs" title={review.breathing.title} color={colors.warn} />
+            <Text style={font.small}>{review.breathing.detail}</Text>
+            <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
+              <Button small kind="secondary" label="Take the STOP-Bang check" onPress={() => router.push({ pathname: '/quiz/[id]', params: { id: 'stopbang' } })} />
+            </View>
+          </Card>
+        </Section>
+      ) : null}
+
       <Section title="Focus for next week">
         <Card accent={colors.accent}>
           <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
