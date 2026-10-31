@@ -10,6 +10,7 @@ import { Button, Card, CardTitle, Chip, Empty, Meter, Note, Ring, Row, Screen, S
 import { confirm } from '@/ui/confirm';
 import { nightLabel } from '@/ui/format';
 import { colors, font, scoreColor, space } from '@/ui/theme';
+import { NightTimelineCard } from '@/ui/WakeCheck';
 
 export default function NightScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,6 +54,8 @@ export default function NightScreen() {
           </View>
         </Row>
       </Card>
+
+      {!m.isNap ? <NightTimelineCard m={m} t={a.timelines[m.id]} /> : null}
 
       <Card>
         <CardTitle icon="chart-gantt" title="Hypnogram" />

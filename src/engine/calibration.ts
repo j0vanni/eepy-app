@@ -20,11 +20,12 @@
 import { CircadianParams, DEFAULT_CIRCADIAN, Interval, KSS_PER_ALERTNESS, kssFromAlertness, simulateAlertness, TPM } from './alertness';
 import { analyzeChronotype } from './chronotype';
 import { wakeTargetFor } from './schedule';
-import { analyzeSessions, buildNights } from './sessions';
+import { buildNights } from './sessions';
 import { debtOnDate } from './sleepDebt';
 import { estimateSleepNeed } from './sleepNeed';
 import { addDays, clamp, DAY, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
 import { AlertnessCheckIn, isSleepStage, SleepDataset } from './types';
+import { correctedMetrics } from './wakeDetect';
 
 export const LEARNING = {
   /** Fewest usable check-ins before a personal fit is attempted. */
@@ -413,7 +414,8 @@ export interface CalibrationContext {
 export function calibrationContext(data: SleepDataset, now: number, opts: { preferredOrigins?: string[]; sleepsFrom?: number } = {}): CalibrationContext {
   const { profile, dayLogs } = data;
   const day = livingDay(now);
-  const metrics = analyzeSessions(
+  const { metrics } = correctedMetrics(
+    data,
     data.sessions.filter((s) => s.start < now && s.end > now - HISTORY_DAYS * DAY),
     { preferredOrigins: opts.preferredOrigins },
   );

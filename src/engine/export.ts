@@ -6,12 +6,13 @@ import { Analysis, trendRows } from './analysis';
 import { CbtiProgram, cbtiStatus } from './cbti';
 import { CHRONOTYPE_LABELS } from './chronotype';
 import { QUIZZES, Quiz, scoreQuiz } from './screening';
-import { analyzeSessions, buildNights, Night } from './sessions';
+import { buildNights, Night } from './sessions';
 import { scoreSleep, SleepScore } from './sleepScore';
 import { mean } from './stats';
 import { TAG_BY_ID } from './tags';
 import { addDays, circularMeanMinutes, circularSdMinutes, dateKey, formatClock, formatDuration, formatTime, minutesOfDay, startOfDateKey } from './time';
 import type { DayLog, NightVitals, SleepDataset } from './types';
+import { correctedMetrics } from './wakeDetect';
 
 // ---------------------------------------------------------------------------------------------
 // CSV
@@ -135,7 +136,7 @@ export function nightsCsv(input: NightsCsvInput): string {
 /** Every recorded night, including those older than the analysis window. */
 export function allNights(data: SleepDataset, now: number, preferredOrigins?: string[]): Night[] {
   const today = dateKey(now);
-  return buildNights(analyzeSessions(data.sessions.filter((x) => x.start < now), { preferredOrigins })).filter((n) => n.wakeDate <= today);
+  return buildNights(correctedMetrics(data, data.sessions.filter((x) => x.start < now), { preferredOrigins }).metrics).filter((n) => n.wakeDate <= today);
 }
 
 /** CSV of `nights` (see {@link allNights}), scoring nights the analysis didn't cover with the same model. */

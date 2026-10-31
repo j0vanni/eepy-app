@@ -20,8 +20,10 @@ import {
   Profile,
   SleepDataset,
   SleepSession,
+  WakeLog,
   Workout,
 } from '../engine/types';
+import { EMPTY_WAKE_LOG } from '../engine/wakeDetect';
 import type { SyncResult } from '../integrations/healthConnect';
 
 export interface NotificationPrefs {
@@ -155,6 +157,8 @@ export interface Settings {
 export interface AppState extends SleepDataset {
   checkins: AlertnessCheckIn[];
   workouts: Workout[];
+  /** App use / "I'm up" taps / your corrections for the accurate wake-up (engine/wakeDetect.ts). */
+  wakeLog: WakeLog;
   /** Learned personal circadian timing (energy forecast calibration). */
   calibration?: CalibrationResult;
   experiments: Experiment[];
@@ -195,6 +199,8 @@ export interface AppState extends SleepDataset {
   setUpdateSettings(patch: Partial<UpdateSettings>): void;
   setSleepModeSettings(patch: Partial<SleepModeSettings>): void;
   setMark(key: string, value: string | number | undefined): void;
+  /** Applies a wakeDetect.ts reducer (logAppUse, logUp, withFix…); a reducer returning the same log changes nothing. */
+  updateWakeLog(fn: (log: WakeLog) => WakeLog): void;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -245,6 +251,7 @@ const EMPTY: Omit<AppState, keyof Actions | 'settings' | 'hydrated'> = {
   profile: DEFAULT_PROFILE,
   checkins: [],
   workouts: [],
+  wakeLog: EMPTY_WAKE_LOG,
   calibration: undefined,
   experiments: [],
   goals: [],
@@ -336,7 +343,13 @@ export const useStore = create<AppState>()(
         ),
 
       importData: (data) =>
-        set((s) => ({ ...data, checkins: data.checkins ?? [], workouts: data.workouts ?? [], settings: { ...s.settings, dataMode: 'live' } })),
+        set((s) => ({
+          ...data,
+          checkins: data.checkins ?? [],
+          workouts: data.workouts ?? [],
+          wakeLog: { ...EMPTY_WAKE_LOG, ...data.wakeLog },
+          settings: { ...s.settings, dataMode: 'live' },
+        })),
 
       resetAll: () => set({ ...EMPTY, settings: DEFAULT_SETTINGS }),
 
@@ -354,6 +367,11 @@ export const useStore = create<AppState>()(
       setUpdateSettings: (patch) => set((s) => ({ settings: { ...s.settings, updates: { ...s.settings.updates, ...patch } } })),
       setSleepModeSettings: (patch) => set((s) => ({ settings: { ...s.settings, sleepMode: { ...s.settings.sleepMode, ...patch } } })),
       setMark: (key, value) => set((s) => ({ settings: { ...s.settings, marks: { ...s.settings.marks, [key]: value } } })),
+      updateWakeLog: (fn) =>
+        set((s) => {
+          const wakeLog = fn(s.wakeLog);
+          return wakeLog === s.wakeLog ? s : { wakeLog };
+        }),
     }),
     {
       name: 'eepy-store-v1',
@@ -368,6 +386,7 @@ export const useStore = create<AppState>()(
         profile: s.profile,
         checkins: s.checkins,
         workouts: s.workouts,
+        wakeLog: s.wakeLog,
         calibration: s.calibration,
         experiments: s.experiments,
         goals: s.goals,
@@ -383,6 +402,7 @@ export const useStore = create<AppState>()(
           profile: { ...DEFAULT_PROFILE, ...p.profile },
           checkins: p.checkins ?? [],
           workouts: p.workouts ?? [],
+          wakeLog: { ...EMPTY_WAKE_LOG, ...p.wakeLog },
           experiments: p.experiments ?? [],
           goals: p.goals ?? [],
           settings: {
@@ -414,6 +434,7 @@ export function selectDataset(s: AppState): SleepDataset {
     profile: s.profile,
     checkins: s.checkins,
     workouts: s.workouts,
+    wakeLog: s.wakeLog,
   };
 }
 

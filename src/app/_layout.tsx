@@ -15,6 +15,7 @@ import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { useAutoSync } from '@/state/sync';
+import { useAppUseLog } from '@/state/wakeLog';
 import { useUpdateChecks } from '@/updates/useUpdates';
 import { EveningScreen } from '@/ui/EveningScreen';
 import { colors } from '@/ui/theme';
@@ -31,6 +32,7 @@ function Background() {
   useAutoSync();
   useUpdateChecks();
   useLearning();
+  useAppUseLog();
   const analysis = useAnalysis();
   const settings = useStore((s) => s.settings);
   const goals = useStore((s) => s.goals);

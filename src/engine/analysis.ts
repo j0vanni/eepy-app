@@ -9,7 +9,6 @@ import { analyzeRegularity, RegularityResult } from './regularity';
 import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
 import {
-  analyzeSessions,
   buildNights,
   Night,
   personalCycleMin,
@@ -24,6 +23,7 @@ import { addDays, atMinutes, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinut
 import { isSleepStage, SleepDataset } from './types';
 import { detectRecoveryAlert, RecoveryAlert } from './recovery';
 import { computeReadiness, Readiness } from './vitals';
+import { correctedMetrics, NightTimeline } from './wakeDetect';
 
 export interface Analysis {
   now: number;
@@ -31,6 +31,8 @@ export interface Analysis {
   day: string;
   age: number;
   metrics: SessionMetrics[];
+  /** Per main sleep: when you got into bed, fell asleep, woke up and got up, and what eepy corrected (wakeDetect.ts). */
+  timelines: Record<string, NightTimeline>;
   nights: Night[];
   /** The most recent night that has a main sleep. */
   lastNight?: Night;
@@ -103,7 +105,9 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   const age = ageFromBirthYear(profile.birthYear, day);
 
   // 120 days covers every model (insights use 90) and keeps the engine fast on-device.
-  const metrics = analyzeSessions(
+  // Every model sees the corrected nights: cut where you were up, onset where you fell asleep.
+  const { metrics, timelines } = correctedMetrics(
+    data,
     data.sessions.filter((s) => s.start < now && s.end > now - ANALYSIS_WINDOW_DAYS * 24 * HOUR),
     { preferredOrigins: opts.preferredOrigins },
   );
@@ -272,6 +276,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     day,
     age,
     metrics,
+    timelines,
     nights,
     upcoming,
     lastNight,

@@ -30,6 +30,7 @@ import {
   instantSamples,
   mapSleepRecord,
   mapWorkout,
+  stepCurve,
   stepsPerDay,
   toHealthConnectSleep,
 } from './healthConnectMapper';
@@ -179,6 +180,11 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
     const m = computeSessionMetrics(s);
     if (!m) continue;
     vitals[s.id] = summarizeNightVitals(m, { hr, hrv, spo2, resp });
+  }
+  // Steps around each night, so eepy can see when you actually got up (engine/wakeDetect.ts).
+  for (const s of sessions) {
+    const steps = stepCurve(stepRecs, s.start, s.end);
+    if (steps && vitals[s.id]) vitals[s.id].stepCurve = steps;
   }
   return {
     from,

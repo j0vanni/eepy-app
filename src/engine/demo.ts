@@ -122,6 +122,8 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   const dayLogs: Record<string, DayLog> = {};
   const caffeine: CaffeineDose[] = [];
   const workouts: Workout[] = [];
+  /** eepy on screen before bed / in the morning (wake-up detection evidence). */
+  const appUse: [number, number][] = [];
   let debt = 0;
 
   for (let i = days; i >= 0; i--) {
@@ -193,6 +195,14 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
     for (let t = onset; t < wake; t += 10 * MINUTE) spo2.push({ time: t, value: Math.round(clamp(gaussian(rand, 96.2, 0.9), 89, 100)) });
     const resp: VitalSample[] = [{ time: onset + 2 * 3600_000, value: Math.round(gaussian(rand, 14, 0.6) * 10) / 10 }];
     vitals[session.id] = summarizeNightVitals(m, { hr, hrv, spo2, resp });
+    // Steps around the night and eepy before bed, without rand() calls so every other value is unchanged:
+    // a bathroom trip during a later awakening on some nights, then up and about after the recording.
+    const bin = (t: number, up: boolean) => (up ? Math.ceil : Math.floor)((t - start) / (10 * MINUTE)) * 10;
+    const trip = awakenings.find((a) => a.at > onset + 3 * HOUR && a.dur >= 5 * MINUTE && a.at + a.dur < wake);
+    const stepCurve: [number, number][] = trip && i % 2 === 1 ? [[bin(trip.at, false), 30 + (i % 5) * 6]] : [];
+    stepCurve.push([bin(end, true), 90 + (i % 4) * 25], [bin(end, true) + 10, 140]);
+    vitals[session.id].stepCurve = stepCurve;
+    appUse.push([start - 9 * MINUTE, start - 3 * MINUTE]);
 
     daily[eve] = {
       date: eve,
@@ -251,7 +261,26 @@ export function generateDemoData(now: number, opts: { days?: number; seed?: numb
   const dataset: SleepDataset = { sessions, vitals, daily, dayLogs, caffeine, profile, workouts };
   // Separate random stream so adding check-ins leaves every other demo value unchanged.
   dataset.checkins = demoCheckins(dataset, now, rng((opts.seed ?? 42) + 7919));
+  dataset.wakeLog = { detect: true, use: appUse, ups: [], fixes: {} };
+  watchRanOn(dataset, `demo-${today}`, now);
   return dataset;
+}
+
+/**
+ * Last night the watch kept "sleeping" for 80 min after you got up; you opened eepy and walked around,
+ * so the wake-up detection cuts it back to exactly the night the rest of the demo was built on.
+ */
+function watchRanOn(data: SleepDataset, id: string, now: number) {
+  const s = data.sessions.find((x) => x.id === id);
+  const v = data.vitals[id];
+  const RUN_ON = 80 * MINUTE;
+  if (!s || !v || now < s.end + RUN_ON + 5 * MINUTE) return;
+  const up = s.end;
+  s.stages = [...s.stages, { stage: 'light', start: up, end: up + RUN_ON }];
+  s.end = up + RUN_ON;
+  const b = Math.ceil((up - s.start) / (10 * MINUTE)) * 10;
+  v.stepCurve = [...(v.stepCurve ?? []).filter(([o]) => s.start + o * MINUTE < up), [b, 130], [b + 10, 100]];
+  data.wakeLog!.use.push([up, up + 4 * MINUTE]);
 }
 
 /**
