@@ -43,6 +43,7 @@ export function parseBackup(text: string): SleepDataset {
     dayLogs: d.dayLogs ?? {},
     caffeine: d.caffeine,
     profile: d.profile,
+    wakeLog: d.wakeLog,
   };
 }
 

@@ -279,6 +279,23 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 
 ---
 
+## NEW — accurate wake-up
+
+| | Feature |
+| --- | --- |
+| ✅ | **The night ends when you got up**, even if the watch or the phone's sleep mode kept "sleeping": eepy cuts the recording at the first sign you were up (opened eepy, "I'm up" on the alarm, a check-in, or ≥ 100 steps within 20 min), unless the watch shows ≥ 5 min of deep/REM sleep after it (you checked the phone and went back to sleep). It never cuts before the last deep/REM sleep, never changes naps or manual logs, and only acts on ≥ 10 min |
+| ✅ | **Falling asleep**: using eepy or walking around after the recorded start moves sleep onset later (never past the first deep/REM sleep); the in-bed time before stays as time awake in bed, so latency and efficiency are right |
+| ✅ | **Woke up vs. got up**: the last sleep is the wake-up used for sleep metrics; getting up ends the time in bed used for efficiency |
+| ✅ | **Wake-ups during the night** with start, end and length, and whether you got up (≥ 20 steps) or used eepy, or just lay awake; eepy use in the middle of the night counts as awake |
+| ✅ | Every model uses the corrected night: total sleep, wake time, score, sleep need, debt, chronotype, regularity, insights, the energy forecast, learning and exports |
+| ✅ | **Night screen — "Your night, step by step"**: in bed → fell asleep (time to fall asleep, last eepy use) → wake-ups → woke up → out of bed, each with its source and a high/medium/low confidence, plus in-bed vs. asleep time |
+| ✅ | **Check and correct**: "Your watch recorded sleep until 9:12 AM — you were up at 7:40 AM (opened eepy, 230 steps)" with **Looks right / Change** on Today's morning card (wake-up) and the night screen (fell asleep, woke up, got up). Your times always win. When nothing was detected but you "slept" ≥ 90 min past your usual wake-up for that kind of day, eepy asks "Were you really asleep until …?" |
+| ✅ | Evidence: eepy remembers when it was on screen in the evening, at night and in the morning (60 days), "I'm up" taps on the watch alarm, check-ins and journal ratings, plus a per-night **step curve** from Health Connect (10-min bins, to 30 min after the night). Heart rate and caffeine logs only add confidence |
+| ✅ | Settings → Data sources → **Detect when I'm actually up** (on by default) |
+| ℹ️ | Step records longer than 30 min (e.g. hourly totals) can't time anything and are ignored; heart-rate / SpO₂ summaries are still computed over the recorded window at sync time |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

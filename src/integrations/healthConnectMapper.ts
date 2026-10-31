@@ -3,7 +3,7 @@
  * model. Kept free of native imports so it can be unit tested.
  */
 import type { DailyStats, SleepSession, Stage, StageSegment, VitalSample, Workout } from '../engine/types';
-import { dateKey } from '../engine/time';
+import { dateKey, MINUTE } from '../engine/time';
 
 /** Health Connect SleepSessionRecord.STAGE_TYPE_* constants. */
 export const HC_STAGE: Record<number, Stage> = {
@@ -136,6 +136,37 @@ export function stepsPerDay(records: HCStepsRecord[]): Record<string, number> {
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k]);
   return out;
+}
+
+/** Step records longer than this are too coarse to tell when you got up (e.g. hourly totals). */
+export const STEP_CURVE_MAX_RECORD_MIN = 30;
+
+/**
+ * Steps around one sleep session in 10-minute bins, from its start to 30 min past its end:
+ * [minutes since session start, steps], empty bins left out (like NightVitals.hrCurve). Each record is
+ * spread over the bins it covers. Undefined when no usable step record touches the window.
+ * Used by engine/wakeDetect.ts to see when you got up.
+ */
+export function stepCurve(records: HCStepsRecord[], start: number, end: number, afterMin = 30): [number, number][] | undefined {
+  const BIN = 10 * MINUTE;
+  const until = end + afterMin * MINUTE;
+  const bins = new Map<number, number>();
+  let seen = false;
+  for (const r of records) {
+    const a = ms(r.startTime);
+    const b = Math.max(a + 1, ms(r.endTime));
+    if (b <= start || a >= until || b - a > STEP_CURVE_MAX_RECORD_MIN * MINUTE) continue;
+    seen = true;
+    for (let t = start + Math.floor((Math.max(a, start) - start) / BIN) * BIN; t < Math.min(b, until); t += BIN) {
+      const o = Math.min(b, t + BIN, until) - Math.max(a, t);
+      if (o > 0) bins.set(t, (bins.get(t) ?? 0) + (r.count * o) / (b - a));
+    }
+  }
+  if (!seen) return undefined;
+  return [...bins.entries()]
+    .sort((x, y) => x[0] - y[0])
+    .map(([t, v]): [number, number] => [Math.round((t - start) / MINUTE), Math.round(v)])
+    .filter(([, v]) => v > 0);
 }
 
 /** Folds steps / resting HR / HRV samples into per-day stats. */

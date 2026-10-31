@@ -7,6 +7,7 @@ import {
   instantSamples,
   mapSleepRecord,
   originLabel,
+  stepCurve,
   stepsPerDay,
   summarizeOrigins,
   toHealthConnectSleep,
@@ -77,6 +78,31 @@ describe('Health Connect mapping', () => {
     expect(steps['2026-10-21']).toBe(500);
     const daily = buildDailyStats(steps, [{ time: Date.parse('2026-10-21T14:00:00Z'), value: 58 }], []);
     expect(daily['2026-10-21']).toEqual({ date: '2026-10-21', steps: 500, restingHr: 58 });
+  });
+
+  it('bins steps around a night for the wake-up detection', () => {
+    const start = Date.parse('2026-10-21T04:00:00Z');
+    const end = Date.parse('2026-10-21T12:00:00Z');
+    const rec = (from: string, to: string, count: number) => ({ startTime: from, endTime: to, count });
+    const curve = stepCurve(
+      [
+        rec('2026-10-21T07:12:00Z', '2026-10-21T07:14:00Z', 30), // bathroom trip
+        rec('2026-10-21T11:35:00Z', '2026-10-21T11:45:00Z', 200), // up and about, split over two bins
+        rec('2026-10-21T12:20:00Z', '2026-10-21T12:25:00Z', 50), // after the night (kept: 30 min past the end)
+        rec('2026-10-21T13:00:00Z', '2026-10-21T13:05:00Z', 999), // too late
+        rec('2026-10-21T08:00:00Z', '2026-10-21T10:00:00Z', 500), // hourly-style total: can't be timed
+      ],
+      start,
+      end,
+    );
+    expect(curve).toEqual([
+      [190, 30],
+      [450, 100],
+      [460, 100],
+      [500, 50],
+    ]);
+    expect(stepCurve([rec('2026-10-21T08:00:00Z', '2026-10-21T10:00:00Z', 500)], start, end)).toBeUndefined();
+    expect(stepCurve([rec('2026-10-21T08:00:00Z', '2026-10-21T08:10:00Z', 0)], start, end)).toEqual([]);
   });
 
   it('labels and ranks data origins, preferring the watch', () => {

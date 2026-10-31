@@ -36,6 +36,8 @@ export default function SettingsScreen() {
   const loadDemo = useStore((s) => s.loadDemo);
   const resetAll = useStore((s) => s.resetAll);
   const importData = useStore((s) => s.importData);
+  const detectWake = useStore((s) => s.wakeLog.detect);
+  const updateWakeLog = useStore((s) => s.updateWakeLog);
   const [busy, setBusy] = useState(false);
   const origins = useMemo(() => summarizeOrigins(sessions.filter((s) => s.source === 'health-connect')), [sessions]);
   const year = new Date().getFullYear();
@@ -175,6 +177,12 @@ export default function SettingsScreen() {
             {settings.dataMode === 'live' ? <Button small kind="ghost" label="Full re-sync" disabled={busy} onPress={() => sync(true)} /> : null}
           </Row>
           <Toggle label="Sync automatically" sub="When you open the app (at most every 15 min)" value={settings.autoSync} onChange={(v) => setSettings({ autoSync: v })} />
+          <Toggle
+            label="Detect when I'm actually up"
+            sub="Ends the night when you open eepy, stop the alarm or walk around — even if the watch kept recording"
+            value={detectWake}
+            onChange={(v) => updateWakeLog((log) => ({ ...log, detect: v }))}
+          />
           <Text style={[font.body, { marginVertical: space.sm }]}>History to import on first sync</Text>
           <Segmented
             value={settings.historyDays}

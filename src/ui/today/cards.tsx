@@ -17,6 +17,7 @@ import { ArcGauge, EnergyChart, energyWord, Hypnogram } from '@/ui/charts';
 import { Button, Card, CardTitle, Chip, Icon, Meter, Note, Ring, Row, Section, Stat } from '@/ui/components';
 import { nightLabel } from '@/ui/format';
 import { colors, debtColor, font, scoreColor, space } from '@/ui/theme';
+import { WakeCheck } from '@/ui/WakeCheck';
 
 type A = { a: Analysis };
 
@@ -79,6 +80,8 @@ export function MorningCheckInCard({ a }: A) {
   const log = useStore((s) => s.dayLogs[a.day]);
   const logDay = useStore((s) => s.logDay);
   const done = log?.sleepRating !== undefined && log?.wokeNaturally !== undefined;
+  const last = a.lastNightIsCurrent ? a.lastNight?.main : undefined;
+  const timeline = last ? a.timelines[last.id] : undefined;
   return (
     <Card accent={done ? undefined : colors.energy}>
       <CardTitle
@@ -94,6 +97,7 @@ export function MorningCheckInCard({ a }: A) {
           </Pressable>
         }
       />
+      {last && timeline ? <WakeCheck m={last} t={timeline} /> : null}
       <Text style={font.small}>How did you sleep?</Text>
       <Row gap={space.xs} style={{ marginTop: 6, justifyContent: 'space-between' }}>
         {RATINGS.map((r, i) => {

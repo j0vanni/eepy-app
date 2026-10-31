@@ -13,6 +13,7 @@ import type { Href } from 'expo-router';
 import { Platform } from 'react-native';
 
 import type { Analysis } from '../../engine/analysis';
+import { logUp } from '../../engine/wakeDetect';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
 import { cancelFullScreenAlarm, hasFullScreenAlarm, nextWakeAlarm, WAKE_ALARM_ID, WAKE_DONE_MARK, WRIST_BUZZ_OFFSETS_MIN } from '../fullScreenAlarm';
@@ -177,8 +178,11 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
 }
 
 /** "I'm up" on a watch buzz: stop the remaining buzzes and the phone backup for that alarm. */
-export async function stopWristWake(state: Pick<AppState, 'setMark'>, base: number): Promise<void> {
+export async function stopWristWake(state: Pick<AppState, 'setMark'> & Partial<Pick<AppState, 'updateWakeLog'>>, base: number): Promise<void> {
   state.setMark(WAKE_DONE_MARK, base);
+  // When you said you were up: evidence for the accurate wake-up (engine/wakeDetect.ts).
+  const at = Date.now();
+  state.updateWakeLog?.((log) => logUp(log, at));
   if (Platform.OS === 'web') return;
   const ids = [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristWakeId(i))), plannedId('reminders', 'wake')];
   for (const id of ids) {

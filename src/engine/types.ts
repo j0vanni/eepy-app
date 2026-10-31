@@ -52,6 +52,8 @@ export interface NightVitals {
   hrNadirOffsetMin?: number;
   /** Heart rate curve in 10-minute bins: [minutes since session start, bpm]. */
   hrCurve?: [number, number][];
+  /** Steps in 10-minute bins from session start to 30 min past its end: [minutes since session start, steps] (empty bins left out). */
+  stepCurve?: [number, number][];
   hrvRmssd?: number;
   spo2Avg?: number;
   spo2Min?: number;
@@ -180,4 +182,31 @@ export interface SleepDataset {
   /** Momentary sleepiness ratings used to personalise the energy forecast. */
   checkins?: AlertnessCheckIn[];
   workouts?: Workout[];
+  /** eepy's own evidence of when you were awake, and your corrections (see engine/wakeDetect.ts). */
+  wakeLog?: WakeLog;
+}
+
+/** Your own times for one night; each one set always wins over what eepy works out. */
+export interface NightFix {
+  /** When you fell asleep. */
+  asleep?: number;
+  /** When you woke up for the day (last sleep). */
+  wake?: number;
+  /** When you got out of bed. */
+  up?: number;
+  /** "Looks right": keep what eepy worked out (and stop asking). */
+  ok?: boolean;
+  /** When the correction was saved. */
+  at: number;
+}
+
+export interface WakeLog {
+  /** "Detect when I'm actually up" (Settings). Your own corrections apply either way. */
+  detect: boolean;
+  /** When eepy was on screen in the evening, at night or in the morning (19:00–13:00): [start, end] epoch ms, oldest first. */
+  use: [number, number][];
+  /** "I'm up" on the wake alarm (watch buzz), epoch ms. */
+  ups: number[];
+  /** Corrections by main-sleep id. */
+  fixes: Record<string, NightFix>;
 }
