@@ -1,5 +1,6 @@
 import { MORNING_STARTS_MIN, shortTitle } from './calendarEvents';
 import { addDays, atMinutes, clamp, clockDiff, formatDuration, formatTime, HOUR, MINUTE, minutesOfDay, normalizeMinutes, weekdayOfKey } from './time';
+import { planTwoStep, shiftTwoStep, TWO_STEP, twoStepFor, TwoStepPlan, twoStepRationale } from './twoStep';
 import type { Profile } from './types';
 
 export interface CycleOption {
@@ -76,6 +77,11 @@ export interface TonightPlan {
   noAlarm?: boolean;
   /** Lights-out was moved earlier to ease into an early morning later this week (calendar). */
   preShift?: { minutes: number; forDate: string };
+  /**
+   * Two-step morning (Profile.twoStepMorning, engine/twoStep.ts): a routine alarm before `wake`, back
+   * to sleep, and `wake` as the final alarm. `inBedMin` includes the routine.
+   */
+  twoStep?: TwoStepPlan;
 }
 
 /** "I can't make it tonight": the user's own bedtime (and optionally wake-up) for one night. */
@@ -170,7 +176,8 @@ function prepPhrase(min: number): string {
 export function planTonight(input: PlanInput): TonightPlan {
   const { profile, needMin, debtMin, efficiency, latencyMin } = input;
   const wakeDate = addDays(input.today, 1);
-  const { wakeMin, isWorkday, noAlarm } = wakeTargetFor(profile, wakeDate);
+  const target = wakeTargetFor(profile, wakeDate);
+  const { wakeMin, isWorkday, noAlarm } = target;
   const usualWake = atMinutes(wakeDate, wakeMin);
   // Tomorrow's first event can only bring the wake-up earlier, never later (free days keep their rule).
   const eventStart = input.firstEventStart;
@@ -179,6 +186,10 @@ export function planTonight(input: PlanInput): TonightPlan {
   const calendarDrove = eventWake !== undefined && eventWake < usualWake;
   const wake = calendarDrove ? eventWake : usualWake;
   const rationale: string[] = [];
+  // Two-step morning: the routine and falling back asleep are time awake inside the night, so the
+  // two stretches of sleep together have to cover the need (a prescribed CBT-I window wins).
+  const twoStepCfg = twoStepFor(profile, wakeDate, target);
+  const awakeMin = twoStepCfg && !input.sleepWindow ? twoStepCfg.routineMin + twoStepCfg.fallBackAsleepMin : 0;
 
   const eff = clamp(efficiency, 0.8, 0.97);
   let extra = 0;
@@ -186,12 +197,11 @@ export function planTonight(input: PlanInput): TonightPlan {
     extra = Math.min(60, input.payoffExtraMin ?? Math.round(debtMin / 6 / 5) * 5);
     rationale.push(`+${formatDuration(extra)} to pay down ${formatDuration(debtMin)} of sleep debt.`);
   }
-  const inBedMin = Math.round(needMin / eff + latencyMin + extra);
+  const inBedMin = Math.round(needMin / eff + latencyMin + extra + awakeMin);
   let bedtime = wake - inBedMin * MINUTE;
   const needBedtime = bedtime;
-  rationale.unshift(
-    `${formatDuration(needMin)} sleep need, plus ${Math.round(inBedMin - needMin - latencyMin - extra)} min of normal night-time waking and ${Math.round(latencyMin)} min to fall asleep.`,
-  );
+  const needLine = `${formatDuration(needMin)} sleep need, plus ${Math.round(inBedMin - needMin - latencyMin - extra - awakeMin)} min of normal night-time waking and ${Math.round(latencyMin)} min to fall asleep.`;
+  rationale.unshift(needLine);
   if (profile.insomniaMode) rationale.push('Insomnia mode: no extra time in bed — a consolidated, consistent window works better.');
 
   let gradual = false;
@@ -232,7 +242,7 @@ export function planTonight(input: PlanInput): TonightPlan {
         gradual = true;
       }
       reasons.push(`${what} — waking ${formatTime(wake)} to have ${prepPhrase(prepMin)} before it.`);
-      const expectedSleep = Math.max(0, (wake - bedtime) / MINUTE - latencyMin) * eff;
+      const expectedSleep = Math.max(0, (wake - bedtime) / MINUTE - latencyMin - awakeMin) * eff;
       const shortBy = Math.round(needMin - expectedSleep);
       const earlier = Math.round((usual.bedtime - bedtime) / MINUTE);
       const moved = earlier >= 10 ? ` (${formatDuration(earlier)} earlier than usual)` : '';
@@ -273,6 +283,18 @@ export function planTonight(input: PlanInput): TonightPlan {
     rationale.splice(0, rationale.length, input.sleepWindow.reason);
   }
 
+  let twoStep: TwoStepPlan | undefined;
+  if (twoStepCfg && input.sleepWindow) {
+    rationale.push('Two-step morning paused while the programme sets your sleep window — getting up and going back to bed works against it.');
+  } else if (twoStepCfg) {
+    const plan = planTwoStep(finalWake, twoStepCfg, eff);
+    // Too little sleep before the routine alarm to be worth splitting the morning: one alarm at the wake-up.
+    if (plan.firstWake - bedtime >= TWO_STEP.minMainSleepMin * MINUTE) {
+      twoStep = plan;
+      rationale.splice(rationale.indexOf(needLine) + 1, 0, twoStepRationale(plan, finalWake));
+    }
+  }
+
   if (calendar) {
     const fits = finalWake + calendar.prepMin * MINUTE <= calendar.eventStart + MINUTE;
     if (input.sleepWindow) {
@@ -307,6 +329,7 @@ export function planTonight(input: PlanInput): TonightPlan {
     rationale,
     ...(calendar ? { calendar } : {}),
     ...(noAlarm ? { noAlarm } : {}),
+    ...(twoStep ? { twoStep } : {}),
   };
 }
 
@@ -326,6 +349,10 @@ export function applyTonightOverride(plan: TonightPlan, override: TonightOverrid
   if (wake - bedtime < MIN_ADJUSTED_NIGHT_MIN * MINUTE) return plan;
   if (bedtime === plan.bedtime && wake === plan.wake) return plan;
   const shift = bedtime - plan.bedtime;
+  // A two-step morning keeps its gap before a moved wake-up; lights-out too close to the routine alarm drops it.
+  const { twoStep: planned, ...rest } = plan;
+  const twoStep = planned ? shiftTwoStep(planned, wake - plan.wake) : undefined;
+  const keepTwoStep = twoStep && twoStep.firstWake - bedtime >= TWO_STEP.minMainSleepMin * MINUTE;
   const note = [
     bedtime !== plan.bedtime ? `lights out ${formatTime(bedtime)} instead of ${formatTime(plan.bedtime)}` : '',
     wake !== plan.wake ? `up at ${formatTime(wake)} instead of ${formatTime(plan.wake)}` : '',
@@ -333,7 +360,7 @@ export function applyTonightOverride(plan: TonightPlan, override: TonightOverrid
     .filter(Boolean)
     .join(', ');
   return {
-    ...plan,
+    ...rest,
     bedtime,
     wake,
     windDownStart: bedtime - windDownMin * MINUTE,
@@ -342,6 +369,7 @@ export function applyTonightOverride(plan: TonightPlan, override: TonightOverrid
     inBedMin: Math.round((wake - bedtime) / MINUTE),
     rationale: [`Adjusted for tonight: ${note}.`, ...plan.rationale],
     adjusted: { plannedBedtime: plan.bedtime, plannedWake: plan.wake },
+    ...(keepTwoStep ? { twoStep } : {}),
   };
 }
 

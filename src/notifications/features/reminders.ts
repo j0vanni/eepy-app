@@ -1,5 +1,6 @@
 /**
- * Core daily reminders: wind-down, bedtime, caffeine cut-off, morning check-in, cycle-timed wake alarm.
+ * Core daily reminders: wind-down, bedtime, caffeine cut-off, morning check-in, cycle-timed wake alarm
+ * (and on a two-step morning the routine alarm before it — engine/twoStep.ts).
  *
  * With `adaptiveReminders` on they react to the day (see `planReminders`): a nap nudge when nap
  * need is high, the caffeine last call only after you've logged caffeine, nothing while a nap
@@ -16,7 +17,16 @@ import type { Analysis } from '../../engine/analysis';
 import { logUp } from '../../engine/wakeDetect';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
-import { cancelFullScreenAlarm, hasFullScreenAlarm, nextWakeAlarm, WAKE_ALARM_ID, WAKE_DONE_MARK, WRIST_BUZZ_OFFSETS_MIN } from '../fullScreenAlarm';
+import {
+  cancelFullScreenAlarm,
+  hasFullScreenAlarm,
+  nextWakeAlarm,
+  WAKE_ALARM_ID,
+  WAKE_DONE_MARK,
+  WAKE_ROUTINE_ALARM_ID,
+  WAKE_ROUTINE_DONE_MARK,
+  WRIST_BUZZ_OFFSETS_MIN,
+} from '../fullScreenAlarm';
 import { plannedId, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
@@ -30,6 +40,9 @@ export const NAP_NUDGE_MIN_NEED = 55;
 export const WRIST_WAKE_CATEGORY = 'wrist-wake';
 export const WRIST_WAKE_KIND = 'wrist-wake';
 const wristWakeId = (i: number) => `wrist-wake-${i}`;
+const wristRoutineId = (i: number) => `wrist-routine-${i}`;
+/** Planner id of a two-step morning's routine phone alarm (builds without the native alarm). */
+export const ROUTINE_PLAN_ID = 'wake-routine';
 /** Highest priority first; lower ones are dropped when a day goes over the cap. */
 const PRIORITY = ['bedtime', 'winddown', 'nap', 'checkin', 'caffeine'];
 
@@ -152,6 +165,27 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
   const planned = day.adaptive ? capPerDay(out, DAILY_REMINDER_CAP) : out;
   if (prefs.smartAlarm) {
     const wake = nextWakeAlarm(a, state.settings, now);
+    // Two-step morning: the gentler routine alarm first (its own buzzes and phone alarm), then the final one.
+    const routine = wake.routine;
+    if (routine && !routine.done) {
+      const backup = formatTime(routine.at);
+      routine.wrist.forEach((at, i) =>
+        planned.push({
+          id: wristRoutineId(i),
+          at,
+          channel: 'wrist',
+          alarm: true,
+          silent: true,
+          categoryId: WRIST_WAKE_CATEGORY,
+          title: i === 0 ? `${routine.title} ⌚` : 'Routine time — still in bed?',
+          body: i === 0 ? `${routine.body} Tap "I'm up", or the phone alarm rings at ${backup}.` : `Phone alarm at ${backup} unless you tap "I'm up".`,
+          data: { kind: WRIST_WAKE_KIND, base: routine.base, routine: true },
+        }),
+      );
+      if (!hasFullScreenAlarm()) {
+        planned.push({ id: ROUTINE_PLAN_ID, at: routine.at, channel: 'wake', sound: 'wake.wav', alarm: true, title: routine.title, body: routine.body });
+      }
+    }
     if (!wake.done) {
       // Watch-first: silent buzzes on the wrist, then the phone alarm as a backup.
       const backup = formatTime(wake.at);
@@ -177,19 +211,28 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
   return planned;
 }
 
-/** "I'm up" on a watch buzz: stop the remaining buzzes and the phone backup for that alarm. */
-export async function stopWristWake(state: Pick<AppState, 'setMark'> & Partial<Pick<AppState, 'updateWakeLog'>>, base: number): Promise<void> {
-  state.setMark(WAKE_DONE_MARK, base);
-  // When you said you were up: evidence for the accurate wake-up (engine/wakeDetect.ts).
+/**
+ * "I'm up" on a watch buzz: stop the remaining buzzes and the phone backup for that alarm — on a
+ * two-step morning just the routine alarm's (`routine`), the final alarm still rings.
+ */
+export async function stopWristWake(
+  state: Pick<AppState, 'setMark'> & Partial<Pick<AppState, 'updateWakeLog'>>,
+  base: number,
+  opts: { routine?: boolean } = {},
+): Promise<void> {
+  state.setMark(opts.routine ? WAKE_ROUTINE_DONE_MARK : WAKE_DONE_MARK, base);
+  // When you said you were up: evidence for the accurate wake-up (engine/wakeDetect.ts; a routine tap is read as the routine).
   const at = Date.now();
   state.updateWakeLog?.((log) => logUp(log, at));
   if (Platform.OS === 'web') return;
-  const ids = [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristWakeId(i))), plannedId('reminders', 'wake')];
+  const ids = opts.routine
+    ? [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristRoutineId(i))), plannedId('reminders', ROUTINE_PLAN_ID)]
+    : [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristWakeId(i))), plannedId('reminders', 'wake')];
   for (const id of ids) {
     await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
     await Notifications.dismissNotificationAsync(id).catch(() => undefined);
   }
-  await cancelFullScreenAlarm(WAKE_ALARM_ID);
+  await cancelFullScreenAlarm(opts.routine ? WAKE_ROUTINE_ALARM_ID : WAKE_ALARM_ID);
 }
 
 const ROUTES = new Set(['/nap', '/journal', '/winddown']);
@@ -226,11 +269,13 @@ export const reminders: NotificationFeature = {
     }
     if (r.data.kind === WRIST_WAKE_KIND) {
       const base = typeof r.data.base === 'number' ? r.data.base : undefined;
+      const routine = r.data.routine === true;
       // A replayed response for an old alarm must not cancel a newer one.
-      if (base !== undefined && Date.now() - base < 3 * HOUR && state.settings.marks[WAKE_DONE_MARK] !== base) {
-        await stopWristWake(state, base);
+      if (base !== undefined && Date.now() - base < 3 * HOUR && state.settings.marks[routine ? WAKE_ROUTINE_DONE_MARK : WAKE_DONE_MARK] !== base) {
+        await stopWristWake(state, base, { routine });
       }
-      openFromNotification('/checkin');
+      // After the routine alarm: Today, with its "back to bed by …" card — not "How did you sleep?".
+      openFromNotification(routine ? '/' : '/checkin');
       return;
     }
     if (r.actionId === RUNNING_LATE_ACTION) {

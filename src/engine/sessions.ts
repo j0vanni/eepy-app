@@ -30,14 +30,21 @@ export interface SessionMetrics {
   wakeDate: string;
   isNap: boolean;
   hasStages: boolean;
+  /** Time in bed: the session, minus a planned morning routine (out of bed). */
   timeInBedMin: number;
   totalSleepMin: number;
   sleepOnset: number;
   finalWake: number;
   latencyMin: number;
+  /** Minutes awake between sleep onset and the final wake-up (a planned morning routine excluded). */
   wasoMin: number;
   awakenings: number;
   efficiency: number;
+  /**
+   * Two-step morning (engine/twoStep.ts): the planned routine in the middle of the night. Its awake
+   * minutes are neither waking in the night (WASO, awakenings) nor time awake in bed.
+   */
+  routine?: { start: number; end: number; minutes: number };
   stageMin: StageMinutes;
   /** Share of total sleep time per stage (0–1); undefined for unstaged sessions. */
   stagePct?: { light: number; deep: number; rem: number };
@@ -132,8 +139,13 @@ function makeCycle(segs: StageSegment[], start: number, end: number, complete: b
   return { start, end, lengthMin: minutes(end - start), complete, deepMin: minutes(deep), remMin: minutes(rem) };
 }
 
+export interface MetricsOptions {
+  /** A planned time awake inside the night (a two-step morning's routine): not WASO, not time in bed. */
+  routine?: { start: number; end: number };
+}
+
 /** Per-session sleep metrics. `isNap` is provisional; {@link analyzeSessions} finalises it. */
-export function computeSessionMetrics(session: SleepSession): SessionMetrics | undefined {
+export function computeSessionMetrics(session: SleepSession, opts: MetricsOptions = {}): SessionMetrics | undefined {
   const segments = normalizeSegments(session);
   if (segments.length === 0) return undefined;
   const sleepSegs = segments.filter((s) => isSleepStage(s.stage));
@@ -142,22 +154,26 @@ export function computeSessionMetrics(session: SleepSession): SessionMetrics | u
   const sleepOnset = sleepSegs[0].start;
   const finalWake = sleepSegs[sleepSegs.length - 1].end;
   const stageMs = { light: 0, deep: 0, rem: 0, asleep: 0, awake: 0 };
+  const planned = opts.routine && opts.routine.end > opts.routine.start ? opts.routine : undefined;
   let wasoMs = 0;
+  let plannedMs = 0;
   let awakenings = 0;
   for (const s of segments) {
     const d = s.end - s.start;
     if (s.stage === 'awake' || s.stage === 'outOfBed') {
       stageMs.awake += d;
       if (s.start >= sleepOnset && s.end <= finalWake) {
-        wasoMs += d;
-        if (d >= MIN_AWAKENING_MS) awakenings++;
+        const p = planned ? Math.max(0, Math.min(s.end, planned.end) - Math.max(s.start, planned.start)) : 0;
+        plannedMs += p;
+        wasoMs += d - p;
+        if (d - p >= MIN_AWAKENING_MS) awakenings++;
       }
     } else {
       stageMs[s.stage] += d;
     }
   }
   const tstMs = stageMs.light + stageMs.deep + stageMs.rem + stageMs.asleep;
-  const tibMs = session.end - session.start;
+  const tibMs = session.end - session.start - plannedMs;
   const hasStages = stageMs.light + stageMs.deep + stageMs.rem > 0;
   const staged = stageMs.light + stageMs.deep + stageMs.rem;
   const cycles = hasStages ? detectCycles(segments, sleepOnset, finalWake) : [];
@@ -193,6 +209,7 @@ export function computeSessionMetrics(session: SleepSession): SessionMetrics | u
     midSleep: sleepOnset + (finalWake - sleepOnset) / 2,
     cycles,
     avgCycleMin: usable.length > 0 ? mean(usable.map((c) => c.lengthMin)) : undefined,
+    ...(planned && plannedMs > 0 ? { routine: { start: planned.start, end: planned.end, minutes: minutes(plannedMs) } } : {}),
   };
 }
 
@@ -215,6 +232,8 @@ export interface SessionAnalyzeOptions {
   preferredOrigins?: string[];
   /** Max awake gap (minutes) between two night sessions that should be merged into one sleep. */
   mergeGapMin?: number;
+  /** Two-step mornings' routine windows: a gap inside one is the routine, merged however long (engine/twoStep.ts). */
+  routineWindows?: { start: number; end: number }[];
 }
 
 /**
@@ -241,15 +260,19 @@ export function dedupeSessions(sessions: SleepSession[], preferredOrigins: strin
   return kept.sort((a, b) => a.start - b.start);
 }
 
-/** Joins night-time sessions split by a short awakening into one sleep period. */
-export function mergeFragmented(sessions: SleepSession[], maxGapMin = 45): SleepSession[] {
+/**
+ * Joins night-time sessions split by a short awakening into one sleep period — or by a two-step
+ * morning's routine (a gap that lies inside one of `routineWindows`).
+ */
+export function mergeFragmented(sessions: SleepSession[], maxGapMin = 45, routineWindows: { start: number; end: number }[] = []): SleepSession[] {
   const out: SleepSession[] = [];
   for (const s of [...sessions].sort((a, b) => a.start - b.start)) {
     const prev = out[out.length - 1];
     const gap = prev ? s.start - prev.end : Infinity;
     const gapMid = prev ? minutesOfDay(prev.end + gap / 2) : 0;
     const atNight = gapMid >= 20 * 60 || gapMid <= 10 * 60;
-    if (prev && gap >= 0 && gap <= maxGapMin * MINUTE && atNight && prev.kind !== 'nap' && s.kind !== 'nap') {
+    const routineGap = !!prev && routineWindows.some((w) => prev.end >= w.start && s.start <= w.end);
+    if (prev && gap >= 0 && (gap <= maxGapMin * MINUTE || routineGap) && atNight && prev.kind !== 'nap' && s.kind !== 'nap') {
       out[out.length - 1] = {
         ...prev,
         id: `${prev.id}+${s.id}`,
@@ -270,7 +293,7 @@ export function mergeFragmented(sessions: SleepSession[], maxGapMin = 45): Sleep
 
 /** Full pipeline: dedupe → merge fragments → metrics → main-sleep / nap classification. */
 export function analyzeSessions(sessions: SleepSession[], opts: SessionAnalyzeOptions = {}): SessionMetrics[] {
-  const cleaned = mergeFragmented(dedupeSessions(sessions, opts.preferredOrigins), opts.mergeGapMin);
+  const cleaned = mergeFragmented(dedupeSessions(sessions, opts.preferredOrigins), opts.mergeGapMin, opts.routineWindows);
   const metrics: SessionMetrics[] = [];
   for (const s of cleaned) {
     const m = computeSessionMetrics(s);
@@ -328,9 +351,10 @@ export function personalCycleMin(nights: Night[], fallback = 90): number {
  * sleep need into time in bed; time to fall asleep is added separately.
  */
 export function personalEfficiency(nights: Night[]): number {
+  // A two-step morning's routine is planned time awake, which the planner adds separately.
   const eff = nights
     .slice(-30)
-    .map((n) => (n.main ? n.main.totalSleepMin / ((n.main.finalWake - n.main.sleepOnset) / MINUTE) : undefined))
+    .map((n) => (n.main ? n.main.totalSleepMin / ((n.main.finalWake - n.main.sleepOnset) / MINUTE - (n.main.routine?.minutes ?? 0)) : undefined))
     .filter((x): x is number => x !== undefined && x > 0.3);
   if (eff.length < 5) return 0.9;
   return Math.min(0.97, Math.max(0.75, median(eff)));

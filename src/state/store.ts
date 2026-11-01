@@ -24,6 +24,7 @@ import {
   WakeLog,
   Workout,
 } from '../engine/types';
+import { DEFAULT_TWO_STEP } from '../engine/twoStep';
 import { EMPTY_WAKE_LOG } from '../engine/wakeDetect';
 import type { SyncResult } from '../integrations/healthConnect';
 
@@ -399,10 +400,13 @@ export const useStore = create<AppState>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>;
         const ps = p.settings;
+        const profile: Profile = { ...DEFAULT_PROFILE, ...p.profile };
+        // Two-step mornings: off when missing; a partly saved setting gets its defaults.
+        if (profile.twoStepMorning) profile.twoStepMorning = { ...DEFAULT_TWO_STEP, ...profile.twoStepMorning };
         return {
           ...current,
           ...p,
-          profile: { ...DEFAULT_PROFILE, ...p.profile },
+          profile,
           checkins: p.checkins ?? [],
           workouts: p.workouts ?? [],
           wakeLog: { ...EMPTY_WAKE_LOG, ...p.wakeLog },

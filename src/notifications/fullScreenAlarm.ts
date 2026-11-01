@@ -11,15 +11,22 @@ import { Platform } from 'react-native';
 
 import EepyAlarm from '../../modules/eepy-alarm';
 import type { Analysis } from '../engine/analysis';
-import { dateKey, HOUR, MINUTE } from '../engine/time';
+import { wakeTargetFor } from '../engine/schedule';
+import { atMinutes, dateKey, formatTime, HOUR, MINUTE, minutesOfDay } from '../engine/time';
+import { TWO_STEP, twoStepFor, twoStepSetting } from '../engine/twoStep';
+import type { Profile } from '../engine/types';
 import type { AppState, Settings } from '../state/store';
 
 /** Native alarm ids (their own namespace: AlarmManager + notifications tagged "eepy-alarm"). */
 export const NAP_ALARM_ID = 'eepy-nap';
 export const WAKE_ALARM_ID = 'eepy-wake';
+/** A two-step morning's first (routine) alarm; the final alarm is WAKE_ALARM_ID. */
+export const WAKE_ROUTINE_ALARM_ID = 'eepy-wake-routine';
 /** Where "I'm up" takes you (expo-router routes /nap and /checkin). */
 export const NAP_ALARM_LINK = 'eepy://nap';
 export const WAKE_ALARM_LINK = 'eepy://checkin';
+/** The routine alarm's "I'm up" opens Today (the routine card), not "How did you sleep?". */
+export const ROUTINE_ALARM_LINK = 'eepy://';
 /** Mirrors AlarmSpec.SNOOZE_MINUTES in the native module. */
 export const SNOOZE_MIN = 9;
 /** Like the notification scheduler: don't (re)schedule anything due in the next 30 s. */
@@ -84,8 +91,13 @@ export interface WakeAlarmContent {
   body: string;
 }
 
-/** The cycle-timed wake alarm (`prefs.smartAlarm`), shared by the notification planner and the native alarm. */
+/**
+ * The wake alarm (`prefs.smartAlarm`), shared by the notification planner and the native alarm:
+ * cycle-timed — except on a two-step morning, where this is the final alarm and rings at the
+ * wake-up itself (the short second stretch has no cycle to time; the routine alarm is the cycle-timed one).
+ */
 export function wakeAlarmContent(a: Analysis): WakeAlarmContent {
+  if (a.tonight.twoStep) return { at: a.tonight.wake, title: 'Good morning ☀️', body: 'Time to get up.' };
   return {
     at: a.alarm.alarm,
     title: 'Good morning ☀️',
@@ -93,12 +105,34 @@ export function wakeAlarmContent(a: Analysis): WakeAlarmContent {
   };
 }
 
+export const ROUTINE_ALARM_TITLE = 'Routine time 🧴';
+
+export function routineAlarmBody(finalWake: number): string {
+  return `Face routine time — keep the lights low, then back to bed until ${formatTime(finalWake)}.`;
+}
+
+/** A two-step morning's routine alarm (cycle-timed, before the first wake-up), if tonight has one. */
+export function routineAlarmContent(a: Analysis): WakeAlarmContent | undefined {
+  const two = a.tonight.twoStep;
+  if (!two || a.tonight.noAlarm) return undefined;
+  return { at: two.firstAlarm, title: ROUTINE_ALARM_TITLE, body: routineAlarmBody(a.tonight.wake) };
+}
+
 /** marks key: first ring (epoch ms) of the wake alarm that is scheduled — see nextWakeAlarm. */
 export const WAKE_AT_MARK = 'wake.at';
 /** marks key: first ring of a wake alarm already stopped from its watch buzz. */
 export const WAKE_DONE_MARK = 'wake.done';
-/** marks key: wake date (YYYY-MM-DD) whose alarm the user skipped ("Skip tomorrow's alarm"). */
+/** marks key: wake date (YYYY-MM-DD) whose alarm the user skipped ("Skip tomorrow's alarm"); both alarms of a two-step morning. */
 export const WAKE_SKIP_MARK = 'wake.skip';
+/** marks key: first ring of the routine alarm scheduled with WAKE_AT_MARK's final alarm (two-step mornings). */
+export const WAKE_ROUTINE_AT_MARK = 'wake.routineAt';
+/** marks key: first ring of a routine alarm already stopped from its watch buzz. */
+export const WAKE_ROUTINE_DONE_MARK = 'wake.routineDone';
+/**
+ * marks key: wake date whose *final* alarm was skipped during the routine ("I'm staying up"). Like
+ * WAKE_SKIP_MARK for the alarms, but that morning isn't a free one (no "did you wake up on your own?").
+ */
+export const WAKE_FINAL_SKIP_MARK = 'wake.skipFinal';
 /** Watch-first alarms buzz the wrist at these offsets (min) before the phone alarm takes over. */
 export const WRIST_BUZZ_OFFSETS_MIN = [0, 1, 2];
 /** A wake alarm that has rung stays current this long (it may be ringing or snoozed). */
@@ -119,18 +153,34 @@ export interface WakeAlarmPlan extends WakeAlarmContent {
   calendarFree: boolean;
   /** Nothing left to ring: stopped from the watch already, or skipped. */
   done: boolean;
+  /** Two-step morning: the routine alarm that rings before this one, the same morning. */
+  routine?: RoutineAlarmPlan;
+}
+
+export interface RoutineAlarmPlan extends WakeAlarmContent {
+  /** First ring: the watch buzz in watch-first mode, otherwise the phone alarm. */
+  base: number;
+  wrist: number[];
+  /** This morning's, kept with the held final alarm. */
+  held: boolean;
+  /** Stopped from the watch already, or the morning is skipped / free. */
+  done: boolean;
 }
 
 /**
  * The wake alarm that should ring next. `at` is the phone alarm (a backup `backupMin` after the
- * first buzz in watch-first mode).
+ * first buzz in watch-first mode). On a two-step morning that's the final alarm, and `routine` is
+ * the routine alarm before it.
  *
  * After 4am the analysis plans the *next* night, so its alarm is tomorrow's — while this morning's
  * may not have rung yet. The alarm last scheduled (WAKE_AT_MARK) is therefore held until it has
- * rung (plus its backup and snoozes) instead of being moved to tomorrow by a re-plan.
+ * rung (plus its backup and snoozes) instead of being moved to tomorrow by a re-plan. On a two-step
+ * morning WAKE_AT_MARK is the *final* alarm, so the hold lasts until that one has rung, and the
+ * routine alarm scheduled with it (WAKE_ROUTINE_AT_MARK) is held alongside.
  */
 export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number): WakeAlarmPlan {
   const planned = wakeAlarmContent(a);
+  const plannedRoutine = routineAlarmContent(a);
   const wristMode = settings.watch.wakeAlarm === 'wrist';
   const backupMs = wristMode ? settings.watch.backupMin * MINUTE : 0;
   const held = settings.marks[WAKE_AT_MARK];
@@ -143,19 +193,82 @@ export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number):
     held > now - 24 * HOUR &&
     now < held + backupMs + RINGING_GRACE_MIN * MINUTE;
   const base = holding ? held : planned.at;
-  const skippedByUser = settings.marks[WAKE_SKIP_MARK] === dateKey(base);
+  const skippedByUser = settings.marks[WAKE_SKIP_MARK] === dateKey(base) || settings.marks[WAKE_FINAL_SKIP_MARK] === dateKey(base);
   const calendarFree = !!a.tonight.noAlarm && dateKey(base) === a.tonight.wakeDate;
+  const buzzes = (t: number) => (wristMode ? WRIST_BUZZ_OFFSETS_MIN.map((m) => t + m * MINUTE) : []);
+  // This morning's routine alarm goes with the held final alarm; otherwise tonight's plan has it (or not).
+  const heldRoutine = settings.marks[WAKE_ROUTINE_AT_MARK];
+  const routineBase = holding
+    ? typeof heldRoutine === 'number' && heldRoutine < held && held - heldRoutine <= (TWO_STEP.maxGapMin + 30) * MINUTE
+      ? heldRoutine
+      : undefined
+    : plannedRoutine?.at;
+  const routine: RoutineAlarmPlan | undefined =
+    routineBase === undefined
+      ? undefined
+      : {
+          title: ROUTINE_ALARM_TITLE,
+          body: routineAlarmBody(base),
+          base: routineBase,
+          at: routineBase + backupMs,
+          wrist: buzzes(routineBase),
+          held: holding,
+          done: routineBase === settings.marks[WAKE_ROUTINE_DONE_MARK] || skippedByUser || calendarFree,
+        };
   return {
     title: planned.title,
     body: holding ? 'Time to get up.' : planned.body,
     base,
     at: base + backupMs,
-    wrist: wristMode ? WRIST_BUZZ_OFFSETS_MIN.map((m) => base + m * MINUTE) : [],
+    wrist: buzzes(base),
     held: holding,
     skipped: skippedByUser || calendarFree,
     calendarFree,
     done: base === done || skippedByUser || calendarFree,
+    ...(routine ? { routine } : {}),
   };
+}
+
+/** A two-step morning in progress: between the routine alarm and the final one. */
+export interface RoutineNow {
+  /** When the routine alarm rang (first ring), or the planned first wake-up without eepy's alarm. */
+  routineAt: number;
+  /** Back in bed by then (routine alarm + routine length). */
+  backToBedBy: number;
+  /** The final alarm's first ring and its phone alarm (the same unless watch-first). */
+  finalAt: number;
+  finalPhoneAt: number;
+  /** The morning (YYYY-MM-DD): the WAKE_FINAL_SKIP_MARK value that skips the final alarm. */
+  date: string;
+  /** The final alarm is skipped ("I'm staying up"). */
+  skipped: boolean;
+  /** eepy rings these alarms (otherwise the times come from the plan, with nothing to skip). */
+  eepyAlarm: boolean;
+}
+
+/**
+ * During a two-step morning's routine — from (5 min before) the routine alarm until the final alarm
+ * rings — the times that matter; undefined at any other time. With eepy's alarm on these are the
+ * alarms actually scheduled (this morning's, held after 4am); otherwise this morning's plan.
+ */
+export function routineNow(a: Analysis, settings: WakeSettings & Pick<Settings, 'notifications'>, profile: Profile, now: number): RoutineNow | undefined {
+  const routineMin = twoStepSetting(profile).routineMin;
+  if (settings.notifications.smartAlarm) {
+    const w = nextWakeAlarm(a, settings, now);
+    const r = w.routine;
+    if (!r || w.calendarFree || now < r.base - 5 * MINUTE || now >= w.base) return undefined;
+    return { routineAt: r.base, backToBedBy: r.base + routineMin * MINUTE, finalAt: w.base, finalPhoneAt: w.at, date: dateKey(w.base), skipped: w.skipped, eepyAlarm: true };
+  }
+  // Your own alarms: this morning's planned times (mornings only).
+  if (minutesOfDay(now) >= 12 * 60) return undefined;
+  const date = dateKey(now);
+  const target = wakeTargetFor(profile, date);
+  const c = twoStepFor(profile, date, target);
+  if (!c) return undefined;
+  const finalAt = atMinutes(date, target.wakeMin);
+  const first = finalAt - c.gapMin * MINUTE;
+  if (now < first - 30 * MINUTE || now >= finalAt) return undefined;
+  return { routineAt: first, backToBedBy: first + c.routineMin * MINUTE, finalAt, finalPhoneAt: finalAt, date, skipped: false, eepyAlarm: false };
 }
 
 /**
@@ -177,46 +290,74 @@ export function planNativeWakeAlarm(
   return { action: 'set', alarm: { at: next.at, title: next.title, body: next.body } };
 }
 
-/** What this process last told the native side about the wake alarm: undefined = nothing yet, null = cancelled. */
+export type NativeAlarmPlan = ReturnType<typeof planNativeWakeAlarm>;
+
+/** The same for a two-step morning's routine alarm ('eepy-wake-routine'): 'cancel' when there is none. */
+export function planNativeRoutineAlarm(
+  a: Analysis | undefined,
+  smartAlarm: boolean,
+  now: number,
+  settings: WakeSettings = { marks: {}, watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 } },
+): NativeAlarmPlan {
+  if (!smartAlarm) return { action: 'cancel' };
+  if (!a) return { action: 'keep' };
+  const r = nextWakeAlarm(a, settings, now).routine;
+  if (!r || r.done) return { action: 'cancel' };
+  if (r.held || r.at <= now + MIN_LEAD_MS) return { action: 'keep' };
+  return { action: 'set', alarm: { at: r.at, title: r.title, body: r.body } };
+}
+
+/** What this process last told the native side about each wake alarm: undefined = nothing yet, null = cancelled. */
 let lastWake: string | null | undefined;
+let lastRoutine: string | null | undefined;
 
 /** Tests only: forget what was scheduled in this process. */
 export function resetWakeAlarmMemo(): void {
   lastWake = undefined;
+  lastRoutine = undefined;
+}
+
+/** Applies a native plan for alarm `id`; returns what is now scheduled (the memo). */
+async function applyNativePlan(id: string, link: string, plan: NativeAlarmPlan, last: string | null | undefined): Promise<string | null | undefined> {
+  if (plan.action === 'keep') return last;
+  if (plan.action === 'cancel') {
+    if (last === null) return last;
+    await cancelFullScreenAlarm(id);
+    return null;
+  }
+  const { at, title, body } = plan.alarm;
+  const key = `${at}|${title}|${body}`;
+  if (key === last) return last;
+  return (await scheduleFullScreenAlarm(id, at, title, body, link)) ? key : last;
 }
 
 /**
  * Side effect that goes with `replanNotifications`: remembers which wake alarm is scheduled (so it
- * survives the 4am switch to tomorrow's plan) and keeps the native wake alarm ('eepy-wake') in
- * line with `prefs.smartAlarm` and the cycle-timed alarm. With the native module present the
- * reminders planner leaves the phone wake alarm out, so this must run wherever notifications are
- * re-planned, right after them. Never throws.
+ * survives the 4am switch to tomorrow's plan) and keeps the native wake alarm ('eepy-wake') — and on
+ * two-step mornings the routine alarm ('eepy-wake-routine') — in line with `prefs.smartAlarm` and
+ * tonight's plan. With the native module present the reminders planner leaves the phone alarms out,
+ * so this must run wherever notifications are re-planned, right after them. Never throws.
  */
 export async function syncWakeAlarm(analysis: Analysis | undefined, state: AppState, now = Date.now()): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
     const { settings } = state;
+    // A routine alarm may be pending natively if one was recorded (or scheduled by this process).
+    const routineMaybeSet = typeof settings.marks[WAKE_ROUTINE_AT_MARK] === 'number' || typeof lastRoutine === 'string';
     if (analysis) {
-      const mark = settings.notifications.smartAlarm ? nextWakeAlarm(analysis, settings, now).base : undefined;
-      if (settings.marks[WAKE_AT_MARK] !== mark) state.setMark(WAKE_AT_MARK, mark);
+      const next = settings.notifications.smartAlarm ? nextWakeAlarm(analysis, settings, now) : undefined;
+      if (settings.marks[WAKE_AT_MARK] !== next?.base) state.setMark(WAKE_AT_MARK, next?.base);
+      if (settings.marks[WAKE_ROUTINE_AT_MARK] !== next?.routine?.base) state.setMark(WAKE_ROUTINE_AT_MARK, next?.routine?.base);
     }
     if (!EepyAlarm) return;
     let smartAlarm = settings.notifications.smartAlarm;
     // Without notification permission the alarm couldn't show, so treat it as off.
     if (smartAlarm && !(await Notifications.getPermissionsAsync()).granted) smartAlarm = false;
-    const plan = planNativeWakeAlarm(analysis, smartAlarm, now, settings);
-    if (plan.action === 'cancel') {
-      if (lastWake !== null) {
-        await cancelFullScreenAlarm(WAKE_ALARM_ID);
-        lastWake = null;
-      }
-      return;
+    lastWake = await applyNativePlan(WAKE_ALARM_ID, WAKE_ALARM_LINK, planNativeWakeAlarm(analysis, smartAlarm, now, settings), lastWake);
+    const routine = planNativeRoutineAlarm(analysis, smartAlarm, now, settings);
+    if (routine.action !== 'cancel' || routineMaybeSet) {
+      lastRoutine = await applyNativePlan(WAKE_ROUTINE_ALARM_ID, ROUTINE_ALARM_LINK, routine, lastRoutine);
     }
-    if (plan.action === 'keep') return;
-    const { at, title, body } = plan.alarm;
-    const key = `${at}|${title}|${body}`;
-    if (key === lastWake) return;
-    if (await scheduleFullScreenAlarm(WAKE_ALARM_ID, at, title, body, WAKE_ALARM_LINK)) lastWake = key;
   } catch (e) {
     console.warn('wake alarm sync failed', e);
   }

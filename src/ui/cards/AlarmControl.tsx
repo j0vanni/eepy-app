@@ -38,7 +38,15 @@ export function AlarmControl({ a }: { a: Analysis }) {
   const w = nextWakeAlarm(a, settings, now);
   const day = dateKey(w.base);
   const when = dayLabel(day);
-  const text = w.wrist.length ? `${when}: watch ${formatTime(w.base)} · phone ${formatTime(w.at)}` : `Alarm ${when.toLowerCase()} at ${formatTime(w.at)}`;
+  // Two-step morning: the routine alarm first, then the final one (engine/twoStep.ts).
+  const r = w.routine;
+  const text = r
+    ? w.wrist.length
+      ? `${when}: routine ⌚ ${formatTime(r.base)} · up ⌚ ${formatTime(w.base)} (phone ${formatTime(w.at)})`
+      : `${when}: routine ${formatTime(r.at)} · up ${formatTime(w.at)}`
+    : w.wrist.length
+      ? `${when}: watch ${formatTime(w.base)} · phone ${formatTime(w.at)}`
+      : `Alarm ${when.toLowerCase()} at ${formatTime(w.at)}`;
   return (
     <Row gap={space.sm} style={{ marginTop: space.md }}>
       <Icon name={w.skipped ? 'alarm-off' : 'alarm'} size={18} color={w.skipped ? colors.textFaint : colors.energy} />

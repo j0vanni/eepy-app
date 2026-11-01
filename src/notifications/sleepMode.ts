@@ -37,6 +37,9 @@ export interface SleepModeWindow {
  * already follows "Adjust tonight"). Off: the first ring of tonight's alarm (`nextWakeAlarm` — in
  * watch-first mode the first wrist buzz, so the buzzes aren't held back), or the planned wake-up
  * when eepy's alarm is off, skipped or already stopped. Undefined when that night is over.
+ * On a two-step morning that's the *final* alarm (`nextWakeAlarm` is the final one): the mode stays
+ * on through the routine and the back-to-sleep stretch — the routine alarm gets through like every
+ * alarm, and the routine is meant to be done with the lights low.
  */
 export function sleepModeWindow(a: Analysis, settings: SleepModeSettingsView, now: number): SleepModeWindow | undefined {
   const t = a.tonight;

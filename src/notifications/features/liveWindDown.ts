@@ -48,6 +48,12 @@ function checklist(a: Analysis, state: AppState, day: DayContext): string {
   const lines = ['☐ Dim the lights', '☐ Screens away (or night mode)', '☐ Cool, dark, quiet room'];
   if (day.adaptive && day.lateCaffeine) lines.push('Caffeine is still around tonight — keep this hour extra calm.');
   else if (day.adaptive && day.napShiftMin > 0) lines.push(`Lights out is ${day.napShiftMin} min later tonight after your nap.`);
+  const two = a.tonight.twoStep;
+  if (two) {
+    // Two-step morning: the routine alarm first, the final wake-up after the back-to-sleep stretch.
+    lines.push(`Routine alarm ${formatTime(two.firstAlarm)} · up ${formatTime(a.tonight.wake)} · tap for your routine`);
+    return lines.join('\n');
+  }
   const wake = state.settings.notifications.smartAlarm ? a.alarm.alarm : a.tonight.wake;
   lines.push(`Wake-up ${formatTime(wake)} · tap for your routine`);
   return lines.join('\n');

@@ -331,6 +331,23 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | ✅ | Breathing card on the night screen (with a lowest-SpO₂-per-5-minutes chart) and a 30-night trend card in Trends → Recovery, both linking to the STOP-Bang check; persistent dips show up in the weekly review and as an insight. Demo data includes plausible SpO₂ (a reading every ~2 min, more dips after alcohol) |
 | 🧪 | Health Connect stores one OxygenSaturation record per reading; eepy keeps one app's readings per night (the watch's), summarises them at sync time and stores only the summary plus a compact 5-minute curve for the last ~30 nights. How often Nothing X writes SpO₂ overnight is still to be confirmed on a real CMF Watch 3 Pro — nights synced before this feature need a full re-sync |
 
+## NEW — two-step mornings
+
+*"Wake up at 5, do my face routine, go back to sleep until 6:05, then get ready."*
+
+| | Feature |
+| --- | --- |
+| ✅ | **Setting** (off by default): routine alarm time (e.g. 5:00), routine length (e.g. 20 min) and which mornings (default: your workdays). The final wake-up stays the day's normal one (workday wake-up, e.g. 6:05); a wake-up set in the calendar keeps the same gap before it; free days and calendar days off never use it. Settings that can't work (routine alarm after the wake-up, more than 3 h before it, less than 15 min left to sleep after the routine) are explained instead |
+| ✅ | **Planning**: total sleep = main block (lights-out → routine alarm) + the back-to-sleep stretch (routine done + ~10 min to fall back asleep → final wake-up). The routine and falling back asleep are time awake, so lights-out moves earlier by exactly that much (20 + 10 min → 30 min) and the two stretches together still cover your need — tonight and every coming night in the calendar / recovery plan, with a rationale line. Paused under a CBT-I sleep window; follows "Adjust tonight" |
+| ✅ | **Two alarms**: a gentler **routine alarm**, cycle-timed in the 30 min before the routine time so it catches light sleep (*"Face routine time — keep the lights low, then back to bed until 6:05"*), and the **final alarm** right at the wake-up — the ~35-min second stretch is light, REM-ish sleep with no full cycle to time, so eepy doesn't pretend to predict one. Separate full-screen alarms (`eepy-wake-routine` and `eepy-wake`) or two planner alarms on builds without the native alarm; watch-first buzzes + phone backup for each; *Skip* silences both; a watch-buzz "I'm up" on the routine alarm stops only that one |
+| ✅ | **Held until the final alarm**: after 4am eepy plans tomorrow while this morning's alarms are still to come; both are kept (marks `wake.at` = the final alarm, `wake.routineAt`) until the final alarm has rung plus its backup and snooze grace, so the 6:05 alarm is never replaced by tomorrow's |
+| ✅ | **Bedtime autopilot** stays on through the routine and switches off at the final alarm (the routine alarm gets through like every alarm) |
+| ✅ | **Accurate wake-up**: the awake stretch around the routine alarm (watch's awake time, eepy use, alarm taps, steps) is the **morning routine** — with any sleep after it, it isn't taken as the final wake-up (even when only light sleep follows), it's labelled "Morning routine" in "Your night, step by step", and up to routine + 10 + 15 min of it counts neither as waking in the night (restfulness, WASO, awakenings, night story) nor as time awake in bed (efficiency, the planner's efficiency). Total sleep = both stretches. Two recordings either side of a long routine are joined into one night. **No sleep after the routine** → it was the real wake-up, and eepy says so |
+| ✅ | **Routine card** for Today (only between the two alarms): *"Back to bed by 5:20 — alarm at 6:05. Lights low, screens off."* with **Staying up? Skip the 6:05 alarm** (also switches sleep mode off; Undo puts both back) — the morning isn't treated as a free day. The routine alarm's "I'm up" opens Today |
+| ✅ | **Editor card** with a live preview: *"Lights out 21:55 → 04:47 routine alarm → back to sleep ~05:17 → up 06:05 · 7h 32m sleep"* |
+| 🧪 | Watch-first: whether Nothing X mirrors the routine buzz while sleep mode is on (the "wrist" channel bypasses Do Not Disturb; the phone backup rings regardless) needs checking on a real CMF Watch 3 Pro |
+| ℹ️ | Without per-night records, the current times are used to read past two-step mornings (mornings from when it was switched on; periods it was on before stay two-step after switching it off) |
+
 ---
 
 ---

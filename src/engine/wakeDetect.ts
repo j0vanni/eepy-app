@@ -48,10 +48,21 @@
  * 10. Naps and manual logs (you typed those times) are never changed. Your own correction
  *     (`wakeLog.fixes`) always wins; "Looks right" keeps what eepy worked out.
  * 11. Nothing detected, but a wake-up ≥ 90 min later than usual for that kind of day: eepy asks.
+ * Two-step mornings (Profile.twoStepMorning, engine/twoStep.ts)
+ * 12. The routine is the awake stretch around the first wake-up (from 45 min before it to 30 min
+ *     after the routine should be done): the watch's awake time, eepy use, alarm taps, check-ins
+ *     (stretches < 10 min apart are one; the one closest to the routine alarm wins). When ≥ 10 min
+ *     of sleep of any stage follows it, you went back to sleep: signs of being up during it are not
+ *     the final wake-up, the stretch counts as awake, and up to routine + 10 min to fall back asleep
+ *     + 15 min is planned time awake — not waking in the night and not time in bed (sessions.ts).
+ *     Two recordings either side of it are one night however long the gap.
+ * 13. No sleep after the routine: it was the real wake-up for the day (rules 1–5 as usual).
  */
+import { wakeTargetFor } from './schedule';
 import { analyzeSessions, computeSessionMetrics, SessionAnalyzeOptions, SessionMetrics } from './sessions';
 import { mean, median } from './stats';
-import { circularMeanMinutes, clockDiff, DAY, HOUR, MINUTE, minutesOfDay, weekdayOfKey } from './time';
+import { circularMeanMinutes, clockDiff, dateKey, DAY, HOUR, MINUTE, minutesOfDay, weekdayOfKey } from './time';
+import { RoutineWindow, routineWindowFor, TWO_STEP } from './twoStep';
 import type { NightFix, NightVitals, Profile, SleepDataset, SleepSession, Stage, StageSegment, WakeLog } from './types';
 
 export const WAKE_RULES = {
@@ -252,6 +263,23 @@ export interface WakeEpisode {
   up: boolean;
   steps: number;
   usedEepy: boolean;
+  /** A two-step morning's routine: planned time awake, not a wake-up in the night. */
+  routine?: boolean;
+}
+
+/** A two-step morning's routine as eepy saw it (rules 12–13). */
+export interface RoutineEpisode {
+  start: number;
+  end: number;
+  minutes: number;
+  /** Awake minutes that don't count as waking in the night or as time awake in bed. */
+  plannedMin: number;
+  /** No sleep after it: the routine was the real wake-up for the day. */
+  stayedUp: boolean;
+  /** When you were asleep again. */
+  backAsleep?: number;
+  /** "stopped the alarm", "opened eepy", "80 steps". */
+  evidence: string[];
 }
 
 export interface NightTimeline {
@@ -281,6 +309,8 @@ export interface NightTimeline {
   askLate: boolean;
   /** Usual wake-up for this kind of day (minutes after midnight), when known. */
   usualWakeMin?: number;
+  /** Two-step morning: the routine (planned time awake), or that you stayed up after it. */
+  routine?: RoutineEpisode;
 }
 
 const EVIDENCE_LABEL: Record<SignalKind, string> = {
@@ -311,11 +341,56 @@ interface NightInput {
   hr: Bin[];
   fix?: NightFix;
   detect: boolean;
+  /** That morning was a two-step morning: where to look for the routine. */
+  routine?: RoutineWindow;
 }
 
 interface Candidate {
   at: number;
   kind: SignalKind | 'steps';
+}
+
+interface RoutineSpan {
+  start: number;
+  end: number;
+  evidence: string[];
+}
+
+/**
+ * Rule 12: the awake stretch that is the routine — the watch's awake time and (with detection on)
+ * eepy use, alarm taps, check-ins and steps inside the window, joined when < 10 min apart; the
+ * stretch overlapping the expected routine most wins. Short watch-only blips (< 5 min) don't count.
+ */
+function findRoutine(segs: StageSegment[], strong: WakeSignal[], steps: Bin[], w: RoutineWindow, onset: number, useSignals: boolean): RoutineSpan | undefined {
+  const R = WAKE_RULES;
+  const spans: { start: number; end: number; label?: string; signal?: boolean }[] = [];
+  for (const s of segs) if (!isSleep(s.stage) && s.start >= onset && s.end > w.start && s.start < w.end) spans.push({ start: s.start, end: s.end });
+  if (useSignals) {
+    for (const s of strong) {
+      if (s.time > w.end || s.end < w.start || s.time < onset) continue;
+      const end = s.kind === 'app' ? Math.min(Math.max(s.end, s.time + R.useMinMin * MINUTE), s.time + R.useMaxMin * MINUTE) : s.time + R.useMinMin * MINUTE;
+      spans.push({ start: s.time, end, label: EVIDENCE_LABEL[s.kind], signal: true });
+    }
+    for (const b of steps) if (b.t >= w.start && b.t < w.end && b.v >= R.upSteps) spans.push({ start: b.t, end: b.t + BIN_MS, signal: true });
+  }
+  const clusters: { start: number; end: number; labels: string[]; signal: boolean }[] = [];
+  for (const sp of spans.sort((a, b) => a.start - b.start)) {
+    const last = clusters[clusters.length - 1];
+    if (last && sp.start - last.end < 10 * MINUTE) {
+      last.end = Math.max(last.end, sp.end);
+      if (sp.label) last.labels.push(sp.label);
+      last.signal ||= !!sp.signal;
+    } else clusters.push({ start: sp.start, end: sp.end, labels: sp.label ? [sp.label] : [], signal: !!sp.signal });
+  }
+  const valid = clusters.filter((c) => c.signal || c.end - c.start >= R.episodeMin * MINUTE);
+  if (!valid.length) return undefined;
+  const target = { start: w.firstWake - 30 * MINUTE, end: w.firstWake + w.routineMin * MINUTE };
+  const fit = (c: { start: number; end: number }) => Math.min(c.end, target.end) - Math.max(c.start, target.start);
+  const best = valid.reduce((a, b) => (fit(b) > fit(a) ? b : a));
+  const n = Math.round(stepsOverlapping(steps, best.start, best.end));
+  const evidence = [...new Set(best.labels)];
+  if (n >= R.upSteps) evidence.push(`${n} steps`);
+  return { start: best.start, end: best.end, evidence };
 }
 
 /** Corrects one main sleep. Returns the input metrics object itself when nothing changed. */
@@ -340,6 +415,12 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   };
   const hrRiseAt = (t: number) => hrAbove(t - 10 * MINUTE, t + 20 * MINUTE);
 
+  // --- Two-step morning (rules 12–13): with sleep after it, the routine is planned time awake, not getting up.
+  const routineSpan = input.routine ? findRoutine(segs, strong, steps, input.routine, rec.onset, detect) : undefined;
+  const backAsleep = !!routineSpan && stageMin(segs, routineSpan.end, rec.end, isSleep) >= TWO_STEP.backAsleepMin;
+  const routine = routineSpan && backAsleep && (fix?.wake === undefined || fix.wake > routineSpan.end) ? routineSpan : undefined;
+  const duringRoutine = (a: number, b = a) => !!routine && a <= routine.end + 5 * MINUTE && b >= routine.start - 5 * MINUTE;
+
   // --- Got up: the earliest sign of being up that wasn't followed by real sleep (rules 1–4).
   let up: Candidate | undefined;
   if (detect) {
@@ -347,7 +428,7 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     const to = rec.end - R.minChangeMin * MINUTE;
     const cands: Candidate[] = [];
     for (const s of strong) {
-      if (s.time < from || s.time > to || asleepAfter(s.time)) continue;
+      if (s.time < from || s.time > to || asleepAfter(s.time) || duringRoutine(s.time)) continue;
       if (!staged) {
         const w = s.time + R.corroborateMin * MINUTE;
         const other = strong.some((o) => o !== s && o.time > s.time && o.time <= w);
@@ -356,7 +437,7 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
       cands.push({ at: s.time, kind: s.kind });
     }
     for (const b of steps) {
-      if (b.t < from || b.t > to || b.v < R.upSteps) continue;
+      if (b.t < from || b.t > to || b.v < R.upSteps || duringRoutine(b.t, b.t + BIN_MS)) continue;
       if (stepsIn(steps, b.t, b.t + R.burstWindowMin * MINUTE) < R.burstSteps || asleepAfter(b.t)) continue;
       cands.push({ at: b.t, kind: 'steps' });
       break;
@@ -445,6 +526,8 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     if (wake > rec.finalWake) out = paint(out, rec.finalWake, wake, 'asleep', (s) => s === 'awake');
     out = paint(out, wake, end, 'awake');
   }
+  // The routine: up from its first sign to its last (rule 12).
+  if (routine) out = paint(out, Math.max(routine.start, onset), Math.min(routine.end, end), 'awake');
   const marks: WakeSignal[] = [];
   if (detect) {
     for (const s of strong) {
@@ -457,11 +540,12 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     }
   }
 
-  const changed = end !== rec.end || onset !== rec.onset || wake !== undefined || marks.length > 0;
+  const changed = end !== rec.end || onset !== rec.onset || wake !== undefined || marks.length > 0 || !!routine;
   let metrics = m;
   if (changed) {
     const session: SleepSession = { ...m.session, start: rec.start, end, stages: out };
-    const next = computeSessionMetrics(session);
+    const planned = routine && input.routine ? { start: routine.start, end: Math.min(routine.end, routine.start + input.routine.allowanceMin * MINUTE) } : undefined;
+    const next = computeSessionMetrics(session, { routine: planned });
     if (next) {
       next.isNap = false;
       metrics = next;
@@ -534,16 +618,33 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     onsetEvidence,
     upEvidence,
     lastUseBeforeSleep: lastUse,
-    episodes: wakeEpisodes(metrics, steps, input.signals),
+    episodes: wakeEpisodes(metrics, steps, input.signals, routine),
     fixed: fix?.wake !== undefined || fix?.asleep !== undefined || fix?.up !== undefined,
     confirmed: ok,
     askLate: false,
   };
+  if (routineSpan) {
+    // Rule 13: nothing slept after the routine — it ended the night.
+    const stayedUp = !backAsleep;
+    if (routine || stayedUp) {
+      const until = stayedUp ? Math.min(routineSpan.end, metrics.end) : routineSpan.end;
+      const backAt = routine ? metrics.segments.find((x) => isSleep(x.stage) && x.start >= routine.end - MINUTE)?.start : undefined;
+      timeline.routine = {
+        start: routineSpan.start,
+        end: until,
+        minutes: Math.round((until - routineSpan.start) / MINUTE),
+        plannedMin: Math.round(metrics.routine?.minutes ?? 0),
+        stayedUp,
+        ...(backAt !== undefined ? { backAsleep: backAt } : {}),
+        evidence: routineSpan.evidence,
+      };
+    }
+  }
   return { metrics, timeline };
 }
 
-/** Wake-ups between sleep onset and the final wake (rule 9). */
-export function wakeEpisodes(m: SessionMetrics, steps: { t: number; v: number }[] = [], signals: WakeSignal[] = []): WakeEpisode[] {
+/** Wake-ups between sleep onset and the final wake (rule 9); the one overlapping a two-step morning's routine is marked. */
+export function wakeEpisodes(m: SessionMetrics, steps: { t: number; v: number }[] = [], signals: WakeSignal[] = [], routine?: { start: number; end: number }): WakeEpisode[] {
   const runs: { start: number; end: number }[] = [];
   for (const s of m.segments) {
     if (isSleep(s.stage) || s.end <= m.sleepOnset || s.start >= m.finalWake) continue;
@@ -557,7 +658,8 @@ export function wakeEpisodes(m: SessionMetrics, steps: { t: number; v: number }[
     const usedEepy = signals.some((s) => STRONG.has(s.kind) && s.time < r.end && s.end >= r.start);
     const minutes = Math.round((r.end - r.start) / MINUTE);
     const up = n >= WAKE_RULES.upSteps || usedEepy;
-    if (minutes >= WAKE_RULES.episodeMin || up) out.push({ start: r.start, end: r.end, minutes, up, steps: n, usedEepy });
+    const isRoutine = !!routine && r.start < routine.end && r.end > routine.start;
+    if (minutes >= WAKE_RULES.episodeMin || up || isRoutine) out.push({ start: r.start, end: r.end, minutes, up, steps: n, usedEepy, ...(isRoutine ? { routine: true } : {}) });
   }
   return out;
 }
@@ -577,7 +679,16 @@ export interface CorrectedNights {
  * pass through untouched.
  */
 export function correctedMetrics(data: SleepDataset, sessions: SleepSession[], opts: SessionAnalyzeOptions = {}): CorrectedNights {
-  const raw = analyzeSessions(sessions, opts);
+  // Two-step mornings: where each morning's routine would be (rules 12–13).
+  const routineCache = new Map<string, RoutineWindow | undefined>();
+  const routineFor = (wakeDate: string) => {
+    if (!routineCache.has(wakeDate)) routineCache.set(wakeDate, routineWindowFor(data.profile, wakeDate, wakeTargetFor(data.profile, wakeDate)));
+    return routineCache.get(wakeDate);
+  };
+  const routineWindows = data.profile.twoStepMorning
+    ? [...new Set(sessions.map((s) => dateKey(s.end)))].map(routineFor).filter((w): w is RoutineWindow => !!w)
+    : [];
+  const raw = analyzeSessions(sessions, routineWindows.length ? { ...opts, routineWindows: [...(opts.routineWindows ?? []), ...routineWindows] } : opts);
   const log = data.wakeLog;
   const detect = log?.detect !== false;
   const fixes = log?.fixes ?? {};
@@ -592,6 +703,7 @@ export function correctedMetrics(data: SleepDataset, sessions: SleepSession[], o
       hr: curveBins(m, data.vitals, starts, 'hrCurve'),
       fix: fixes[m.id],
       detect,
+      routine: routineFor(m.wakeDate),
     });
     timelines[m.id] = r.timeline;
     return r.metrics;
