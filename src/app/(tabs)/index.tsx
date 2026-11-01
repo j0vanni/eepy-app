@@ -28,6 +28,7 @@ import {
   TonightCard,
 } from '@/ui/today/cards';
 import { DayHero, EveningHero, MorningHero, NightMoreToggle, NightView } from '@/ui/today/heroes';
+import { QuickActions } from '@/ui/today/QuickActions';
 
 const PHASE_LABEL: Record<DayPhase, string> = { morning: 'morning', day: 'daytime', evening: 'evening', night: 'night' };
 
@@ -51,9 +52,6 @@ export default function Today() {
 
   const header = (
     <Row gap={space.md}>
-      <Pressable onPress={() => router.push('/calendar')} accessibilityLabel="Calendar" hitSlop={8}>
-        <Icon name="calendar-month-outline" size={24} color={colors.textDim} />
-      </Pressable>
       <Pressable onPress={() => router.push('/journal')} accessibilityLabel="Journal" hitSlop={8}>
         <Icon name="notebook-edit-outline" size={24} color={colors.textDim} />
       </Pressable>
@@ -93,7 +91,7 @@ export default function Today() {
       {!night ? <UpdateBanner /> : null}
       {settings.dataMode === 'demo' && !night ? (
         <Note tone="info" icon="flask-outline">
-          Demo data. Connect your watch in Settings → Data sources to switch to your own sleep.
+          Demo data. Connect your watch in Settings → Health Connect & data to switch to your own sleep.
         </Note>
       ) : null}
       {syncMsg ? <Note tone="info">{syncMsg}</Note> : settings.lastSyncError ? <Note tone="warn">{settings.lastSyncError}</Note> : null}
@@ -150,6 +148,7 @@ export default function Today() {
         </>
       ) : (
         <>
+          <QuickActions phase={phase} />
           <RecoveryAlertCard analysis={a} />
           {/* Keyed by phase so the hero re-enters when the day moves on. */}
           <View key={phase}>

@@ -34,7 +34,7 @@ function SleepModeLineInner({ a }: { a: Analysis }) {
       <Row gap={space.sm} style={{ marginTop: space.md }}>
         <Icon name="moon-waning-crescent" size={18} color={colors.textFaint} />
         <Text style={[font.small, { flex: 1 }]}>Let eepy switch your phone to sleep mode at {settings.sleepMode.startAt === 'winddown' ? 'wind-down' : 'lights-out'}?</Text>
-        <Button small kind="secondary" label="Set up" onPress={() => router.push('/settings')} />
+        <Button small kind="secondary" label="Set up" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'winddown' } })} />
       </Row>
     );
   }
@@ -78,7 +78,7 @@ function SleepModeLineInner({ a }: { a: Analysis }) {
         <Text style={[font.body, { fontVariant: ['tabular-nums'] }]}>{text}</Text>
         <Text style={font.tiny}>{sub}</Text>
       </View>
-      {!status.access ? <Button small kind="secondary" label="Fix" onPress={() => router.push('/settings')} /> : null}
+      {!status.access ? <Button small kind="secondary" label="Fix" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'winddown' } })} /> : null}
       {status.access && status.active ? <Button small kind="secondary" icon="stop" label="Stop" disabled={busy} onPress={() => run(() => stopSleepModeNow(target.night))} /> : null}
       {canStart ? <Button small kind="secondary" icon="moon-waning-crescent" label="Start now" disabled={busy} onPress={() => run(() => startSleepModeNow(target.night, target.off))} /> : null}
     </Row>

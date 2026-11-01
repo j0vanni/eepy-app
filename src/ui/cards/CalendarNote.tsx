@@ -65,7 +65,7 @@ export function CalendarNote({ analysis }: { analysis: Analysis }) {
   const summary = firstEventSummary(analysis.tonight, first);
   const toneColor = { info: colors.info, warn: colors.warn, good: colors.good }[summary.tone];
   return (
-    <Card onPress={() => router.push('/plan')} accent={conflicts.length || summary.tone === 'warn' ? colors.warn : undefined}>
+    <Card onPress={() => router.push('/planner')} accent={conflicts.length || summary.tone === 'warn' ? colors.warn : undefined}>
       <CardTitle icon="calendar-clock" title="Your calendar" right={<Icon name="chevron-right" color={colors.textFaint} />} />
       <Line icon="weather-sunset-up" color={toneColor} title={summary.text} />
       {conflicts.map((c) => (
@@ -75,7 +75,7 @@ export function CalendarNote({ analysis }: { analysis: Analysis }) {
   );
 }
 
-/** Calendar lines for the Plan tab's Tonight card, or an entry to turn the calendar on. */
+/** Calendar lines for the Planner's Tonight card, or an entry to turn the calendar on. */
 export function PlanCalendarLines({ analysis }: { analysis: Analysis }) {
   const settings = useStore((s) => s.settings.calendar);
   const first = useFirstEventTomorrowDetails(settings);
@@ -83,7 +83,7 @@ export function PlanCalendarLines({ analysis }: { analysis: Analysis }) {
   if (!settings.enabled) {
     return (
       <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-        <ListRow icon="calendar-sync" title="Plan around your calendar" sub="Let tomorrow’s first event set your alarm and bedtime" onPress={() => router.push('/settings')} />
+        <ListRow icon="calendar-sync" title="Plan around your calendar" sub="Let tomorrow’s first event set your alarm and bedtime" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'you' } })} />
       </View>
     );
   }

@@ -62,7 +62,7 @@ export function WatchSection() {
         <Segmented options={ALARM_STYLES} value={watch.napAlarm} onChange={(napAlarm) => setWatch({ napAlarm })} />
         <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Morning alarm</Text>
         <Segmented options={ALARM_STYLES} value={watch.wakeAlarm} onChange={(wakeAlarm) => setWatch({ wakeAlarm })} />
-        {watch.wakeAlarm === 'wrist' && !smartAlarm ? <Text style={[font.tiny, { marginTop: 4 }]}>Turn on "Wake alarm" under Notifications for the morning buzz.</Text> : null}
+        {watch.wakeAlarm === 'wrist' && !smartAlarm ? <Text style={[font.tiny, { marginTop: 4 }]}>Turn on "Wake alarm" above for the morning buzz.</Text> : null}
 
         {wristAny ? (
           <>
@@ -99,8 +99,8 @@ export function WatchSection() {
         <CardTitle icon="music-note-outline" title="Also on the watch" />
         <Text style={font.small}>
           • Sleep sounds show up in the watch's music controls — pause or stop the noise from your wrist without unlocking the phone.{'\n'}• Alertness pings, the morning report and
-          reminders buzz the watch too; tap them on the phone to answer.{'\n'}• Sleep, heart rate, HRV, SpO₂ and steps come from the watch through Health Connect (Settings → Data
-          sources).
+          reminders buzz the watch too; tap them on the phone to answer.{'\n'}• Sleep, heart rate, HRV, SpO₂ and steps come from the watch through Health Connect (Settings → Health Connect &
+          data).
         </Text>
       </Card>
     </Section>

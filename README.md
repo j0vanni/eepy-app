@@ -10,11 +10,23 @@ A sleep coach for Android that works with the **CMF Watch 3 Pro**. It answers th
 
 The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 🗺️) is in **[FEATURES.md](FEATURES.md)**. What's next is in **[PLAN.md](PLAN.md)**.
 
-| Today | Nap coach | Plan | Trends | Night | Journal |
-| --- | --- | --- | --- | --- | --- |
-| ![Today](docs/screenshots/today.png) | ![Nap](docs/screenshots/nap.png) | ![Plan](docs/screenshots/plan.png) | ![Trends](docs/screenshots/trends.png) | ![Night](docs/screenshots/night.png) | ![Journal](docs/screenshots/journal.png) |
+| Today | Planner | Nap coach | Sleep | More | Night | Journal |
+| --- | --- | --- | --- | --- | --- | --- |
+| ![Today](docs/screenshots/today.png) | ![Planner](docs/screenshots/planner.png) | ![Nap](docs/screenshots/nap.png) | ![Sleep](docs/screenshots/sleep.png) | ![More](docs/screenshots/more.png) | ![Night](docs/screenshots/night.png) | ![Journal](docs/screenshots/journal.png) |
 
 *(Screenshots use the built-in demo data.)*
+
+## NEW — easier navigation and planner
+
+Five tabs with plain names — **Today · Planner · Nap · Sleep · More**:
+
+- **Today** changes through the day (morning report → energy now → bedtime countdown → a dimmed "time to sleep" view), with big one-tap buttons at the top: *Log coffee*, *Check in*, *Nap* and *Adjust tonight* (*Wind down* in the evening).
+- **Planner** — the week ahead at a glance (tap a day to set a wake-up time, make it a free day with no alarm, or see why it's planned that way), **Tonight** in big type with *Can't make it? Adjust tonight*, **Your usual week** (workdays and wake-up times) and folded tools (bedtime calculator, move your schedule, caffeine, phone light). *Month view* opens the calendar.
+- **Nap** — should you nap, when, and for how long.
+- **Sleep** — your history: *Trends*, the month *Calendar* and every *Night*.
+- **More** — coach, body clock, self-checks, wind-down, programmes, journal, reports and settings, with a **"Find a feature or setting…"** search box (also at the top of Settings).
+
+Settings are split into short pages (You & schedule, Alarms & watch, Notifications & shortcuts, Wind-down & phone light, Caffeine & drinks, Health Connect & data, App updates, About). After updating, a one-time *What's new* sheet shows where things moved (also in More → What's new).
 
 ## Install the APK
 
@@ -43,7 +55,7 @@ CMF Watch 3 Pro ──Bluetooth──▶ Nothing X ──▶ Health Connect ─�
 
 eepy's Connect screen ticks off the Nothing X step by itself once it finds sleep from Nothing X (`com.nothing.smartcenter`) in Health Connect. If last night is missing, open Nothing X and let it sync the watch first, and exclude Nothing X from battery optimisation.
 
-**Alarms on the watch:** turn on eepy under Nothing X → your watch → Notifications, then Settings → CMF Watch → *Send test buzz*. With *Watch first* the nap / morning alarm buzzes your wrist silently and the phone alarm only rings a few minutes later as a backup.
+**Alarms on the watch:** turn on eepy under Nothing X → your watch → Notifications, then Settings → Alarms & watch → *Send test buzz*. With *Watch first* the nap / morning alarm buzzes your wrist silently and the phone alarm only rings a few minutes later as a backup.
 
 ## How it works
 
@@ -92,7 +104,7 @@ npm run typecheck
 ```
 
 ```bash
-npm run web         # quick UI preview in a browser (use Settings → Load demo data)
+npm run web         # quick UI preview in a browser (onboarding → Explore with demo data)
 ```
 
 ```bash

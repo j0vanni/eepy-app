@@ -209,9 +209,9 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | 🧪 | **Pinned wind-down and nap cards** in the notification shade (I'm up / Cancel from the lock screen); gentle generated wake chime for the cycle-timed alarm |
 | ✅ | **"What if?" simulator**: drag tonight's bedtime/alarm, add a nap or coffee, and watch tomorrow's energy, debt, sleep and expected score redraw live |
 | ✅ | **Today changes through the day** (morning report & check-in → energy now → countdown & wind-down → dimmed "go to sleep" view), live countdowns, sleep-pressure gauge |
-| ✅ | **Touchable charts** (drag to read values, haptic ticks; tap a night on Trends), animations, floating quick check-in (sleepiness, energy, coffee, tags) |
+| ✅ | **Touchable charts** (drag to read values, haptic ticks; tap a night on Sleep → Trends), animations, floating quick check-in (sleepiness, energy, coffee, tags) |
 | ✅ | **Workout-timing insights** from Health Connect exercise sessions (if Nothing X writes them) |
-| ✅ | **Coach tab** hub for all of the above |
+| ✅ | **Coach** hub for all of the above (now More → Coach) |
 | 🧪 | **Full-screen alarm** for naps and the cycle-timed wake-up: rings over the lock screen at alarm volume with Snooze (9 min) / I'm up, survives reboots, falls back to a ringing heads-up when the phone is in use (Android 14+ asks you to allow full-screen alarms) |
 
 ## 17. New in 0.3 — coffee times and the watch on your wrist
@@ -220,7 +220,7 @@ The CMF Watch 3 Pro has no public SDK. It pairs over Bluetooth with Nothing's **
 | --- | --- |
 | ✅ | **Drink editor**: change the time, day or amount of any logged drink; shows what it leaves in your system at lights-out |
 | ✅ | **Usual-coffee learning** + one-tap "log my usual" and the 🧪 *Had your usual coffee?* nudge (see §8) |
-| 🧪 | **Watch-first alarms** (Settings → CMF Watch): nap and/or morning alarms buzz the CMF Watch silently three times through Nothing X's notification mirroring; the phone alarm rings 3/5/10 min later only if you haven't tapped *I'm up* |
+| 🧪 | **Watch-first alarms** (Settings → Alarms & watch): nap and/or morning alarms buzz the CMF Watch silently three times through Nothing X's notification mirroring; the phone alarm rings 3/5/10 min later only if you haven't tapped *I'm up* |
 | 🧪 | **Test buzz** and step-by-step Nothing X notification setup; sleep sounds are controllable from the watch's music controls |
 | ℹ️ | The CMF Watch 3 Pro has no third-party apps, watch faces or SDK, so eepy can't put a screen or tile on the watch — notifications, music controls and Health Connect are the three ways in |
 
@@ -256,11 +256,11 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 
 | | Feature |
 | --- | --- |
-| ✅ | **12-hour clock** everywhere (times, charts, notifications, quiz answers, experiment rules): Settings → You → *Time format* — follow the phone (default), 12-hour or 24-hour |
+| ✅ | **12-hour clock** everywhere (times, charts, notifications, quiz answers, experiment rules): Settings → You & schedule → *Time format* — follow the phone (default), 12-hour or 24-hour |
 | ✅ | **Instant coffee** (62 mg) and **decaf** (3 mg) presets |
-| ✅ | **Your own drinks**: name + amount (e.g. "Instant, 2 tsp · 105 mg") saved from the drink editor, shown first everywhere, removable in Settings |
+| ✅ | **Your own drinks**: name + amount (e.g. "Instant, 2 tsp · 105 mg") saved from the drink editor, shown first everywhere, removable in Settings → Caffeine & drinks |
 | ✅ | **The check-in shows what you actually drink** — your most-logged drinks of the last 30 days first, common ones after; *More…* shows everything |
-| ✅ | **Skip tomorrow's alarm** in one tap (evening countdown or Plan → Smart alarm), with Undo; only that morning is skipped, and it counts as a free morning for sleep-need learning |
+| ✅ | **Skip tomorrow's alarm** in one tap (evening countdown or Planner → Tonight), with Undo; only that morning is skipped, and it counts as a free morning for sleep-need learning |
 | ✅ | The evening countdown and Plan show the **alarm that will actually ring** (this morning's held alarm, or watch buzz + phone backup times) |
 
 ---
@@ -274,18 +274,18 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | ✅ | **Phone light**: a personal screen-light schedule from your plan — evening (~3 h before lights-out, when melatonin rises): Night Light on, brightness ≤ 40%; wind-down: warmest + Extra dim, ≤ 15%; night: screen away; morning: bright is fine but get daylight. Shown on Today in the evening, in the wind-down routine and on Plan, with the Night Light custom schedule to set |
 | 🧪 | Live **brightness check** against the target (reads the phone's brightness, no permission needed) and shortcuts to Android's **Night Light** and **Extra dim** settings; **Dim eepy now** |
 | 🧪 | **Phone-light reminder** when the evening limits start (button opens Night Light settings) |
-| 🧪 | **eepy dims and warms itself** in the evening (warm tint; its own window dimmed from wind-down) — Settings → Wind-down |
+| 🧪 | **eepy dims and warms itself** in the evening (warm tint; its own window dimmed from wind-down) — Settings → Wind-down & phone light |
 | ℹ️ | Android doesn't let apps switch Night Light or change system brightness without a special permission, so eepy guides and links rather than changing them |
 
 ## 21. New in 0.6 — calendar, recovery plan, wind-down timeline
 
 | | Feature |
 | --- | --- |
-| ✅ | **Calendar** (Today's header, Plan, Coach): month grid where each day shows the night that ended that morning — sleep vs your need (purple met / amber short) and duration — and coming mornings with their planned wake-up; month stats (average sleep and score, nights that met your need, usual sleep and wake times) |
+| ✅ | **Calendar** (Planner → Month view, Sleep → Calendar): month grid where each day shows the night that ended that morning — sleep vs your need (purple met / amber short) and duration — and coming mornings with their planned wake-up; month stats (average sleep and score, nights that met your need, usual sleep and wake times) |
 | ✅ | **Plan single mornings**: tap a coming day → usual wake-up, a set time ("up by 6:00 AM" for work, a flight…) or a free day with no alarm. eepy shows the optimal night before: wind-down, lights-out, cycle-timed alarm, expected sleep and any extra for sleep debt. Tonight's plan, reminders and alarm follow the calendar |
 | ✅ | **Eases into early mornings**: nights before an early start move earlier by at most 45 min a night (the body clock can't jump), which can pull tonight's lights-out earlier too; nights that can't move earlier than your body clock allows are flagged as short, with a nap tip |
 | ✅ | **Recovery autopilot**: sleep debt is paid back a little each night (at most +30 min) instead of one long lie-in, with wake-ups kept steady; a "Getting back on track" card shows the coming nights and when debt drops under an hour |
-| ✅ | **Wind-down timeline**: evening light, last big meal, hard exercise done, wind-down, **screens off** (30/45/60 min before lights-out, default 45 — Settings → Wind-down), screen-free routine, lights-out; on Today in the evening and in the wind-down routine, with what's happening now and a countdown to the next step; the phone-light "screen away" phase starts at screens-off |
+| ✅ | **Wind-down timeline**: evening light, last big meal, hard exercise done, wind-down, **screens off** (30/45/60 min before lights-out, default 45 — Settings → Wind-down & phone light), screen-free routine, lights-out; on Today in the evening and in the wind-down routine, with what's happening now and a countdown to the next step; the phone-light "screen away" phase starts at screens-off |
 | 🧪 | **Screens-off reminder** at that time |
 | 🧪 | **Phone brightness slider** in the Phone light card: sets the phone's own brightness (after allowing "Modify system settings" once), with the current target marked, "Set to target" and auto-brightness on/off. Targets now match the position of Android's brightness slider (evening ≤ 50%, wind-down ≤ 30%, night ≤ 15%) |
 
@@ -294,13 +294,13 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | | Feature |
 | --- | --- |
 | 🧪 | **App-icon shortcuts** (long-press the eepy icon): *Log my usual coffee*, *Start a nap*, *Running late* (Adjust tonight) and *Check in* — Android dynamic shortcuts set when eepy starts, so no setup; drag one to the home screen to pin it |
-| 🧪 | **"Log coffee" Quick Settings tile**: logs your usual drink at its usual time from anywhere and collapses the shade. Settings → Shortcuts → *Add "Log coffee" to Quick Settings* (Android 13+ asks in one tap; older: edit Quick Settings and drag it in) |
+| 🧪 | **"Log coffee" Quick Settings tile**: logs your usual drink at its usual time from anywhere and collapses the shade. Settings → Notifications & shortcuts → *Add "Log coffee" to Quick Settings* (Android 13+ asks in one tap; older: edit Quick Settings and drag it in) |
 | ✅ | **One-tap sheet** (`eepy://quick/coffee · nap · late · checkin · sounds`): coffee is logged with the same per-day id as every other "usual" button (can't double-log; a same drink logged by hand near the usual time counts too), with **Undo**, **Change time** and *Log another now*; no usual drink yet → the drink editor. Nap offers the recommended nap with its alarm time (**Start nap**) or opens the Nap coach |
 | 🧪 | **Bedtime autopilot**: eepy owns an Android mode, **"eepy sleep"**, and switches it on at lights-out (or the start of wind-down — your choice) and off when your morning alarm starts (the first watch buzz in watch-first mode; the planned wake-up when the alarm is off or skipped). Follows "Adjust tonight". Exact alarms switch it **while eepy is closed** and survive reboots |
 | 🧪 | **Android 15+**: the phone's own sleep mode — grayscale, dimmed wallpaper, dark theme, no always-on display, notifications silenced; it appears with your phone's modes, where you choose who may still call. **Android 10–14**: a Do Not Disturb rule that only silences notifications. Alarms (eepy's included) and media (sleep sounds) always get through |
-| 🧪 | **Stop now** keeps it off for the rest of that night (also when you switch the mode off yourself); **Start now** from 3 h before. Status and controls in Settings → Bedtime autopilot and on Today's evening countdown |
+| 🧪 | **Stop now** keeps it off for the rest of that night (also when you switch the mode off yourself); **Start now** from 3 h before. Status and controls in Settings → Wind-down & phone light → Bedtime autopilot and on Today's evening countdown |
 | 🧪 | Optional **"Sleep mode on 🌙 — play sleep sounds?"** notification when it switches on; *Play sounds* starts your default sound with its timer |
-| ℹ️ | **Allow once**: Settings → Bedtime autopilot → *Allow access* opens Android's "Do Not Disturb access" (on Android 15+ "Modes" access) list — turn eepy on. Every mode call needs it; without it eepy shows the status and nothing is switched |
+| ℹ️ | **Allow once**: Settings → Wind-down & phone light → Bedtime autopilot → *Allow access* opens Android's "Do Not Disturb access" (on Android 15+ "Modes" access) list — turn eepy on. Every mode call needs it; without it eepy shows the status and nothing is switched |
 | ℹ️ | Android reserves the "Bedtime" mode type for the system's Digital Wellbeing app, so "eepy sleep" is a time-based mode (eepy tries Bedtime first and falls back) |
 
 ## 23. New in 0.7 — accurate wake-up and sleep
@@ -315,7 +315,7 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | ✅ | **Night screen — "Your night, step by step"**: in bed → fell asleep (time to fall asleep, last eepy use) → wake-ups → woke up → out of bed, each with its source and a high/medium/low confidence, plus in-bed vs. asleep time |
 | ✅ | **Check and correct**: "Your watch recorded sleep until 9:12 AM — you were up at 7:40 AM (opened eepy, 230 steps)" with **Looks right / Change** on Today's morning card (wake-up) and the night screen (fell asleep, woke up, got up). Your times always win. When nothing was detected but you "slept" ≥ 90 min past your usual wake-up for that kind of day, eepy asks "Were you really asleep until …?" |
 | ✅ | Evidence: eepy remembers when it was on screen in the evening, at night and in the morning (60 days), "I'm up" taps on the watch alarm, check-ins and journal ratings, plus a per-night **step curve** from Health Connect (10-min bins, to 30 min after the night). Heart rate and caffeine logs only add confidence |
-| ✅ | Settings → Data sources → **Detect when I'm actually up** (on by default) |
+| ✅ | Settings → Health Connect & data → **Detect when I'm actually up** (on by default) |
 | ℹ️ | Step records longer than 30 min (e.g. hourly totals) can't time anything and are ignored; heart-rate / SpO₂ summaries are still computed over the recorded window at sync time |
 
 ## 24. New in 0.7 — night story and breathing check
@@ -328,8 +328,26 @@ To revoke later: github.com/settings/applications → *Authorized GitHub Apps* (
 | ✅ | One-line version on Today's last-night card and as the first line of the 🧪 morning-report notification (*"Restless (20m awake) and REM short (14% vs 21%) — likely drinking alcohol."*) |
 | ✅ | **Breathing check (SpO₂ dips)**: per night, dips of ≥ 3% and ≥ 4% below a local 15-minute baseline per hour of covered sleep (an ODI-like count), lowest reading, time below 90%, readings per hour, coverage and a confidence level; single-reading glitches and readings while awake are ignored |
 | ✅ | Conservative verdicts — *looks normal* (< 5 dips/h), *some dips* (≥ 5/h), *frequent dips* (≥ 15/h of 3%, ≥ 10/h of 4%, or ≥ 10% of the night below 90%) — and only the 30-night median over ≥ 5 dense nights can say *"frequent dips — worth mentioning to a doctor"*. Too few readings (< 1 every 5 min) → "too few readings to judge", never a guess. Always with the disclaimer that a wrist sensor is not a diagnostic test |
-| ✅ | Breathing card on the night screen (with a lowest-SpO₂-per-5-minutes chart) and a 30-night trend card in Trends → Recovery, both linking to the STOP-Bang check; persistent dips show up in the weekly review and as an insight. Demo data includes plausible SpO₂ (a reading every ~2 min, more dips after alcohol) |
+| ✅ | Breathing card on the night screen (with a lowest-SpO₂-per-5-minutes chart) and a 30-night trend card in Sleep → Trends → Recovery, both linking to the STOP-Bang check; persistent dips show up in the weekly review and as an insight. Demo data includes plausible SpO₂ (a reading every ~2 min, more dips after alcohol) |
 | 🧪 | Health Connect stores one OxygenSaturation record per reading; eepy keeps one app's readings per night (the watch's), summarises them at sync time and stores only the summary plus a compact 5-minute curve for the last ~30 nights. How often Nothing X writes SpO₂ overnight is still to be confirmed on a real CMF Watch 3 Pro — nights synced before this feature need a full re-sync |
+
+## NEW — easier navigation and planner
+
+Built for a non-technical user who found it confusing where things were. Nothing was removed; things moved to where you'd look for them, every screen has a plain one-line explanation, and a search box finds any feature or setting.
+
+| | Feature |
+| --- | --- |
+| ✅ | **Five tabs with plain names: Today · Planner · Nap · Sleep · More** (were Today · Nap · Plan · Coach · Trends). The old `/plan` and `/trends` routes redirect to Planner and Sleep; `/coach` is now a screen under More |
+| ✅ | **Planner tab** (replaces Plan and the planning half of the Calendar): a **7-day week strip** — each morning's weekday, wake-up and the lights-out the night before, with marks for a time you set, a free day (no alarm) or a skipped alarm. Tap a day for its plan in plain words (*"Lights out 11:05 PM → alarm 6:05 AM · 7h 10m sleep, wind down from 10:05 PM"*), why it's earlier/shorter (body clock, easing into an early start, paying back debt) and the same controls as the month calendar: **Usual / Set a time / Free day**, each with a one-line explanation |
+| ✅ | Planner → **Tonight**: lights-out in big type, wind-down, the alarm (cycle-timed, explained: *wakes you at the end of a sleep cycle, in the 30 minutes before your wake-up*), one clear **Can't make it? Adjust tonight** button, Skip / Undo for the alarm, "Why these times?" folded, calendar notes, the step-by-step wind-down and "Getting back on track" when there's sleep debt |
+| ✅ | Planner → **Your usual week**: workdays (Mon–Sun toggles), workday wake-up and wake-up on other days (automatic = 1 h later) — moved here from Settings — plus the spot where the morning-routine card mounts |
+| ✅ | Planner → **More planning tools**, folded: bedtime calculator, move your schedule, caffeine in your system, phone light; What if? and the jet lag planner; tonight's body-clock note. **Month view** button opens the month calendar (same day editor) |
+| ✅ | **Sleep tab** = your history: **Trends** (all the charts), **Calendar** (the month of past nights and coming mornings) and **Nights** (every night, newest first, with sleep vs need and score; tap for the night report; *Log a night*) |
+| ✅ | **More tab**: grouped under plain headings — Coach (coach, experiments, goals, weekly review), Learn (body clock, sleep need, What if?), Self-checks, Wind-down, Programmes (insomnia programme, jet lag), Your data (journal, log a night/drink, reports, connect the watch), App (settings, updates, what's new) |
+| ✅ | **Search — "Find a feature or setting…"** at the top of More and Settings: a small index of every screen, tool, Settings page and the settings people look for by name (wake time, alarm, coffee, backup, do not disturb…), each result saying where it lives (*Planner › Your usual week*). Prefix and plural matching; a unit test fails if a screen or Settings page is missing from it or a result points at a route that doesn't exist |
+| ✅ | **Settings split into short pages**: You & schedule · Alarms & watch · Notifications & shortcuts · Wind-down & phone light · Caffeine & drinks · Health Connect & data · App updates · About (`/settings/<page>`), grouped on a short Settings home with the same search box |
+| ✅ | **Today**: a row of big one-tap buttons near the top — Log coffee, Check in, Nap, and Adjust tonight (Wind down in the evening). The evening no longer repeats tonight's times in a second card (a link opens the full plan in the Planner); the header keeps journal, sync and settings |
+| ✅ | **"What's new / where things moved"** sheet, once, for people who used eepy before this update (new installs skip it); always available from More → What's new and Settings → About |
 
 ---
 

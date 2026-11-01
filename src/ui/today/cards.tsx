@@ -387,7 +387,7 @@ export function NeedDebtRow({ a }: A) {
             {a.need.method === 'override' ? 'set by you' : a.need.method === 'personalized' ? `personalised · ${a.need.confidence} confidence` : 'age-based estimate'}
           </Text>
         </Card>
-        <Card style={{ flex: 1 }} onPress={() => router.push('/trends')}>
+        <Card style={{ flex: 1 }} onPress={() => router.push('/sleep')}>
           <Text style={font.tiny}>SLEEP DEBT</Text>
           <Text style={[font.stat, { marginTop: 4, color: debtCol }]}>{formatDuration(a.debt.debtMin)}</Text>
           <Text style={font.small}>
@@ -410,7 +410,7 @@ export function TonightCard({ a, now, detailed }: A & { now: number; detailed?: 
   const wake = settings.notifications.smartAlarm ? nextWakeAlarm(a, settings, now) : undefined;
   const skipped = wake?.skipped && dateKey(wake.base) === a.tonight.wakeDate;
   return (
-    <Card onPress={() => router.push('/plan')}>
+    <Card onPress={() => router.push('/planner')}>
       <CardTitle icon="moon-waning-crescent" title={detailed ? "Tonight's plan" : 'Tonight'} right={chevron} />
       <Row>
         <Stat label="Wind down" value={formatTime(a.tonight.windDownStart)} />
@@ -546,7 +546,7 @@ export function CoachingSection({ a }: A) {
 export function InsightsSection({ a }: A) {
   if (!a.insights.length) return null;
   return (
-    <Section title="What affects your sleep" action={<Button small kind="ghost" label="All" onPress={() => router.push('/trends')} />}>
+    <Section title="What affects your sleep" action={<Button small kind="ghost" label="All" onPress={() => router.push('/sleep')} />}>
       {a.insights.slice(0, 3).map((i) => (
         <Card key={i.id} accent={i.kind === 'negative' ? colors.warn : i.kind === 'positive' ? colors.good : undefined}>
           <Text style={font.h3}>{i.title}</Text>

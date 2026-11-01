@@ -164,7 +164,7 @@ export default function ConnectScreen() {
 
       <Step n={4} title="Import your nights" done={!!lastSync && dataMode === 'live'}>
         <Text style={[font.small, { marginBottom: space.sm }]}>
-          Pulls your history (Settings → history length) and keeps syncing every time you open eepy.{dataMode === 'demo' ? ' This replaces the demo data.' : ''}
+          Pulls your history (how far back: Settings → Health Connect & data) and keeps syncing every time you open eepy.{dataMode === 'demo' ? ' This replaces the demo data.' : ''}
         </Text>
         {busy ? <ActivityIndicator color={colors.accent} /> : <Button small icon="sync" label="Sync now" disabled={!perms?.sleep} onPress={sync} />}
         {message ? (
@@ -185,7 +185,7 @@ export default function ConnectScreen() {
           <Text style={font.small}>
             • Open Nothing X and let it sync the watch — sleep reaches Health Connect only after the watch syncs.{'\n'}• Exclude Nothing X from battery optimisation so it
             can sync in the background.{'\n'}• Sleep tracking must be enabled on the watch (it records automatically when worn).{'\n'}• Wear the watch snugly
-            — loose fit hurts heart-rate and stage accuracy.{'\n'}• Several apps writing sleep (e.g. a phone sleep tracker)? Pick Nothing X under Settings → "Which app's sleep
+            — loose fit hurts heart-rate and stage accuracy.{'\n'}• Several apps writing sleep (e.g. a phone sleep tracker)? Pick Nothing X under Settings → Health Connect & data → "Which app's sleep
             to trust".
           </Text>
         </Card>

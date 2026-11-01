@@ -178,7 +178,7 @@ export default function LearningScreen() {
           </Text>
           <Text style={[font.small, { marginTop: space.sm }]}>
             {!prefs.pings
-              ? 'Pings are off — turn them on in Settings, or check in here whenever you like.'
+              ? 'Pings are off — turn them on in Settings → Notifications & shortcuts, or check in here whenever you like.'
               : perDay === 1
                 ? 'Pings: 1 a day. Your fit is well calibrated, so one a day keeps it current as your routine changes.'
                 : `Pings: ${perDay} a day. After ${LEARNING.taperCheckins} check-ins over ${LEARNING.taperDays}+ days they drop to one a day.`}

@@ -96,7 +96,13 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="settings/index" options={{ title: 'Settings' }} />
+        <Stack.Screen name="settings/[section]" options={{ title: '' }} />
+        <Stack.Screen name="coach" options={{ title: 'Coach' }} />
+        <Stack.Screen name="whats-new" options={{ title: "What's new", presentation: 'modal' }} />
+        {/* Old tab routes (Plan, Trends) now redirect to the Planner and Sleep tabs. */}
+        <Stack.Screen name="plan" options={{ headerShown: false }} />
+        <Stack.Screen name="trends" options={{ headerShown: false }} />
         <Stack.Screen name="connect" options={{ title: 'Connect CMF Watch' }} />
         <Stack.Screen name="night/[id]" options={{ title: 'Night details' }} />
         <Stack.Screen name="quiz/[id]" options={{ title: '' }} />
@@ -107,7 +113,7 @@ export default function RootLayout() {
         <Stack.Screen name="checkin" options={{ title: 'Quick check-in', presentation: 'modal' }} />
         <Stack.Screen name="caffeine" options={{ title: 'Drink', presentation: 'modal' }} />
         <Stack.Screen name="tonight" options={{ title: 'Adjust tonight', presentation: 'modal' }} />
-        <Stack.Screen name="calendar" options={{ title: 'Calendar' }} />
+        <Stack.Screen name="calendar" options={{ title: 'Month view' }} />
         <Stack.Screen name="simulate" options={{ title: 'What if?' }} />
         <Stack.Screen name="learning" options={{ title: 'Your body clock' }} />
         <Stack.Screen name="experiments/index" options={{ title: 'Experiments' }} />

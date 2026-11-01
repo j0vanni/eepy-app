@@ -268,7 +268,7 @@ export function physiologyInsights(rows: NightRow[], breathing?: BreathingTrend)
       kind: 'negative',
       category: 'physiology',
       title: 'Frequent overnight blood-oxygen dips',
-      detail: `${breathing.detail} The STOP-Bang check in Settings is a quick next step.`,
+      detail: `${breathing.detail} The STOP-Bang check (More → Self-checks) is a quick next step.`,
       evidence: `${breathing.analysable} nights with dense SpO₂ readings · median ${breathing.medianOdi3}/h`,
       strength: 0.7,
     });

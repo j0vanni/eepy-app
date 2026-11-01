@@ -134,7 +134,7 @@ export default function ExportScreen() {
           Times are in this phone&apos;s time zone. Sleep stages, heart rate, HRV and SpO₂ are your CMF Watch&apos;s estimates via Health Connect, not a medical test.
         </Note>
         <Note tone="info" icon="backup-restore">
-          For a full backup you can restore later, use Settings → Your data → Export backup.
+          For a full backup you can restore later, use Settings → Health Connect & data → Export backup.
         </Note>
       </Section>
       <Text style={[font.tiny, { color: colors.textFaint, marginTop: space.sm }]}>Report tables use 24-hour times and A4 pages.</Text>

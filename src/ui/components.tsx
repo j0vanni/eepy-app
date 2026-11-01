@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ComponentProps, createContext, ReactNode, useContext, useState } from 'react';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ComponentProps, createContext, ReactNode, Ref, useContext, useState } from 'react';
+import { Pressable, ScrollView, ScrollViewInstance, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -30,6 +30,7 @@ export function Screen({
   children,
   refreshControl,
   tone = 'default',
+  scrollRef,
 }: {
   title?: string;
   subtitle?: string;
@@ -38,6 +39,8 @@ export function Screen({
   refreshControl?: ComponentProps<typeof ScrollView>['refreshControl'];
   /** 'night' dims the whole screen. */
   tone?: 'default' | 'night';
+  /** For screens that scroll to a section (e.g. the Planner opened from search). */
+  scrollRef?: Ref<ScrollViewInstance>;
 }) {
   const [locked, setLocked] = useState(false);
   const floatingInset = useContext(FloatingInsetContext);
@@ -45,6 +48,7 @@ export function Screen({
     <ScrollLockContext.Provider value={setLocked}>
       <SafeAreaView style={[styles.safe, tone === 'night' && { backgroundColor: NIGHT_BG }]} edges={['top']}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.scroll, floatingInset ? { paddingBottom: 48 + floatingInset } : null]}
           refreshControl={refreshControl}
           keyboardShouldPersistTaps="handled"

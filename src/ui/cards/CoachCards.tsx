@@ -151,7 +151,7 @@ export function GoalsCard({ analysis: a, showEmpty }: { analysis: Analysis; show
 
 /**
  * Teaser for the latest weekly review. Shown on Sunday/Monday or while a new review is unseen;
- * `always` keeps it visible (Coach tab).
+ * `always` keeps it visible (Coach screen).
  */
 export function WeeklyReviewCard({ analysis: a, always }: { analysis: Analysis; always?: boolean }) {
   const data = useStore(useShallow(selectDataset));

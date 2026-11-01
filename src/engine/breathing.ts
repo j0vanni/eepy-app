@@ -397,7 +397,7 @@ export function breathingTrend(input: { nights: Night[]; vitals: Record<string, 
     nightsFrequent,
     legacyNights,
   };
-  const resync = legacyNights >= 3 ? ` ${legacyNights} earlier nights were synced before the breathing check — a full re-sync in Settings analyses them.` : '';
+  const resync = legacyNights >= 3 ? ` ${legacyNights} earlier nights were synced before the breathing check — a full re-sync (Settings → Health Connect & data) analyses them.` : '';
 
   if (dense.length < R.trendMinNights) {
     let detail: string;
