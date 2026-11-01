@@ -182,6 +182,27 @@ export interface Profile {
   onboarded: boolean;
   /** Calendar: per-morning wake plans (YYYY-MM-DD of the morning) that override the weekly pattern. */
   wakePlan?: Record<string, DayWakePlan>;
+  /** Up early for a short routine, back to bed, up for good at the normal wake-up (engine/twoStep.ts). Off when missing. */
+  twoStepMorning?: TwoStepMorning;
+}
+
+/**
+ * "Two-step morning": a first alarm for a short routine (washing, moisturiser), back to sleep, and
+ * the day's normal wake-up as the final alarm. The gap between the two is kept before calendar
+ * wake-ups too; mornings without a fixed wake-up (free days) never use it.
+ */
+export interface TwoStepMorning {
+  enabled: boolean;
+  /** First (routine) wake-up on a normal workday, minutes after midnight (e.g. 300 = 5:00). */
+  firstWakeMin: number;
+  /** Minutes up for the routine. */
+  routineMin: number;
+  /** Mornings it applies to (0 = Sunday … 6 = Saturday); default: your workdays. */
+  days?: number[];
+  /** Morning (YYYY-MM-DD) it was switched on: earlier nights aren't read as two-step mornings. */
+  since?: string;
+  /** Earlier periods it was on — [first morning, morning after the last] — still read as two-step mornings. */
+  past?: [string, string][];
 }
 
 /** One morning in the calendar: a fixed wake-up time, or a free day with no alarm. */

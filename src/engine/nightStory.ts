@@ -385,8 +385,11 @@ export function buildNightStory(input: NightStoryInput): NightStory | undefined 
     else say('deep', tone, v(formatDuration(deep)), ' of deep sleep', ...cmp, '.');
   }
 
-  // Awakenings, with heart rate around them when the 10-minute HR curve is there.
-  const wakes = m.segments.filter((s) => s.stage === 'awake' && s.start >= m.sleepOnset && s.end <= m.finalWake);
+  // Awakenings, with heart rate around them when the 10-minute HR curve is there. A two-step
+  // morning's routine is planned time awake, not a wake-up (wakeDetect.ts rule 12).
+  const routine = m.routine;
+  const inRoutine = (s: { start: number; end: number }) => !!routine && s.start < routine.end && s.end > routine.start;
+  const wakes = m.segments.filter((s) => s.stage === 'awake' && s.start >= m.sleepOnset && s.end <= m.finalWake && !inRoutine(s));
   const named = wakes
     .filter((s) => s.end - s.start >= R.namedAwakeningMin * MINUTE)
     .sort((a, b) => b.end - b.start - (a.end - a.start))
@@ -422,6 +425,7 @@ export function buildNightStory(input: NightStoryInput): NightStory | undefined 
   } else {
     say('awake', awakeTone, v(formatDuration(m.wasoMin)), ` awake during the night across ${m.awakenings} short wake-up${m.awakenings === 1 ? '' : 's'}.`);
   }
+  if (routine) say('awake', 'neutral', 'Up for your morning routine ', v(formatTimeRange(routine.start, routine.end)), ', then back to sleep — planned, so it doesn’t count as waking.');
 
   if (rem !== undefined) {
     if (dev.has('remDown'))

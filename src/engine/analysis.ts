@@ -10,6 +10,7 @@ import { buildNightStory, NightStory } from './nightStory';
 import { analyzeRegularity, RegularityResult } from './regularity';
 import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
+import { retimeTwoStep } from './twoStep';
 import {
   buildNights,
   Night,
@@ -53,6 +54,10 @@ export interface Analysis {
   habitualMidSleepMin: number;
   wakeTime: number;
   tonight: TonightPlan;
+  /**
+   * The cycle-timed alarm that ends the main sleep. On a two-step morning that's the routine alarm
+   * (`tonight.twoStep.firstAlarm`); the final alarm rings at `tonight.wake`.
+   */
   alarm: ReturnType<typeof smartAlarm>;
   energy: EnergyForecast;
   caffeine: { nowMg: number; cutoff: CaffeineCutoff };
@@ -176,8 +181,10 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     ? preShiftTonight(planned, draft[0].preShiftMin, draft[0].preShiftFor, draft.find((n) => n.wakeDate === draft[0].preShiftFor)?.wake ?? planned.wake)
     : planned;
   // Everything below (alarm, caffeine cut-off, forecast, nap advice) follows an adjusted night.
-  const tonight = applyTonightOverride(eased, opts.tonightOverride, profile.windDownMin);
-  const alarm = smartAlarm(tonight.bedtime, tonight.wake, cycleMin, latencyMin);
+  const adjusted = applyTonightOverride(eased, opts.tonightOverride, profile.windDownMin);
+  // Two-step morning: the cycle-timed alarm is the routine alarm before the first wake-up.
+  const alarm = smartAlarm(adjusted.bedtime, adjusted.twoStep?.firstWake ?? adjusted.wake, cycleMin, latencyMin);
+  const tonight: TonightPlan = adjusted.twoStep ? { ...adjusted, twoStep: retimeTwoStep(adjusted.twoStep, alarm.alarm, adjusted.wake, efficiency) } : adjusted;
   const upcoming = planUpcomingNights({ ...nightPlan, first: tonight, lockFirst: true });
   upcoming[0] = {
     ...upcoming[0],
@@ -185,6 +192,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     cycles: tonight.noAlarm ? undefined : alarm.cycles,
     preShiftMin: tonight.preShift?.minutes ?? 0,
     preShiftFor: tonight.preShift?.forDate,
+    ...(tonight.twoStep ? { twoStep: tonight.twoStep } : {}),
   };
 
   // Today's wake-up. If last night hasn't synced yet, assume a habitual night so the model stays sane.

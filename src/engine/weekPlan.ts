@@ -11,6 +11,7 @@
  */
 import { smartAlarm, TonightPlan } from './schedule';
 import { addDays, clamp, formatDuration, formatTime, MINUTE, startOfDateKey, weekdayOfKey } from './time';
+import { retimeTwoStep, TwoStepPlan } from './twoStep';
 import type { Profile } from './types';
 
 /** How much earlier one night may be than the next (minutes): the body clock advances slowly. */
@@ -24,10 +25,12 @@ export interface UpcomingNight {
   wake: number;
   bedtime: number;
   windDownStart: number;
-  /** Cycle-timed alarm; undefined on a calendar free day. */
+  /** Cycle-timed alarm (the routine alarm on a two-step morning); undefined on a calendar free day. */
   alarm?: number;
   cycles?: number;
-  /** Expected sleep if the plan is followed. */
+  /** Two-step morning: routine alarm `alarm`, back to sleep, final alarm at `wake` (engine/twoStep.ts). */
+  twoStep?: TwoStepPlan;
+  /** Expected sleep if the plan is followed (both stretches on a two-step morning). */
   sleepMin: number;
   isWorkday: boolean;
   /** Wake-up set for this date in the calendar. */
@@ -75,7 +78,8 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
   const { first, profile, needMin, latencyMin, cycleMin } = input;
   const eff = clamp(input.efficiency, 0.8, 0.97);
   const days = Math.max(1, input.days);
-  const sleepOf = (bed: number, wake: number) => Math.max(0, Math.round(((wake - bed) / MINUTE - latencyMin) * eff));
+  // A two-step morning's routine and falling back asleep are awake time inside the night.
+  const sleepOf = (bed: number, wake: number, awakeMin = 0) => Math.max(0, Math.round(((wake - bed) / MINUTE - latencyMin - awakeMin) * eff));
 
   // 1) Wake-ups and need-based bedtimes, paying debt back gradually.
   const nights: UpcomingNight[] = [];
@@ -90,6 +94,7 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
     let isWorkday: boolean;
     let noAlarm: boolean;
     let held: boolean;
+    let twoStep: TwoStepPlan | undefined;
     if (k === 0) {
       wake = first.wake;
       bedtime = first.bedtime;
@@ -97,6 +102,7 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
       isWorkday = first.isWorkday;
       noAlarm = !!first.noAlarm;
       held = first.gradual;
+      twoStep = first.twoStep;
     } else {
       const plan = input.planNight(wakeDate, debt, recoveryExtraMin(debt));
       wake = plan.wake;
@@ -105,9 +111,10 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
       isWorkday = plan.isWorkday;
       noAlarm = !!plan.noAlarm;
       held = plan.gradual;
+      twoStep = plan.twoStep;
     }
     heldBack.push(held);
-    debt = Math.max(0, debt - (sleepOf(bedtime, wake) - needMin));
+    debt = Math.max(0, debt - (sleepOf(bedtime, wake, twoStep?.awakeMin) - needMin));
     nights.push({
       wakeDate,
       wake,
@@ -121,6 +128,7 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
       preShiftMin: 0,
       debtAfterMin: 0,
       heldBack: held,
+      ...(twoStep ? { twoStep } : {}),
     });
   }
 
@@ -142,11 +150,13 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
   debt = input.debtMin;
   for (const n of nights) {
     n.windDownStart = n.bedtime - profile.windDownMin * MINUTE;
-    n.sleepMin = sleepOf(n.bedtime, n.wake);
+    n.sleepMin = sleepOf(n.bedtime, n.wake, n.twoStep?.awakeMin);
     if (!n.noAlarm) {
-      const a = smartAlarm(n.bedtime, n.wake, cycleMin, latencyMin);
+      // On a two-step morning the cycle-timed alarm is the routine alarm; the final one rings at the wake-up.
+      const a = smartAlarm(n.bedtime, n.twoStep?.firstWake ?? n.wake, cycleMin, latencyMin);
       n.alarm = a.alarm;
       n.cycles = a.cycles;
+      if (n.twoStep) n.twoStep = retimeTwoStep(n.twoStep, a.alarm, n.wake, input.efficiency);
     }
     debt = Math.max(0, debt - (n.sleepMin - needMin));
     n.debtAfterMin = Math.round(debt);

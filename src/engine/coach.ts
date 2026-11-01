@@ -111,7 +111,29 @@ export function buildDailyPlan(input: {
       detail: 'Dim the lights, put screens away, keep the room cool (≈18–20 °C). Your melatonin is rising.',
     },
     { id: 'bed', kind: 'bed', time: tonight.bedtime, title: 'Lights out', detail: tonight.rationale.join(' ') },
-    {
+  );
+  const two = tonight.twoStep;
+  if (two) {
+    // Two-step morning: the cycle-timed alarm is the routine alarm; the final one rings at the wake-up.
+    items.push(
+      {
+        id: 'routine',
+        kind: 'alarm',
+        time: input.alarm.alarm,
+        end: two.routineEnd,
+        title: `Routine alarm${input.alarm.onBoundary ? ' (end of a sleep cycle)' : ''}`,
+        detail: `Your ${two.routineMin}-min routine with the lights low and screens off, then back to bed by ${formatTime(two.routineEnd)} — asleep again ~${formatTime(two.backToSleep)}.`,
+      },
+      {
+        id: 'alarm',
+        kind: 'alarm',
+        time: tonight.wake,
+        title: 'Final alarm',
+        detail: 'The second stretch is short, light sleep with no full cycle to time, so this one rings right at your wake-up.',
+      },
+    );
+  } else {
+    items.push({
       id: 'alarm',
       kind: 'alarm',
       time: input.alarm.alarm,
@@ -119,8 +141,8 @@ export function buildDailyPlan(input: {
       detail: input.alarm.onBoundary
         ? `Timed to a predicted cycle boundary, before your ${formatTime(tonight.wake)} target, so you wake from light sleep.`
         : 'No cycle boundary fell inside your wake window, so the alarm stays at your target time.',
-    },
-  );
+    });
+  }
   return items.sort((a, b) => a.time - b.time);
 }
 

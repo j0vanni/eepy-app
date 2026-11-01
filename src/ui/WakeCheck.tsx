@@ -27,6 +27,10 @@ export function trackerLabel(s: SleepSession): string {
 export function wakeQuestion(m: SessionMetrics, t: NightTimeline): { text: string; yes: string } | undefined {
   if (t.fixed || t.confirmed) return undefined;
   const who = trackerLabel(m.session);
+  // Two-step morning without the second stretch: the routine was the real wake-up.
+  if (t.routine?.stayedUp) {
+    return { text: `No sleep after your morning routine — so ${formatTime(t.woke.time)} was your real wake-up.`, yes: 'Looks right' };
+  }
   if (t.trimmedMin >= 10) {
     const why = t.upEvidence.length ? ` (${t.upEvidence.join(', ')})` : '';
     return { text: `${who} recorded sleep until ${formatTime(t.recorded.end)} — you were up at ${formatTime(t.outOfBed.time)}${why}.`, yes: 'Looks right' };
@@ -212,34 +216,60 @@ export function NightTimelineCard({ m, t }: { m: SessionMetrics; t?: NightTimeli
     t.trimmedMin >= 1 ? `recording ran on to ${formatTime(rec.end)}` : undefined,
   ].filter(Boolean);
   const shown = t.episodes.slice(0, MAX_EPISODES);
+  const routine = t.routine;
   return (
     <Card>
       <CardTitle icon="timeline-clock-outline" title="Your night, step by step" />
       <Step color={colors.textFaint} label="In bed" time={formatTime(t.inBed.time)} b={t.inBed} />
       <Step color={colors.light} label="Fell asleep" time={formatTime(t.asleep.time)} detail={asleepBits.join(' · ') || undefined} b={t.asleep} />
-      {shown.map((e) => (
-        <Step
-          key={e.start}
-          color={colors.awake}
-          label="Awake"
-          time={formatTime(e.start)}
-          detail={[
-            `until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`,
-            e.steps >= 20 ? `got up (${e.steps} steps)` : e.usedEepy ? 'used eepy' : 'in bed',
-          ].join(' · ')}
-        />
-      ))}
+      {shown.map((e) =>
+        e.routine ? (
+          // Two-step morning: planned time up, not a wake-up in the night (engine/wakeDetect.ts rule 12).
+          <Step
+            key={e.start}
+            color={colors.energy}
+            label="Morning routine"
+            time={formatTime(e.start)}
+            detail={[
+              `until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`,
+              routine?.backAsleep !== undefined ? `back asleep ${formatTime(routine.backAsleep)}` : undefined,
+              routine?.evidence.length ? routine.evidence.join(', ') : undefined,
+              routine && routine.minutes > routine.plannedMin ? `${formatDuration(routine.minutes - routine.plannedMin)} longer than planned counts as awake` : 'planned — not counted as waking',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          />
+        ) : (
+          <Step
+            key={e.start}
+            color={colors.awake}
+            label="Awake"
+            time={formatTime(e.start)}
+            detail={[
+              `until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`,
+              e.steps >= 20 ? `got up (${e.steps} steps)` : e.usedEepy ? 'used eepy' : 'in bed',
+            ].join(' · ')}
+          />
+        ),
+      )}
       {t.episodes.length > shown.length ? <Text style={[font.tiny, { marginLeft: 16 }]}>+{t.episodes.length - shown.length} more wake-ups</Text> : null}
       <Step
         color={colors.energy}
         label="Woke up"
         time={formatTime(t.woke.time)}
-        detail={late > 0 ? `${formatDuration(late)} later than your usual ${formatClock(t.usualWakeMin!)}` : undefined}
+        detail={
+          routine?.stayedUp
+            ? `no sleep after your morning routine (${formatTime(routine.start)}), so this was your real wake-up`
+            : late > 0
+              ? `${formatDuration(late)} later than your usual ${formatClock(t.usualWakeMin!)}`
+              : undefined
+        }
         b={t.woke}
       />
       <Step color={colors.good} label="Out of bed" time={formatTime(t.outOfBed.time)} detail={outBits.join(' · ') || undefined} b={t.outOfBed} />
       <Text style={[font.small, { marginTop: space.sm }]}>
         In bed {formatDuration(m.timeInBedMin)} · asleep {formatDuration(m.totalSleepMin)} · {Math.round(m.efficiency * 100)}% efficiency
+        {m.routine ? ` · ${formatDuration(m.routine.minutes)} up for your routine not counted as in bed` : ''}
         {t.trimmedMin >= 1 ? ` · ${formatDuration(t.trimmedMin)} after you got up left out` : ''}
       </Text>
       <WakeCheck m={m} t={t} full />
