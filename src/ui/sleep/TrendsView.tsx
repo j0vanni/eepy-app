@@ -1,33 +1,25 @@
+/** Sleep tab → Trends: charts of sleep vs need, debt, score, timing, chronotype, stages and recovery. */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
+import type { Analysis } from '@/engine/analysis';
 import { trendRows } from '@/engine/analysis';
 import { CHRONOTYPE_LABELS } from '@/engine/chronotype';
 import { mean } from '@/engine/stats';
 import { formatClock, formatDuration } from '@/engine/time';
 import { selectDataset, useStore } from '@/state/store';
-import { useAnalysis } from '@/state/useAnalysis';
 import { BreathingTrendCard } from '@/ui/cards/BreathingCard';
 import { DurationBars, LineChart, SleepTimeline } from '@/ui/charts';
-import { Button, Card, CardTitle, Empty, Row, Screen, Section, Segmented, Stat } from '@/ui/components';
+import { Button, Card, CardTitle, Row, Section, Segmented, Stat } from '@/ui/components';
 import { dayLabel, shortDate, weekdayInitial } from '@/ui/format';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
-export default function TrendsScreen() {
-  const a = useAnalysis();
+export function TrendsView({ a }: { a: Analysis }) {
   const data = useStore(useShallow(selectDataset));
   const [days, setDays] = useState(14);
   const rows = useMemo(() => (a ? trendRows(a, data, days) : []), [a, data, days]);
-
-  if (!a) {
-    return (
-      <Screen title="Trends">
-        <Empty icon="chart-timeline-variant" title="No trends yet" body="Trends appear after a few nights of data." />
-      </Screen>
-    );
-  }
 
   const label = (d: string) => (days <= 14 ? weekdayInitial(d) : shortDate(d));
   const tips = rows.map((r) => dayLabel(r.date));
@@ -43,7 +35,7 @@ export default function TrendsScreen() {
   const hrvBase = a.readiness?.hrvBaseline;
 
   return (
-    <Screen title="Trends" subtitle={`${withSleep.length} of ${days} nights recorded`}>
+    <>
       <Segmented
         value={days}
         onChange={setDays}
@@ -55,7 +47,8 @@ export default function TrendsScreen() {
         ]}
       />
 
-      <Card style={{ marginTop: space.md }}>
+      <Text style={[font.small, { marginTop: space.sm }]}>{`${withSleep.length} of ${days} nights recorded`}</Text>
+      <Card style={{ marginTop: space.sm }}>
         <Row>
           <Stat label="Avg sleep" value={avgSleep ? formatDuration(avgSleep) : '–'} sub={`need ${formatDuration(a.need.needMin)}`} />
           <Stat label="Avg score" value={avgScore ? String(avgScore) : '–'} color={avgScore ? scoreColor(avgScore) : undefined} />
@@ -125,7 +118,7 @@ export default function TrendsScreen() {
           {chrono.category ? <Text style={font.small}>{CHRONOTYPE_LABELS[chrono.category].description}</Text> : null}
           <Row style={{ marginTop: space.md }}>
             <Stat label="Mid-sleep (free days)" value={chrono.msfScMin !== undefined ? formatClock(chrono.msfScMin) : '–'} sub="corrected for oversleep" />
-            <Stat label="Social jet lag" value={chrono.socialJetlagMin !== undefined ? formatDuration(chrono.socialJetlagMin) : '–'} />
+            <Stat label="Social jet lag" value={chrono.socialJetlagMin !== undefined ? formatDuration(chrono.socialJetlagMin) : '–'} sub="workdays vs days off" />
           </Row>
           <Text style={[font.tiny, { marginTop: space.sm }]}>
             Based on {chrono.nWork} workday and {chrono.nFree} free-day nights{chrono.quizScore !== undefined ? ` · quiz score ${chrono.quizScore}` : ''}.
@@ -148,7 +141,7 @@ export default function TrendsScreen() {
 
       <Section title="Recovery">
         <Card>
-          <Text style={[font.small, { marginBottom: 4 }]}>HRV (RMSSD, ms)</Text>
+          <Text style={[font.small, { marginBottom: 4 }]}>Heart rate variability (HRV, ms) — higher usually means better recovered</Text>
           <LineChart
             values={rows.map((r) => r.hrv)}
             labels={rows.map((r) => label(r.date))}
@@ -188,6 +181,6 @@ export default function TrendsScreen() {
           ))
         )}
       </Section>
-    </Screen>
+    </>
   );
 }

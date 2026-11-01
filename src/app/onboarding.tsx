@@ -8,6 +8,7 @@ import { ensureNotificationPermission } from '@/state/notifications';
 import { useStore } from '@/state/store';
 import { Button, Card, Chip, Icon, Row, Screen, Stepper } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
+import { markWhatsNewSeen } from '@/ui/WhatsNew';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -31,6 +32,8 @@ export default function Onboarding() {
 
   const finish = (next: 'connect' | 'demo' | 'manual' | 'home') => {
     setProfile({ onboarded: true });
+    // New here: nothing has "moved", so skip the what's-new sheet.
+    markWhatsNewSeen();
     // Android 13+ needs a runtime prompt before wind-down / bedtime reminders can appear.
     if (Platform.OS !== 'web') ensureNotificationPermission().catch(() => undefined);
     if (next === 'demo') loadDemo();
@@ -82,7 +85,7 @@ export default function Onboarding() {
       {step === 2 ? (
         <View style={{ paddingTop: space.xl }}>
           <Text style={font.h1}>Your schedule</Text>
-          <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>Which days have a fixed wake-up (work, school, kids)?</Text>
+          <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>Which days have a fixed wake-up (work, school, kids)? You can change this any time in Planner → Your usual week.</Text>
           <Card>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md }}>
               {DAYS.map((d, i) => (

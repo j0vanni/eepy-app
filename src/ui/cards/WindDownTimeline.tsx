@@ -59,7 +59,7 @@ export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: bo
         </View>
       ) : off ? (
         <Text style={[font.tiny, { marginTop: space.md }]}>
-          Screens off {screensOffMin} min before lights-out (change in Settings → Wind-down). What's on the screen keeps you up as much as its light does.
+          Screens off {screensOffMin} min before lights-out (change it in Settings → Wind-down & phone light). What's on the screen keeps you up as much as its light does.
         </Text>
       ) : null}
     </Card>

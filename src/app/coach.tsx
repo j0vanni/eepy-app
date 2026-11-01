@@ -1,5 +1,6 @@
-import { Href, router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+// Coach: your experiment, goals & streaks, this week's review and what to try next (More → Coach).
+import { router } from 'expo-router';
+import { Text, View } from 'react-native';
 
 import { TEMPLATE_BY_ID } from '@/engine/experiments';
 import { useAnalysis } from '@/state/useAnalysis';
@@ -7,59 +8,7 @@ import { ExperimentCard, GoalsCard, RecoveryAlertCard, WeeklyReviewCard } from '
 import { useActiveExperiment, useSuggestions } from '@/ui/coach/hooks';
 import { Button, Card, Empty, Icon, Row, Screen, Section } from '@/ui/components';
 import { greeting } from '@/ui/format';
-import { colors, font, radius, space } from '@/ui/theme';
-
-interface Tool {
-  href: Href;
-  icon: string;
-  title: string;
-  sub: string;
-  color: string;
-}
-
-const TOOLS: Tool[] = [
-  { href: '/calendar', icon: 'calendar-month-outline', title: 'Calendar', sub: 'Nights & planned mornings', color: colors.accent },
-  { href: '/experiments', icon: 'flask-outline', title: 'Experiments', sub: 'Test what changes your sleep', color: colors.accent },
-  { href: '/goals', icon: 'flag-checkered', title: 'Goals', sub: 'Streaks, one day at a time', color: colors.good },
-  { href: '/review', icon: 'calendar-week', title: 'Weekly review', sub: 'Your week in sleep', color: colors.info },
-  { href: '/learning', icon: 'clock-time-four-outline', title: 'Body clock', sub: 'Teach eepy your rhythm', color: colors.energy },
-  { href: '/simulate', icon: 'tune-variant', title: 'What if?', sub: 'Play with tomorrow', color: colors.rem },
-  { href: '/winddown', icon: 'weather-night', title: 'Wind down', sub: 'Breathing & sounds', color: colors.light },
-  { href: '/cbti', icon: 'account-heart-outline', title: 'Insomnia programme', sub: '6-week CBT-I', color: colors.bad },
-  { href: '/journal', icon: 'notebook-outline', title: 'Journal', sub: 'Tags, ratings, caffeine', color: colors.warn },
-  { href: '/need', icon: 'battery-charging-high', title: 'Sleep need', sub: 'How much you really need', color: colors.good },
-  { href: '/jetlag', icon: 'airplane-clock', title: 'Jet lag', sub: 'Plan a time-zone shift', color: colors.info },
-  { href: '/export', icon: 'export-variant', title: 'Reports & export', sub: 'PDF for your doctor, CSV', color: colors.textDim },
-];
-
-function ToolTile({ t }: { t: Tool }) {
-  return (
-    <Pressable
-      onPress={() => router.push(t.href)}
-      accessibilityRole="button"
-      accessibilityLabel={t.title}
-      style={({ pressed }) => ({
-        width: '48.5%',
-        backgroundColor: colors.surface,
-        borderRadius: radius.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-        padding: space.md,
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={t.icon} size={19} color={t.color} />
-      </View>
-      <Text style={[font.h3, { marginTop: space.sm, fontSize: 15 }]} numberOfLines={1}>
-        {t.title}
-      </Text>
-      <Text style={[font.tiny, { marginTop: 2 }]} numberOfLines={2}>
-        {t.sub}
-      </Text>
-    </Pressable>
-  );
-}
+import { colors, font, space } from '@/ui/theme';
 
 export default function CoachScreen() {
   const a = useAnalysis();
@@ -69,7 +18,7 @@ export default function CoachScreen() {
   const testableTips = a ? a.tips.filter((t) => t.experimentId && TEMPLATE_BY_ID[t.experimentId] && t.experimentId !== active?.templateId).slice(0, 2) : [];
 
   return (
-    <Screen title="Coach" subtitle={a ? `${greeting(a.now)} — let's make tonight a little better` : 'Experiments, goals and your week in sleep'}>
+    <Screen subtitle={a ? `${greeting(a.now)} — let's make tonight a little better` : 'Experiments, goals and your week in sleep'}>
       {a ? (
         <>
           <RecoveryAlertCard analysis={a} />
@@ -142,13 +91,16 @@ export default function CoachScreen() {
         </Empty>
       )}
 
-      <Section title="Tools">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm }}>
-          {TOOLS.map((t) => (
-            <ToolTile key={t.title} t={t} />
-          ))}
-        </View>
-      </Section>
+      <Card onPress={() => router.navigate('/more')}>
+        <Row gap={space.md}>
+          <Icon name="dots-horizontal-circle-outline" size={22} color={colors.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.h3}>All tools</Text>
+            <Text style={font.small}>Body clock, sleep need, wind-down, journal, reports — in the More tab</Text>
+          </View>
+          <Icon name="chevron-right" color={colors.textFaint} />
+        </Row>
+      </Card>
     </Screen>
   );
 }

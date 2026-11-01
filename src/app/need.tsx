@@ -62,7 +62,7 @@ export default function NeedScreen() {
           Your age group ({base.label}) is the starting point. Genetics make a real difference: a small number of people truly thrive on under 7h, while others need
           9h+. Sleep debt inflates how long you sleep when you finally can, so eepy subtracts part of your debt from those nights.
         </Note>
-        <Button kind="ghost" label="Set my need manually" onPress={() => router.push('/settings')} />
+        <Button kind="ghost" label="Set my need manually" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'you' } })} />
       </Section>
     </Screen>
   );

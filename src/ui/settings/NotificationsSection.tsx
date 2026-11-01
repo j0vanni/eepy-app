@@ -79,11 +79,91 @@ function useBackgroundReadAllowed(enabled: boolean): [boolean | undefined, (v: b
   return [allowed, setAllowed];
 }
 
+/** Turns a notification preference on (after Android's permission prompt) or off. */
+function useSetNotif() {
+  const setNotificationPrefs = useStore((s) => s.setNotificationPrefs);
+  return async (key: keyof NotificationPrefs, value: boolean) => {
+    if (value && !(await ensureNotificationPermission())) {
+      notify('Notifications are off', 'Allow notifications for eepy in Android settings to get reminders and alarms.');
+      return;
+    }
+    setNotificationPrefs({ [key]: value });
+  };
+}
+
+/** Settings → Alarms & watch: eepy's own cycle-timed wake alarm and whether it can take over the lock screen. */
+export function WakeAlarmSection() {
+  const smartAlarm = useStore((s) => s.settings.notifications.smartAlarm);
+  const setNotif = useSetNotif();
+  return (
+    <Section title="Wake alarm">
+      <Card>
+        <Toggle
+          label="Wake alarm (cycle-timed)"
+          sub="eepy rings at the end of a sleep cycle, in the 30 minutes before your wake-up time — so you wake up less groggy"
+          value={smartAlarm}
+          onChange={(v) => setNotif('smartAlarm', v)}
+        />
+        <FullScreenAlarmRow />
+        <Text style={[font.tiny, { marginTop: 4 }]}>To skip one morning or change a day's wake-up time, use the Planner.</Text>
+      </Card>
+    </Section>
+  );
+}
+
+/** Settings → Notifications & shortcuts: reminders through the day and evening. */
 export function NotificationsSection() {
   const profile = useStore((s) => s.profile);
   const settings = useStore((s) => s.settings);
-  const setNotificationPrefs = useStore((s) => s.setNotificationPrefs);
+  const setNotif = useSetNotif();
+
+  return (
+    <Section title="Reminders">
+      <Card>
+        <Toggle label="Wind-down reminder" sub={`${profile.windDownMin} min before lights out`} value={settings.notifications.windDown} onChange={(v) => setNotif('windDown', v)} />
+        <Toggle
+          label="Live wind-down card"
+          sub="Pinned checklist from wind-down until lights out (replaces the plain wind-down reminder)"
+          value={settings.notifications.liveWindDown}
+          onChange={(v) => setNotif('liveWindDown', v)}
+        />
+        <Toggle label="Bedtime" sub="At lights-out time" value={settings.notifications.bedtime} onChange={(v) => setNotif('bedtime', v)} />
+        <Toggle label="Caffeine cut-off" sub="When it's time for your last coffee of the day" value={settings.notifications.caffeine} onChange={(v) => setNotif('caffeine', v)} />
+        <Toggle
+          label="Phone-light reminder"
+          sub="When melatonin starts rising (~3 h before lights-out): Night Light on, screen dimmer"
+          value={settings.notifications.screenLight}
+          onChange={(v) => setNotif('screenLight', v)}
+        />
+        <Toggle
+          label="Screens-off reminder"
+          sub="From the wind-down timeline: phone on the charger, face down"
+          value={settings.notifications.screensOff}
+          onChange={(v) => setNotif('screensOff', v)}
+        />
+        <Toggle
+          label="Forgot your coffee?"
+          sub={'An hour after your usual morning drink, if nothing is logged: "Yes" logs it at your usual time'}
+          value={settings.notifications.caffeineNudge}
+          onChange={(v) => setNotif('caffeineNudge', v)}
+        />
+        <Toggle label="Morning check-in" sub="How did you sleep? Two taps" value={settings.notifications.morningCheckIn} onChange={(v) => setNotif('morningCheckIn', v)} />
+        <Toggle
+          label="Adaptive reminders"
+          sub="Nap nudge when you need one, caffeine last call only on days you log caffeine, quiet during naps, lights-out moved after a long nap — at most 5 a day"
+          value={settings.notifications.adaptiveReminders}
+          onChange={(v) => setNotif('adaptiveReminders', v)}
+        />
+      </Card>
+    </Section>
+  );
+}
+
+/** Settings → Notifications & shortcuts: background sync, the morning report and the missing-night nudge. */
+export function BackgroundSection() {
+  const settings = useStore((s) => s.settings);
   const setBackground = useStore((s) => s.setBackground);
+  const setNotif = useSetNotif();
   const live = settings.dataMode === 'live';
   const bg = settings.background;
   const [bgAllowed, setBgAllowed] = useBackgroundReadAllowed(live && bg.enabled);
@@ -95,14 +175,6 @@ export function NotificationsSection() {
       .then((s) => setTasksAvailable(s.available))
       .catch(() => setTasksAvailable(undefined));
   }, [bg.enabled]);
-
-  const setNotif = async (key: keyof NotificationPrefs, value: boolean) => {
-    if (value && !(await ensureNotificationPermission())) {
-      notify('Notifications are off', 'Allow notifications for eepy in Android settings to get reminders and alarms.');
-      return;
-    }
-    setNotificationPrefs({ [key]: value });
-  };
 
   const allowBackground = async () => {
     try {
@@ -125,58 +197,10 @@ export function NotificationsSection() {
   else status = `Hasn't run yet — Android runs it at most every ${BACKGROUND_INTERVAL_MIN} min while the phone is online and eepy is closed.`;
 
   return (
-    <Section title="Notifications">
+    <Section title="While eepy is closed">
       <Card>
-        <Toggle label="Wind-down reminder" sub={`${profile.windDownMin} min before lights out`} value={settings.notifications.windDown} onChange={(v) => setNotif('windDown', v)} />
-        <Toggle
-          label="Live wind-down card"
-          sub="Pinned checklist from wind-down until lights out (replaces the plain wind-down reminder)"
-          value={settings.notifications.liveWindDown}
-          onChange={(v) => setNotif('liveWindDown', v)}
-        />
-        <Toggle label="Bedtime" value={settings.notifications.bedtime} onChange={(v) => setNotif('bedtime', v)} />
-        <Toggle label="Caffeine cut-off" value={settings.notifications.caffeine} onChange={(v) => setNotif('caffeine', v)} />
-        <Toggle
-          label="Phone-light reminder"
-          sub="When melatonin starts rising (~3 h before lights-out): Night Light on, screen dimmer"
-          value={settings.notifications.screenLight}
-          onChange={(v) => setNotif('screenLight', v)}
-        />
-        <Toggle
-          label="Screens-off reminder"
-          sub="From the wind-down timeline: phone on the charger, face down"
-          value={settings.notifications.screensOff}
-          onChange={(v) => setNotif('screensOff', v)}
-        />
-        <Toggle
-          label="Forgot your coffee?"
-          sub={'An hour after your usual morning drink, if nothing is logged: "Yes" logs it at your usual time'}
-          value={settings.notifications.caffeineNudge}
-          onChange={(v) => setNotif('caffeineNudge', v)}
-        />
-        <Toggle label="Morning check-in" value={settings.notifications.morningCheckIn} onChange={(v) => setNotif('morningCheckIn', v)} />
-        <Toggle
-          label="Wake alarm (cycle-timed)"
-          sub="Rings at the end of a predicted sleep cycle before your wake time"
-          value={settings.notifications.smartAlarm}
-          onChange={(v) => setNotif('smartAlarm', v)}
-        />
-        <FullScreenAlarmRow />
-        <Toggle
-          label="Adaptive reminders"
-          sub="Nap nudge when you need one, caffeine last call only on days you log caffeine, quiet during naps, lights-out moved after a long nap — at most 5 a day"
-          value={settings.notifications.adaptiveReminders}
-          onChange={(v) => setNotif('adaptiveReminders', v)}
-        />
-      </Card>
-      <Card>
-        <CardTitle icon="sync" title="While eepy is closed" />
-        <Toggle
-          label="Background sync"
-          sub="Pulls new nights from Health Connect and refreshes reminders"
-          value={bg.enabled}
-          onChange={(v) => setBackground({ enabled: v })}
-        />
+        <CardTitle icon="sync" title="Background sync" />
+        <Toggle label="Background sync" sub="Pulls new nights from Health Connect and refreshes reminders" value={bg.enabled} onChange={(v) => setBackground({ enabled: v })} />
         <Text style={[font.small, { marginBottom: space.sm }]}>{status}</Text>
         {bg.enabled && live && bgAllowed === false ? (
           <>

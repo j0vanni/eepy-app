@@ -211,7 +211,7 @@ export function buildTips(input: {
       experimentId: 'no-naps',
       priority: 72,
       title: 'Spend less time awake in bed',
-      detail: 'Use the bed only for sleep (and sex) so your brain links it with sleeping. Insomnia mode in Settings applies these CBT-I rules to your plan.',
+      detail: 'Use the bed only for sleep (and sex) so your brain links it with sleeping. Insomnia mode (Settings → You & schedule) applies these CBT-I rules to your plan.',
     });
   }
   if (input.caffeine.overLimit) {

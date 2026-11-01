@@ -15,7 +15,7 @@ import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
 import { colors, font, radius, space } from '@/ui/theme';
-import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, TonightCard, until, UsualCoffeeCard } from './cards';
+import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, until, UsualCoffeeCard } from './cards';
 
 type HeroProps = { a: Analysis; now: number };
 
@@ -94,6 +94,13 @@ function CountdownCard({ a }: { a: Analysis }) {
       </Row>
       <AlarmControl a={a} />
       <SleepModeLine a={a} />
+      <Pressable onPress={() => router.navigate({ pathname: '/planner', params: { show: 'tonight' } })} hitSlop={8} accessibilityRole="link" style={{ marginTop: space.md }}>
+        <Row gap={4}>
+          <Icon name="calendar-clock" size={16} color={colors.accent} />
+          <Text style={[font.small, { color: colors.accent, fontWeight: '600', flex: 1 }]}>Tonight's full plan, and the week ahead</Text>
+          <Icon name="chevron-right" size={18} color={colors.accent} />
+        </Row>
+      </Pressable>
     </Card>
   );
 }
@@ -110,7 +117,7 @@ export function EveningHero({ a, now }: HeroProps) {
         <CardTitle icon="gauge" title="Sleep pressure" color={colors.light} />
         <SleepPressureCard a={a} now={now} embedded />
       </Card>
-      <TonightCard a={a} now={now} detailed />
+      {/* Tonight's times are in the countdown above; the full plan is a tap away in the Planner. */}
       <CalendarNote analysis={a} />
     </>
   );
@@ -123,7 +130,8 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
   const afterBedtime = now >= input.bedtime;
   const alarm = nightWakeTarget(now, input);
   // The smart alarm sits in a window before the target wake-up; anything up to the target is fine.
-  const latest = afterBedtime ? Math.max(a.tonight.wake, alarm) : alarm;
+  // On a two-step morning the main stretch ends at the routine alarm, not the final wake-up.
+  const latest = afterBedtime ? Math.max(a.tonight.twoStep?.firstWake ?? a.tonight.wake, alarm) : alarm;
   const options = fallAsleepNowOptions(now, { cycleMin: a.cycleMin, latencyMin: a.latencyMin, needMin: a.need.needMin, latestWake: latest });
   // The last few options that fit before the alarm, plus the first one that doesn't.
   const fitting = options.filter((o) => o.fitsBeforeWake);

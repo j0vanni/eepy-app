@@ -7,7 +7,7 @@ import { PlayButton, SoundPicker, TimerPicker, VolumeSlider } from '@/audio/ui/S
 import { useSoundPlayer } from '@/audio/useSoundPlayer';
 import { useStore } from '@/state/store';
 import { SCREENS_OFF_OPTIONS } from '@/engine/windDownPlan';
-import { Card, CardTitle, ListRow, Section, Segmented } from '@/ui/components';
+import { Card, CardTitle, ListRow, Section, Segmented, Stepper } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
 import { colors, font, space } from '@/ui/theme';
 
@@ -18,7 +18,7 @@ export function WindDownSection() {
   const screensOffMin = useStore((s) => s.settings.screensOffMin);
   const setSettings = useStore((s) => s.setSettings);
   return (
-    <Section title="Wind-down">
+    <Section title="Sounds & screens">
       <Card>
         <CardTitle icon="music-note-outline" title="Sleep sounds" color={colors.rem} right={<PlayButton playing={sound.playing} size={36} onPress={() => sound.toggle()} label={sound.playing ? 'Stop preview' : 'Preview sound'} />} />
         <Text style={[font.small, { marginBottom: space.md }]}>
@@ -44,6 +44,25 @@ export function WindDownSection() {
         <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <ListRow icon="weather-night" title="Open wind-down routine" sub="Countdown, checklist, breathing and a light check" onPress={() => router.push('/winddown')} />
         </View>
+      </Card>
+    </Section>
+  );
+}
+
+/** How long the wind-down before lights-out is (it sets when wind-down starts every evening). */
+export function WindDownLengthSection() {
+  const windDownMin = useStore((s) => s.profile.windDownMin);
+  const setProfile = useStore((s) => s.setProfile);
+  return (
+    <Section title="Wind-down length">
+      <Card>
+        <Stepper
+          label="Wind-down routine"
+          sub="Time to dim the lights and put screens away before lights-out"
+          value={`${windDownMin} min`}
+          onDec={() => setProfile({ windDownMin: Math.max(15, windDownMin - 15) })}
+          onInc={() => setProfile({ windDownMin: Math.min(120, windDownMin + 15) })}
+        />
       </Card>
     </Section>
   );

@@ -1,5 +1,5 @@
 /**
- * eepy follows its own phone-light advice (Settings → Wind-down → "Dim & warm eepy"): a faint
+ * eepy follows its own phone-light advice (Settings → Wind-down & phone light → "Dim & warm eepy"): a faint
  * warm tint from the evening on, and from wind-down its window is dimmed to the target (only
  * eepy's own window, and only if the phone is brighter than that). Daytime: no change.
  */

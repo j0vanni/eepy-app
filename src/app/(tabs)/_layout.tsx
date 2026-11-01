@@ -7,13 +7,15 @@ import { useStore } from '@/state/store';
 import { FloatingInsetContext, Icon } from '@/ui/components';
 import { FAB_SIZE, QuickCheckInButton } from '@/ui/QuickCheckInButton';
 import { colors } from '@/ui/theme';
+import { WhatsNewSheet } from '@/ui/WhatsNew';
 
+/** Five tabs with short, plain names; everything else is one tap away in More (with search). */
 const TABS = [
-  { name: 'index', title: 'Today', icon: 'weather-night' },
+  { name: 'index', title: 'Today', icon: 'home-variant-outline' },
+  { name: 'planner', title: 'Planner', icon: 'calendar-clock' },
   { name: 'nap', title: 'Nap', icon: 'sleep' },
-  { name: 'plan', title: 'Plan', icon: 'calendar-clock' },
-  { name: 'coach', title: 'Coach', icon: 'account-heart-outline' },
-  { name: 'trends', title: 'Trends', icon: 'chart-timeline-variant' },
+  { name: 'sleep', title: 'Sleep', icon: 'chart-timeline-variant' },
+  { name: 'more', title: 'More', icon: 'dots-horizontal-circle-outline' },
 ];
 
 // Matches the JS tab bar's own height (49 + bottom inset) so the button floats just above it.
@@ -40,6 +42,8 @@ export default function TabLayout() {
           ))}
         </Tabs>
         <QuickCheckInButton bottom={TAB_BAR_HEIGHT + insets.bottom + 16} />
+        {/* One-time "What's new / where things moved" after the update that brought these tabs. */}
+        <WhatsNewSheet />
       </View>
     </FloatingInsetContext.Provider>
   );
