@@ -3,14 +3,14 @@ import { router } from 'expo-router';
 
 import { QUIZZES, scoreQuiz } from '@/engine/screening';
 import { useStore } from '@/state/store';
-import { Card, ListRow } from '@/ui/components';
+import { ListCard, ListRow } from '@/ui/components';
 
 const QUIZ_ICON: Record<string, string> = { rmeq: 'owl', ess: 'sleep', isi: 'eye-outline', stopbang: 'lungs' };
 
 export function SelfChecksCard() {
   const screenings = useStore((s) => s.profile.screenings);
   return (
-    <Card>
+    <ListCard>
       {Object.values(QUIZZES).map((q) => {
         const r = screenings[q.id];
         const band = r ? scoreQuiz(q.id, r.answers).band : undefined;
@@ -24,6 +24,6 @@ export function SelfChecksCard() {
           />
         );
       })}
-    </Card>
+    </ListCard>
   );
 }

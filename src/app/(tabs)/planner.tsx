@@ -96,7 +96,7 @@ export default function PlannerScreen() {
         ) : (
           <Row gap={space.sm} style={{ paddingHorizontal: 2 }}>
             <Icon name="gesture-tap" size={18} color={colors.accent} />
-            <Text style={[font.small, { flex: 1 }]}>Tap a day to see its plan — or to set a wake-up time, make it a free day with no alarm.</Text>
+            <Text style={[font.small, { flex: 1 }]}>Tap a day to see its plan, change its wake-up or make it a free day.</Text>
           </Row>
         )}
       </View>
@@ -137,7 +137,7 @@ export default function PlannerScreen() {
           </View>
           <View onLayout={at('tool:light')}>
             <Disclosure icon="brightness-6" color={colors.light} title="Phone light" sub="How bright your screen should be this evening" open={!!open.light} onToggle={() => toggle('light')}>
-              <ScreenLightCard a={a} full />
+              <ScreenLightCard a={a} full embedded />
             </Disclosure>
           </View>
           <Card>

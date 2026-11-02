@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { Analysis } from '@/engine/analysis';
@@ -11,7 +11,8 @@ import type { SleepDataset } from '@/engine/types';
 import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { CompareChart } from '@/ui/CompareChart';
-import { Button, Card, CardTitle, Chip, Empty, Icon, Screen } from '@/ui/components';
+import { AppSwitch, Button, Card, CardTitle, Chip, Empty, Icon, Screen } from '@/ui/components';
+import { Disclosure } from '@/ui/Disclosure';
 import { Slider } from '@/ui/Slider';
 import { colors, font, radius, space } from '@/ui/theme';
 
@@ -158,7 +159,7 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
         <View style={styles.sticky}>
           <Card style={{ marginBottom: 0, paddingBottom: space.md }}>
             <View style={[styles.row, { marginBottom: space.xs }]}>
-              <Text style={[font.tiny, { flex: 1, fontWeight: '600' }]}>TOMORROW’S ENERGY</Text>
+              <Text style={[font.label, { flex: 1 }]}>TOMORROW’S ENERGY</Text>
               <Text style={font.tiny}>
                 wake {formatTime(s.scenario.wake)} · dip {s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'}
               </Text>
@@ -244,13 +245,11 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
             icon="sleep"
             title="Nap today"
             right={
-              <Switch
+              <AppSwitch
                 value={!!draft.nap}
                 disabled={!canNap}
-                onValueChange={(on) => patch({ nap: on ? { start: clampT(napPresetAt, napLo, napHi), minutes: 20 } : undefined })}
-                trackColor={{ true: colors.accent, false: colors.border }}
-                thumbColor={colors.text}
-                accessibilityLabel="Add a nap"
+                onChange={(on) => patch({ nap: on ? { start: clampT(napPresetAt, napLo, napHi), minutes: 20 } : undefined })}
+                label="Add a nap"
               />
             }
           />
@@ -369,8 +368,8 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
           <CardTitle icon="compare-horizontal" title="Compared with your plan" />
           <View style={[styles.tableRow, { paddingTop: 0 }]}>
             <Text style={[font.tiny, { flex: 1.5 }]} />
-            <Text style={[font.tiny, styles.cell]}>PLAN</Text>
-            <Text style={[font.tiny, styles.cell]}>WHAT IF</Text>
+            <Text style={[font.label, styles.cell]}>PLAN</Text>
+            <Text style={[font.label, styles.cell]}>WHAT IF</Text>
             <View style={styles.deltaCell} />
           </View>
           <Group title="Tonight" />
@@ -390,10 +389,12 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
           <TableRow label="Sleep debt" plan={formatDuration(b.debtMin)} what={formatDuration(s.debtMin)} delta={deltaMin(d.debtMin)} color={tone(d.debtMin, 'down', 5)} />
           <TableRow label="Average energy" plan={String(Math.round(b.tomorrow.avgEnergy))} what={String(Math.round(s.tomorrow.avgEnergy))} delta={deltaNum(d.avgEnergy)} color={tone(d.avgEnergy, 'up', 0.5)} />
           <TableRow label="Focus zone" plan={`${b.tomorrow.focusHours.toFixed(1)} h`} what={`${s.tomorrow.focusHours.toFixed(1)} h`} delta={deltaNum(d.focusHours, 1, 'h')} color={tone(d.focusHours, 'up', 0.25)} />
+          {/* Time and depth of the dip on their own rows: together they didn't fit the column. */}
+          <TableRow label="Afternoon dip" plan={b.tomorrow.dip ? formatTime(b.tomorrow.dip.t) : '—'} what={s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'} />
           <TableRow
-            label="Afternoon dip"
-            plan={b.tomorrow.dip ? `${formatTime(b.tomorrow.dip.t)} · ${Math.round(b.tomorrow.dip.energy)}` : '—'}
-            what={s.tomorrow.dip ? `${formatTime(s.tomorrow.dip.t)} · ${Math.round(s.tomorrow.dip.energy)}` : '—'}
+            label="Energy in the dip"
+            plan={b.tomorrow.dip ? String(Math.round(b.tomorrow.dip.energy)) : '—'}
+            what={s.tomorrow.dip ? String(Math.round(s.tomorrow.dip.energy)) : '—'}
             delta={b.tomorrow.dip && s.tomorrow.dip ? deltaNum(s.tomorrow.dip.energy - b.tomorrow.dip.energy) : undefined}
             color={b.tomorrow.dip && s.tomorrow.dip ? tone(s.tomorrow.dip.energy - b.tomorrow.dip.energy, 'up', 0.5) : undefined}
           />
@@ -408,7 +409,7 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
 function Kpi({ label, value, delta, color }: { label: string; value: string; delta: string; color: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={font.tiny}>{label.toUpperCase()}</Text>
+      <Text style={font.label}>{label.toUpperCase()}</Text>
       <Text style={[font.h3, { marginTop: 2, fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
         {value}
       </Text>
@@ -422,7 +423,7 @@ function Kpi({ label, value, delta, color }: { label: string; value: string; del
 }
 
 function Group({ title }: { title: string }) {
-  return <Text style={[font.tiny, { marginTop: space.sm, marginBottom: 2, color: colors.accent, fontWeight: '600' }]}>{title.toUpperCase()}</Text>;
+  return <Text style={[font.label, { marginTop: space.sm, marginBottom: 2, color: colors.accent }]}>{title.toUpperCase()}</Text>;
 }
 
 function TableRow({ label, plan, what, delta, color = colors.textFaint }: { label: string; plan: string; what: string; delta?: string; color?: string }) {
@@ -450,9 +451,9 @@ function ModelNotes({ a, result }: { a: Analysis; result: SimulationResult }) {
     `Focus zone is time within ${SIM.focusBelowPeak} points of your planned day’s peak (energy ${result.focusEnergy}+). The expected score rates a synthetic night shaped like yours — cycle length, deep and REM share, awakenings — the same way real nights are scored.`,
     'It’s a model, not a promise: single nights vary a lot. Use it to compare options, not to predict to the minute.',
   ];
+  const [open, setOpen] = useState(false);
   return (
-    <Card>
-      <CardTitle icon="flask-outline" title="How the simulator works" />
+    <Disclosure icon="flask-outline" title="How the simulator works" sub="The models behind each number, and their limits" open={open} onToggle={() => setOpen(!open)}>
       <View style={{ gap: space.sm }}>
         {notes.map((n, i) => (
           <Text key={i} style={font.small}>
@@ -460,7 +461,7 @@ function ModelNotes({ a, result }: { a: Analysis; result: SimulationResult }) {
           </Text>
         ))}
       </View>
-    </Card>
+    </Disclosure>
   );
 }
 

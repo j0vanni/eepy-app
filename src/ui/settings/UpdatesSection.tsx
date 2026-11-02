@@ -146,7 +146,8 @@ function ReleaseDetails({ release, installed }: { release: ReleaseBuild; install
   );
 }
 
-export function UpdatesSection({ title = 'App updates' }: { title?: string }) {
+/** On the Settings page (the page title already says it) there is no heading; elsewhere pass one. */
+export function UpdatesSection({ title = '' }: { title?: string }) {
   const updates = useStore((s) => s.settings.updates);
   const setUpdates = useStore((s) => s.setUpdateSettings);
   const checking = useUpdateStatus((s) => s.checking);

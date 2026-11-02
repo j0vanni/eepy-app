@@ -67,7 +67,7 @@ function TemplateCard({ s, a, open, onToggle, blocked }: { s: TemplateSuggestion
         <View style={{ marginTop: space.md, gap: space.md }}>
           <Text style={font.body}>{t.why}</Text>
           <View>
-            <Text style={[font.tiny, { marginBottom: 6 }]}>WHAT EEPY MEASURES</Text>
+            <Text style={[font.label, { marginBottom: 6 }]}>WHAT EEPY MEASURES</Text>
             <MetricChips t={t} />
           </View>
           {target !== undefined ? (

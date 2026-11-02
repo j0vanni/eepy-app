@@ -4,15 +4,15 @@
  */
 import { Href, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable } from 'react-native';
+import { View } from 'react-native';
 
 import { cbtiStatus, CBTI_WEEKS } from '@/engine/cbti';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Card, Icon, ListRow, Screen, Section } from '@/ui/components';
+import { IconButton, ListCard, ListRow, Screen, Section } from '@/ui/components';
 import { FeatureSearch } from '@/ui/FeatureSearch';
 import { SelfChecksCard } from '@/ui/settings/SelfChecks';
-import { colors } from '@/ui/theme';
+import { colors, space } from '@/ui/theme';
 
 interface Item {
   icon: string;
@@ -25,11 +25,11 @@ interface Item {
 function Group({ title, items }: { title: string; items: Item[] }) {
   return (
     <Section title={title}>
-      <Card style={{ paddingVertical: 4 }}>
+      <ListCard>
         {items.map((i) => (
           <ListRow key={i.title} icon={i.icon} iconColor={i.color} title={i.title} sub={i.sub} onPress={() => router.push(i.href)} />
         ))}
-      </Card>
+      </ListCard>
     </Section>
   );
 }
@@ -41,9 +41,9 @@ export default function MoreScreen() {
   const cbti = useMemo(() => (a && program?.active ? cbtiStatus(program, a.nights, a.day) : undefined), [a, program]);
 
   const settingsButton = (
-    <Pressable onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Settings" hitSlop={8}>
-      <Icon name="cog-outline" size={24} color={colors.textDim} />
-    </Pressable>
+    <View style={{ marginRight: -space.sm }}>
+      <IconButton icon="cog-outline" label="Settings" onPress={() => router.push('/settings')} />
+    </View>
   );
 
   return (

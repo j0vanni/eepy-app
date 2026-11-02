@@ -23,7 +23,7 @@ export default function CoachScreen() {
         <>
           <RecoveryAlertCard analysis={a} />
 
-          <Section title={active ? 'Your experiment' : 'Experiment of the week'} action={<Button small kind="ghost" label="All" onPress={() => router.push('/experiments')} />}>
+          <Section title={active ? 'Your experiment' : 'Experiment of the week'} action={<Button small kind="ghost" label="See all" onPress={() => router.push('/experiments')} />}>
             <ExperimentCard analysis={a} showEmpty />
           </Section>
 
@@ -62,9 +62,7 @@ export default function CoachScreen() {
                     <Icon name={t.icon} size={20} color={colors.accent} />
                     <View style={{ flex: 1 }}>
                       <Text style={font.h3}>{t.title}</Text>
-                      <Text style={[font.small, { marginTop: 2 }]} numberOfLines={3}>
-                        {t.detail}
-                      </Text>
+                      <Text style={[font.small, { marginTop: 2 }]}>{t.detail}</Text>
                       <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
                         <Button
                           small

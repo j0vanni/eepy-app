@@ -27,7 +27,9 @@ export default function SleepScreen() {
     const v = asView(params.view);
     if (!v) return;
     setView(v);
-    router.setParams({ view: undefined });
+    // Deferred like the Planner's: on a cold start the navigator may not be mounted yet.
+    const id = setTimeout(() => router.setParams({ view: undefined }), 150);
+    return () => clearTimeout(id);
   }, [params.view]);
 
   if (!a) {

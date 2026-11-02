@@ -11,6 +11,7 @@ import { REVIEW_SEEN_MARK } from '@/ui/cards/CoachCards';
 import { DurationBars } from '@/ui/charts';
 import { Button, Card, CardTitle, Empty, Icon, ListRow, Meter, Note, Row, Screen, Section, Stat } from '@/ui/components';
 import { weekdayInitial } from '@/ui/format';
+import { InsightCard } from '@/ui/InsightCard';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
 const signed = (min: number) => `${min >= 0 ? '+' : '−'}${formatDuration(Math.abs(min))}`;
@@ -178,11 +179,7 @@ export default function ReviewScreen() {
       {review.insights.length ? (
         <Section title="Top insights">
           {review.insights.map((i) => (
-            <Card key={i.id} accent={i.kind === 'negative' ? colors.warn : i.kind === 'positive' ? colors.good : undefined}>
-              <Text style={font.h3}>{i.title}</Text>
-              <Text style={[font.small, { marginTop: 4 }]}>{i.detail}</Text>
-              {i.evidence ? <Text style={[font.tiny, { marginTop: 6 }]}>{i.evidence}</Text> : null}
-            </Card>
+            <InsightCard key={i.id} insight={i} />
           ))}
         </Section>
       ) : null}

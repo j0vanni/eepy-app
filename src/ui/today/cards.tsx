@@ -16,6 +16,7 @@ import { useNow } from '@/state/useAnalysis';
 import { ArcGauge, EnergyChart, energyWord, Hypnogram } from '@/ui/charts';
 import { Button, Card, CardTitle, Chip, Icon, Meter, Note, Ring, Row, Section, Stat } from '@/ui/components';
 import { nightLabel } from '@/ui/format';
+import { InsightCard } from '@/ui/InsightCard';
 import { colors, debtColor, font, scoreColor, space } from '@/ui/theme';
 import { WakeCheck } from '@/ui/WakeCheck';
 
@@ -49,7 +50,7 @@ export function LastNightCard({ a, hero }: A & { hero?: boolean }) {
       <Row gap={space.lg}>
         <Ring value={score.total} color={scoreColor(score.total)} size={size} stroke={hero ? 12 : 10}>
           <Text style={[font.stat, { fontSize: hero ? 32 : 26 }]}>{score.total}</Text>
-          <Text style={font.tiny}>{score.label.toUpperCase()}</Text>
+          <Text style={[font.label, { fontSize: 10, letterSpacing: 0.2 }]}>{score.label.toUpperCase()}</Text>
         </Ring>
         <View style={{ flex: 1, gap: space.sm }}>
           <Row>
@@ -191,7 +192,7 @@ export function EnergyCard({ a, now, hero }: A & { now: number; hero?: boolean }
       {hero && pos ? (
         <Row gap={space.md} style={{ marginBottom: space.md, alignItems: 'flex-end' }}>
           <View>
-            <Text style={font.tiny}>ENERGY RIGHT NOW</Text>
+            <Text style={font.label}>ENERGY RIGHT NOW</Text>
             <Row gap={6} style={{ alignItems: 'flex-end' }}>
               <Text style={[font.stat, { fontSize: 52, lineHeight: 58, color: colors.energy, fontVariant: ['tabular-nums'] }]}>{Math.round(pos.energy)}</Text>
               <Icon name={pos.trend === 'rising' ? 'trending-up' : pos.trend === 'falling' ? 'trending-down' : 'trending-neutral'} size={26} color={colors.energy} />
@@ -234,7 +235,7 @@ export function NapCard({ a }: A) {
       <Text style={font.body}>{a.nap.headline}</Text>
       <View style={{ marginTop: space.sm }}>
         <Meter value={a.nap.needScore} color={a.nap.needScore >= 55 ? colors.accent : a.nap.needScore >= 35 ? colors.warn : colors.good} />
-        <Text style={[font.tiny, { marginTop: 4 }]}>NAP NEED {a.nap.needScore}/100</Text>
+        <Text style={[font.label, { marginTop: 6 }]}>NAP NEED {a.nap.needScore}/100</Text>
       </View>
     </Card>
   );
@@ -381,19 +382,25 @@ export function NeedDebtRow({ a }: A) {
     <>
       <Row gap={space.md} style={{ alignItems: 'stretch' }}>
         <Card style={{ flex: 1 }} onPress={() => router.push('/need')}>
-          <Text style={font.tiny}>SLEEP NEED</Text>
-          <Text style={[font.stat, { marginTop: 4 }]}>{formatDuration(a.need.needMin)}</Text>
+          <Text style={font.label}>SLEEP NEED</Text>
+          <Text style={[font.stat, { marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatDuration(a.need.needMin)}
+          </Text>
           <Text style={font.small}>
             {a.need.method === 'override' ? 'set by you' : a.need.method === 'personalized' ? `personalised · ${a.need.confidence} confidence` : 'age-based estimate'}
           </Text>
         </Card>
         <Card style={{ flex: 1 }} onPress={() => router.push('/sleep')}>
-          <Text style={font.tiny}>SLEEP DEBT</Text>
-          <Text style={[font.stat, { marginTop: 4, color: debtCol }]}>{formatDuration(a.debt.debtMin)}</Text>
-          <Text style={font.small}>
-            {a.debt.category === 'none' ? 'fully rested' : `${a.debt.category}`}
-            {a.debt.trendMin !== undefined && Math.abs(a.debt.trendMin) >= 15 ? ` · ${a.debt.trendMin > 0 ? '▲' : '▼'} ${formatDuration(Math.abs(a.debt.trendMin))} this week` : ''}
+          <Text style={font.label}>SLEEP DEBT</Text>
+          <Text style={[font.stat, { marginTop: 4, color: debtCol }]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatDuration(a.debt.debtMin)}
           </Text>
+          <Text style={font.small}>{a.debt.category === 'none' ? 'fully rested' : `${a.debt.category}`}</Text>
+          {a.debt.trendMin !== undefined && Math.abs(a.debt.trendMin) >= 15 ? (
+            <Text style={font.small}>
+              {a.debt.trendMin > 0 ? '▲' : '▼'} {formatDuration(Math.abs(a.debt.trendMin))} this week
+            </Text>
+          ) : null}
         </Card>
       </Row>
       {a.debt.payoff ? (
@@ -510,8 +517,14 @@ export function PlanSection({ a, now }: A & { now: number }) {
           const past = (p.end ?? p.time) < now && minutesOfDay(p.time) >= 0 && p.kind !== 'alarm';
           const isCurrent = current?.id === p.id;
           return (
-            <Row key={p.id} gap={space.md} style={{ alignItems: 'flex-start', paddingVertical: 8, opacity: past ? 0.45 : 1, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
-              <Text style={[font.h3, { width: 50, fontVariant: ['tabular-nums'], color: isCurrent ? colors.accent : colors.text }]}>{formatTime(p.time)}</Text>
+            <Row key={p.id} gap={space.sm} style={{ alignItems: 'flex-start', paddingVertical: 10, opacity: past ? 0.45 : 1, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
+              <Text
+                style={[font.small, { width: 64, marginTop: 1, fontWeight: '700', fontVariant: ['tabular-nums'], color: isCurrent ? colors.accent : colors.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatTime(p.time)}
+              </Text>
               <Icon name={meta.icon} color={meta.color} />
               <View style={{ flex: 1 }}>
                 <Text style={font.body}>
@@ -546,13 +559,9 @@ export function CoachingSection({ a }: A) {
 export function InsightsSection({ a }: A) {
   if (!a.insights.length) return null;
   return (
-    <Section title="What affects your sleep" action={<Button small kind="ghost" label="All" onPress={() => router.push('/sleep')} />}>
+    <Section title="What affects your sleep" action={<Button small kind="ghost" label="See all" onPress={() => router.push({ pathname: '/sleep', params: { view: 'trends' } })} />}>
       {a.insights.slice(0, 3).map((i) => (
-        <Card key={i.id} accent={i.kind === 'negative' ? colors.warn : i.kind === 'positive' ? colors.good : undefined}>
-          <Text style={font.h3}>{i.title}</Text>
-          <Text style={[font.small, { marginTop: 4 }]}>{i.detail}</Text>
-          {i.evidence ? <Text style={[font.tiny, { marginTop: 6 }]}>{i.evidence}</Text> : null}
-        </Card>
+        <InsightCard key={i.id} insight={i} />
       ))}
     </Section>
   );

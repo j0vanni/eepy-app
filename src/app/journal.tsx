@@ -7,7 +7,7 @@ import { TAGS } from '@/engine/tags';
 import { addDays, atMinutes, dateKey, formatClock, formatDuration, formatTime, minutesOfDay, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Card, CardTitle, Chip, Icon, ListRow, Row, Screen, Section, Stepper } from '@/ui/components';
+import { Button, Card, CardTitle, Chip, Icon, IconButton, ListRow, Row, Screen, Section, Stepper } from '@/ui/components';
 import { dayLabel, nightLabel } from '@/ui/format';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
@@ -124,22 +124,22 @@ export default function JournalScreen() {
           ))}
         </View>
         {dayDoses.map((d) => (
-          <Row key={d.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}>
+          <Row key={d.id} style={{ paddingVertical: 2, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}>
             <Pressable
               onPress={() => router.push({ pathname: '/caffeine', params: { id: d.id } })}
               style={({ pressed }) => [{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm }, pressed ? { opacity: 0.6 } : null]}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${d.label} at ${formatTime(d.time)}`}
             >
-              <Text style={[font.body, { width: 56 }]}>{formatTime(d.time)}</Text>
+              <Text style={[font.body, { width: 76, fontWeight: '600', fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatTime(d.time)}
+              </Text>
               <Text style={[font.small, { flex: 1 }]}>
                 {d.label} · {d.mg} mg
               </Text>
               <Icon name="pencil-outline" size={16} color={colors.textFaint} />
             </Pressable>
-            <Pressable onPress={() => removeCaffeine(d.id)} hitSlop={8} accessibilityLabel="Remove drink">
-              <Icon name="close" color={colors.textFaint} />
-            </Pressable>
+            <IconButton icon="close" label="Remove drink" color={colors.textFaint} onPress={() => removeCaffeine(d.id)} />
           </Row>
         ))}
         <Row style={{ marginTop: space.sm, justifyContent: 'space-between' }}>

@@ -1,7 +1,7 @@
 // OWNER: learning workstream. "Your body clock": how eepy is learning your rhythm and sleep need.
 import { router } from 'expo-router';
-import { ReactNode, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ReactNode, useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
 
 import { energyFromKss, forecastEnergy } from '@/engine/alertness';
 import { describeRhythm, eligibleCheckins, LEARNING, livingDay, TimeOfDay, timeOfDay } from '@/engine/calibration';
@@ -10,7 +10,8 @@ import { atMinutes, DAY, formatDuration, formatTime, minutesOfDay } from '@/engi
 import { LEARNING_RESET_MARK, useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Card, CardTitle, Empty, Icon, ListRow, Meter, Note, Row, Screen, Section, Stat } from '@/ui/components';
+import { Button, Card, CardTitle, Empty, Icon, IconButton, ListRow, Meter, Note, Row, Screen, Section, Stat } from '@/ui/components';
+import { Disclosure } from '@/ui/Disclosure';
 import { confirm } from '@/ui/confirm';
 import { dayLabel } from '@/ui/format';
 import { KSS_LABELS, QuickCheckIn } from '@/ui/learning/QuickCheckIn';
@@ -29,6 +30,8 @@ export default function LearningScreen() {
   const prefs = useStore((s) => s.settings.notifications);
   const resetAt = useStore((s) => s.settings.marks[LEARNING_RESET_MARK]);
   const since = typeof resetAt === 'number' ? resetAt : undefined;
+  const [allCheckins, setAllCheckins] = useState(false);
+  const [howOpen, setHowOpen] = useState(false);
 
   const now = a?.now ?? Date.now();
   const eligible = useMemo(() => eligibleCheckins(checkins, now, since), [checkins, now, since]);
@@ -106,18 +109,14 @@ export default function LearningScreen() {
     <Screen>
       <Card accent={applied ? colors.accent : undefined}>
         <CardTitle icon="brain" title={applied ? 'Personal forecast active' : 'Learning your rhythm'} />
-        <Row gap={space.lg} style={{ alignItems: 'flex-end' }}>
-          <View>
-            <Text style={font.tiny}>FORECAST ACCURACY</Text>
-            <Text style={[font.stat, { fontSize: 40, color: applied ? colors.text : colors.textDim }]}>{calibration?.accuracy !== undefined ? `${calibration.accuracy}%` : '—'}</Text>
-          </View>
-          <View style={{ flex: 1, paddingBottom: 6 }}>
-            <Text style={font.small}>{calibration ? `confidence ${calibration.confidence ?? 'low'}` : 'not fitted yet'}</Text>
-          </View>
+        <Text style={font.label}>FORECAST ACCURACY</Text>
+        <Row gap={space.sm} style={{ alignItems: 'flex-end' }}>
+          <Text style={[font.stat, { fontSize: 40, lineHeight: 46, color: applied ? colors.text : colors.textDim }]}>{calibration?.accuracy !== undefined ? `${calibration.accuracy}%` : '—'}</Text>
+          <Text style={[font.small, { paddingBottom: 7 }]}>{calibration ? `· ${calibration.confidence ?? 'low'} confidence` : '· not fitted yet'}</Text>
         </Row>
         <Text style={[font.small, { marginTop: space.sm }]}>{status}</Text>
         <Row style={{ marginTop: space.md }}>
-          <Stat label="Check-ins" value={`${n}`} sub={n >= target ? 'enough for a confident fit' : `of ${target} for a confident fit`} />
+          <Stat label="Check-ins" value={`${n}`} sub={n >= target ? 'enough to fit' : `of ${target} needed`} />
           <Stat label="Days" value={`${calibration?.days ?? new Set(eligible.map((c) => livingDay(c.time))).size}`} sub="with ratings" />
           <Stat label="Typical error" value={calibration ? `${fmtErr(calibration.maeBefore)} → ${fmtErr(calibration.maeAfter)}` : '–'} sub="KSS points" />
         </Row>
@@ -215,31 +214,35 @@ export default function LearningScreen() {
       <Section title="Recent check-ins" action={<Button small kind="ghost" label="Check in" icon="plus" onPress={() => router.push('/checkin')} />}>
         <Card>
           {recent.length === 0 ? <Text style={font.small}>No check-ins yet.</Text> : null}
-          {recent.map((c, i) => (
+          {(allCheckins ? recent : recent.slice(0, 5)).map((c, i) => (
             <View key={c.id} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
               <ListRow
                 icon={c.source === 'ping' ? 'bell-outline' : 'gesture-tap'}
                 title={`${dayLabel(livingDay(c.time), a.day)} ${formatTime(c.time)} · KSS ${c.kss}`}
                 sub={`${KSS_LABELS[Math.round(c.kss)] ?? ''}${since !== undefined && c.time < since ? ' · from before the reset' : ''}`}
                 right={
-                  <Pressable
-                    hitSlop={10}
-                    accessibilityLabel="Delete check-in"
+                  <IconButton
+                    icon="trash-can-outline"
+                    label="Delete check-in"
+                    color={colors.textFaint}
                     onPress={async () => {
                       if (await confirm('Delete check-in?', `${formatTime(c.time)} · KSS ${c.kss}`, 'Delete', true)) removeCheckIn(c.id);
                     }}
-                  >
-                    <Icon name="trash-can-outline" color={colors.textFaint} />
-                  </Pressable>
+                  />
                 }
               />
             </View>
           ))}
+          {recent.length > 5 ? (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.sm, alignItems: 'flex-start' }}>
+              <Button small kind="ghost" label={allCheckins ? 'Show fewer' : `Show all ${recent.length}`} icon={allCheckins ? 'chevron-up' : 'chevron-down'} onPress={() => setAllCheckins(!allCheckins)} />
+            </View>
+          ) : null}
         </Card>
       </Section>
 
       <Section title="How this works">
-        <Card>
+        <Disclosure icon="school-outline" title="How eepy learns your rhythm" sub="The model, what a check-in changes, and its limits" open={howOpen} onToggle={() => setHowOpen(!howOpen)}>
           <Text style={font.small}>
             The energy curve comes from a sleep-science model with three parts: sleep pressure that builds while you're awake (from your watch's sleep data), a
             body clock — a 24-hour rhythm plus the early-afternoon dip — and grogginess right after waking. The body-clock part starts from population averages.
@@ -253,7 +256,7 @@ export default function LearningScreen() {
             Accuracy is measured on check-ins left out of the fit, and your personal model is only used once it beats the average one. It can't see caffeine,
             meals, stress, illness or daylight — those show up as noise. Expect about two weeks of 2–3 check-ins a day for a confident fit.
           </Text>
-        </Card>
+        </Disclosure>
         {calibration?.skipped ? (
           <Note tone="info">
             {calibration.skipped} check-in{calibration.skipped === 1 ? ' was' : 's were'} left out because the sleep before {calibration.skipped === 1 ? 'it' : 'them'} wasn't

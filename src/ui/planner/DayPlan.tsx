@@ -98,7 +98,7 @@ export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: 
 export function NightBeforeStats({ night, needMin, isTonight }: { night: UpcomingNight; needMin: number; isTonight: boolean }) {
   return (
     <View style={{ marginTop: space.md }}>
-      <Text style={font.tiny}>BEST PLAN FOR THE NIGHT BEFORE</Text>
+      <Text style={font.label}>BEST PLAN FOR THE NIGHT BEFORE</Text>
       <Row style={{ marginTop: 4 }}>
         <Stat label="Wind down" value={formatTime(night.windDownStart)} />
         <Stat label="Lights out" value={formatTime(night.bedtime)} color={colors.accent} />

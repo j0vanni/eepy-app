@@ -23,7 +23,7 @@ export function DayCard({ night, needMin, isTonight, skippedDate }: { night: Upc
   const cycleTimed = !night.noAlarm && night.alarm !== undefined && Math.abs(night.alarm - night.wake) >= 60_000;
   return (
     <Card>
-      <Text style={font.tiny}>{isTonight ? 'TONIGHT’S PLAN' : `${nightBefore(night.wakeDate).toUpperCase()} → ${weekday.toUpperCase()} MORNING`}</Text>
+      <Text style={font.label}>{isTonight ? 'TONIGHT’S PLAN' : `${nightBefore(night.wakeDate).toUpperCase()} → ${weekday.toUpperCase()} MORNING`}</Text>
       <Text style={[font.h2, { marginTop: 2 }]}>{title}</Text>
       <Row gap={space.sm} style={{ marginTop: space.sm, alignItems: 'flex-start' }}>
         <Icon name={meta.icon} size={20} color={meta.color} />
@@ -41,7 +41,7 @@ export function DayCard({ night, needMin, isTonight, skippedDate }: { night: Upc
       <View style={{ marginTop: space.sm }}>
         <NightNotes night={night} needMin={needMin} />
       </View>
-      <Text style={[font.tiny, { marginTop: space.sm, marginBottom: 6 }]}>WAKE-UP THAT MORNING</Text>
+      <Text style={[font.label, { marginTop: space.sm, marginBottom: 6 }]}>WAKE-UP THAT MORNING</Text>
       <WakePlanPicker date={night.wakeDate} />
       {isTonight ? <AdjustTonightButton /> : null}
     </Card>

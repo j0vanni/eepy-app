@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { UpdateBanner } from '@/ui/cards/UpdateBanner';
-import { Card, ListRow, Screen, Section } from '@/ui/components';
+import { ListCard, ListRow, Screen, Section } from '@/ui/components';
 import { FeatureSearch } from '@/ui/FeatureSearch';
 import { SETTINGS_SECTIONS, SettingsSectionInfo } from '@/ui/settings/sections';
 import { font, space } from '@/ui/theme';
@@ -24,11 +24,11 @@ export default function SettingsHome() {
           <UpdateBanner />
           {GROUPS.map((g) => (
             <Section key={g} title={g}>
-              <Card style={{ paddingVertical: 4 }}>
+              <ListCard>
                 {SETTINGS_SECTIONS.filter((s) => s.group === g).map((s) => (
                   <ListRow key={s.id} icon={s.icon} title={s.title} sub={s.sub} onPress={() => router.push({ pathname: '/settings/[section]', params: { section: s.id } })} />
                 ))}
-              </Card>
+              </ListCard>
             </Section>
           ))}
           <Text style={[font.tiny, { marginTop: space.sm, textAlign: 'center' }]}>Workdays and wake-up times are in Planner → Your usual week.</Text>

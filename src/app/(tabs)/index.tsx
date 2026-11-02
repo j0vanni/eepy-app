@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useContext, useState } from 'react';
+import { ActivityIndicator, RefreshControl, View } from 'react-native';
 
 import { dayPhase, DayPhase, phaseInputFor } from '@/engine/dayPhase';
 import { useStore } from '@/state/store';
@@ -12,7 +12,7 @@ import { ExperimentCard, GoalsCard, RecoveryAlertCard, WeeklyReviewCard } from '
 import { LearningCard } from '@/ui/cards/LearningCard';
 import { SimulatorCard } from '@/ui/cards/SimulatorCard';
 import { UpdateBanner } from '@/ui/cards/UpdateBanner';
-import { Button, Empty, Icon, Note, Row, Screen } from '@/ui/components';
+import { Button, Empty, IconButton, Note, Row, Screen } from '@/ui/components';
 import { dayLabel, greeting, relativeTime } from '@/ui/format';
 import { colors, space } from '@/ui/theme';
 import {
@@ -30,6 +30,7 @@ import {
 import { DayHero, EveningHero, MorningHero, NightMoreToggle, NightView } from '@/ui/today/heroes';
 import { QuickActions } from '@/ui/today/QuickActions';
 import { RoutineMorningNow } from '@/ui/cards/RoutineMorningNow';
+import { NightChromeContext } from '@/ui/QuickCheckInButton';
 
 const PHASE_LABEL: Record<DayPhase, string> = { morning: 'morning', day: 'daytime', evening: 'evening', night: 'night' };
 
@@ -42,6 +43,16 @@ export default function Today() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string>();
   const [nightMore, setNightMore] = useState(false);
+  const setNightChrome = useContext(NightChromeContext);
+  // Known before the early return below, so the hook order never changes.
+  const nightNow = !!a && dayPhase(now, phaseInputFor(a, profile)) === 'night';
+  // While the night view is on screen, the floating button and tab bar dim too.
+  useFocusEffect(
+    useCallback(() => {
+      setNightChrome(nightNow);
+      return () => setNightChrome(false);
+    }, [nightNow, setNightChrome]),
+  );
 
   const sync = async () => {
     if (settings.dataMode === 'demo') return;
@@ -52,18 +63,14 @@ export default function Today() {
   };
 
   const header = (
-    <Row gap={space.md}>
-      <Pressable onPress={() => router.push('/journal')} accessibilityLabel="Journal" hitSlop={8}>
-        <Icon name="notebook-edit-outline" size={24} color={colors.textDim} />
-      </Pressable>
+    <Row gap={0} style={{ marginRight: -space.sm }}>
+      <IconButton icon="notebook-edit-outline" label="Journal" onPress={() => router.push('/journal')} />
       {settings.dataMode === 'live' ? (
-        <Pressable onPress={sync} accessibilityLabel="Sync now" hitSlop={8}>
-          {syncing ? <ActivityIndicator color={colors.accent} /> : <Icon name="sync" size={24} color={colors.textDim} />}
-        </Pressable>
+        <IconButton icon="sync" label="Sync now" onPress={sync}>
+          {syncing ? <ActivityIndicator color={colors.accent} /> : undefined}
+        </IconButton>
       ) : null}
-      <Pressable onPress={() => router.push('/settings')} accessibilityLabel="Settings" hitSlop={8}>
-        <Icon name="cog-outline" size={24} color={colors.textDim} />
-      </Pressable>
+      <IconButton icon="cog-outline" label="Settings" onPress={() => router.push('/settings')} />
     </Row>
   );
 
@@ -92,7 +99,7 @@ export default function Today() {
       {!night ? <UpdateBanner /> : null}
       {settings.dataMode === 'demo' && !night ? (
         <Note tone="info" icon="flask-outline">
-          Demo data. Connect your watch in Settings → Health Connect & data to switch to your own sleep.
+          Demo data. To use your own sleep, connect your watch in Settings → Health Connect & data.
         </Note>
       ) : null}
       {syncMsg ? <Note tone="info">{syncMsg}</Note> : settings.lastSyncError ? <Note tone="warn">{settings.lastSyncError}</Note> : null}

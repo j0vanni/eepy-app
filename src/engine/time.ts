@@ -136,10 +136,13 @@ export function formatHourLabel(minutes: number): string {
   return t.mm === '00' ? `${t.h}\u00A0${t.ampm}` : `${t.h}:${t.mm}\u00A0${t.ampm}`;
 }
 
-/** Rewrites "HH:MM" times inside fixed text (quiz answers, experiment rules) in the current format. */
+/**
+ * Rewrites "HH:MM" times inside fixed text (quiz answers, experiment rules) in the current format.
+ * Times that already carry AM/PM (e.g. a target filled in with formatClock) are left as they are.
+ */
 export function localizeClockText(text: string): string {
   if (clockFormat === '24h') return text;
-  return text.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, (_, h: string, mm: string) => formatClock(Number(h) * 60 + Number(mm)));
+  return text.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b(?![\s\u00A0\u202F]?[AaPp][Mm]\b)/g, (_, h: string, mm: string) => formatClock(Number(h) * 60 + Number(mm)));
 }
 
 export function formatTime(t: number): string {

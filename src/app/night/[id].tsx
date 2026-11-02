@@ -54,13 +54,12 @@ export default function NightScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: m.isNap ? 'Nap' : nightLabel(m.wakeDate) }} />
-      {story ? <NightStoryCard story={story} /> : null}
-      <Card>
+      <Card accent={score ? scoreColor(score.total) : undefined}>
         <Row gap={space.lg}>
           {score ? (
             <Ring value={score.total} color={scoreColor(score.total)} size={96}>
               <Text style={[font.stat, { fontSize: 28 }]}>{score.total}</Text>
-              <Text style={font.tiny}>{score.label.toUpperCase()}</Text>
+              <Text style={[font.label, { fontSize: 10, letterSpacing: 0.2 }]}>{score.label.toUpperCase()}</Text>
             </Ring>
           ) : null}
           <View style={{ flex: 1, gap: space.sm }}>
@@ -74,6 +73,7 @@ export default function NightScreen() {
           </View>
         </Row>
       </Card>
+      {story ? <NightStoryCard story={story} /> : null}
 
       {!m.isNap ? <NightTimelineCard m={m} t={a.timelines[m.id]} /> : null}
 
@@ -94,7 +94,7 @@ export default function NightScreen() {
         </Row>
         {m.cycles.length ? (
           <View style={{ marginTop: space.md }}>
-            <Text style={font.tiny}>SLEEP CYCLES{m.avgCycleMin ? ` · AVG ${Math.round(m.avgCycleMin)} MIN` : ''}</Text>
+            <Text style={font.label}>SLEEP CYCLES{m.avgCycleMin ? ` · AVG ${Math.round(m.avgCycleMin)} MIN` : ''}</Text>
             <Row gap={6} style={{ flexWrap: 'wrap', marginTop: 6 }}>
               {m.cycles.map((c, i) => (
                 <View key={i} style={{ backgroundColor: colors.surfaceAlt, borderRadius: 10, padding: 8, minWidth: 64 }}>
@@ -140,7 +140,7 @@ export default function NightScreen() {
               <Stat
                 label="SpO₂"
                 value={vitals.spo2Avg ? `${vitals.spo2Avg}%` : '–'}
-                sub={vitals.spo2Min ? `min ${vitals.spo2Min}%${vitals.spo2DipsPerHour !== undefined ? ` · ${vitals.spo2DipsPerHour}/h dips` : ''}` : undefined}
+                sub={vitals.spo2Min ? `lowest ${vitals.spo2Min}%` : undefined}
               />
             </Row>
             {curve.length > 3 ? (

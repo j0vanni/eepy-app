@@ -24,17 +24,17 @@ export function TonightPanel({ a }: { a: Analysis }) {
   const kind = t.noAlarm ? 'free day — no alarm' : t.isWorkday ? 'workday' : 'not a workday';
   return (
     <Card accent={colors.accent}>
-      <Text style={font.tiny}>{`TONIGHT → ${morning.toUpperCase()} · ${kind.toUpperCase()}`}</Text>
+      <Text style={font.label}>{`TONIGHT → ${morning.toUpperCase()} · ${kind.toUpperCase()}`}</Text>
       <Text style={[font.small, { marginTop: space.sm }]}>Lights out</Text>
       <Text style={[font.stat, { fontSize: 44, lineHeight: 52, color: colors.accent, fontVariant: ['tabular-nums'] }]}>{formatTime(t.bedtime)}</Text>
       <Row style={{ marginTop: space.sm }}>
-        <Stat label="Wind down" value={formatTime(t.windDownStart)} sub="dim lights, screens away" />
+        <Stat label="Wind down" value={formatTime(t.windDownStart)} sub="lights low" />
         <Stat
           label={t.noAlarm ? 'Wake up' : t.twoStep ? 'Routine alarm' : 'Alarm'}
           value={t.noAlarm ? formatTime(t.wake) : formatTime(a.alarm.alarm)}
           sub={t.noAlarm ? 'no alarm' : t.twoStep ? `then up ${formatTime(t.wake)}` : a.alarm.onBoundary ? 'cycle-timed' : undefined}
         />
-        <Stat label="Sleep" value={first ? formatDuration(first.sleepMin) : formatDuration(t.inBedMin)} sub={`you need ${formatDuration(a.need.needMin)}`} />
+        <Stat label="Sleep" value={first ? formatDuration(first.sleepMin) : formatDuration(t.inBedMin)} sub={`need ${formatDuration(a.need.needMin)}`} />
       </Row>
 
       {t.adjusted ? (
@@ -48,8 +48,8 @@ export function TonightPanel({ a }: { a: Analysis }) {
       {!t.noAlarm ? (
         <Text style={[font.tiny, { marginTop: 6 }]}>
           {a.alarm.onBoundary
-            ? `Cycle-timed alarm: wakes you at the end of a sleep cycle (your ${ordinal(a.alarm.cycles)}), in the 30 minutes before ${formatTime(t.twoStep?.firstWake ?? t.wake)} — you feel less groggy. Uses your ${a.cycleMin}-min cycles and ${Math.round(a.latencyMin)} min to fall asleep.`
-            : `No sleep cycle ends in the 30 minutes before ${formatTime(t.twoStep?.firstWake ?? t.wake)}, so the alarm stays at ${formatTime(a.alarm.alarm)}.`}
+            ? `Rings at the end of your ${ordinal(a.alarm.cycles)} sleep cycle, in the 30 min before ${formatTime(t.twoStep?.firstWake ?? t.wake)}, so you wake less groggy (${a.cycleMin}-min cycles, ~${Math.round(a.latencyMin)} min to fall asleep).`
+            : `No sleep cycle ends in the 30 min before ${formatTime(t.twoStep?.firstWake ?? t.wake)}, so the alarm stays at ${formatTime(a.alarm.alarm)}.`}
           {t.twoStep ? ` Then back to bed — the final alarm rings at ${formatTime(t.wake)}.` : ''}
         </Text>
       ) : null}
@@ -57,9 +57,13 @@ export function TonightPanel({ a }: { a: Analysis }) {
         onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'alarms' } })}
         hitSlop={6}
         accessibilityRole="link"
-        style={{ marginTop: 6 }}
+        style={({ pressed }) => [{ marginTop: space.sm, minHeight: 32, justifyContent: 'center' }, pressed ? { opacity: 0.7 } : null]}
       >
-        <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Alarm sound, watch buzz and backup → Settings</Text>
+        <Row gap={6}>
+          <Icon name="cog-outline" size={16} color={colors.accent} />
+          <Text style={[font.small, { color: colors.accent, fontWeight: '600', flex: 1 }]}>Alarm sound, watch buzz and backup</Text>
+          <Icon name="chevron-right" size={18} color={colors.accent} />
+        </Row>
       </Pressable>
 
       {first ? (
@@ -68,7 +72,13 @@ export function TonightPanel({ a }: { a: Analysis }) {
         </View>
       ) : null}
 
-      <Pressable onPress={() => setWhy(!why)} accessibilityRole="button" accessibilityState={{ expanded: why }} style={{ marginTop: space.md }} hitSlop={6}>
+      <Pressable
+        onPress={() => setWhy(!why)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: why }}
+        style={{ marginTop: space.sm, minHeight: 32, justifyContent: 'center' }}
+        hitSlop={6}
+      >
         <Row gap={4}>
           <Icon name="help-circle-outline" size={17} color={colors.accent} />
           <Text style={[font.small, { color: colors.accent, fontWeight: '600', flex: 1 }]}>Why these times?</Text>

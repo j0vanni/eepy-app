@@ -77,7 +77,7 @@ export function DataSourcesSection() {
               icon={o.likelyWatch ? 'watch' : 'cellphone'}
               title={o.label}
               sub={`${o.sessions} sessions${o.staged ? ' · with sleep stages' : ' · no stages'} · ${o.origin}`}
-              right={settings.preferredOrigins[0] === o.origin ? <Text style={[font.tiny, { color: colors.accent }]}>PREFERRED</Text> : undefined}
+              right={settings.preferredOrigins[0] === o.origin ? <Text style={[font.label, { color: colors.accent }]}>PREFERRED</Text> : undefined}
               onPress={() => setSettings({ preferredOrigins: [o.origin, ...settings.preferredOrigins.filter((x) => x !== o.origin)] })}
             />
           ))}
