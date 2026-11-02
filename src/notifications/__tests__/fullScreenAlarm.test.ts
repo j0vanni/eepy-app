@@ -113,12 +113,12 @@ describe('cycle-timed wake alarm', () => {
     await syncWakeAlarm(analysis, state, now);
     await syncWakeAlarm(analysis, state, now + MINUTE);
     expect(mockNative.scheduleAlarm).toHaveBeenCalledTimes(1);
-    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, analysis.alarm.alarm, 'Good morning ☀️', expect.any(String), 'eepy://checkin');
+    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, analysis.alarm.alarm, 'Good morning ☀️', expect.any(String), 'eepy://checkin?up=alarm');
 
     const moved = { ...analysis, alarm: { ...analysis.alarm, alarm: analysis.alarm.alarm + 15 * MINUTE } };
     await syncWakeAlarm(moved, state, now + 2 * MINUTE);
     expect(mockNative.scheduleAlarm).toHaveBeenCalledTimes(2);
-    expect(mockNative.scheduleAlarm).toHaveBeenLastCalledWith(WAKE_ALARM_ID, moved.alarm.alarm, expect.any(String), expect.any(String), 'eepy://checkin');
+    expect(mockNative.scheduleAlarm).toHaveBeenLastCalledWith(WAKE_ALARM_ID, moved.alarm.alarm, expect.any(String), expect.any(String), 'eepy://checkin?up=alarm');
     expect(mockNative.cancelAlarm).not.toHaveBeenCalled();
   });
 

@@ -41,6 +41,7 @@ internal object AppShortcuts {
   private fun iconRes(name: String): Int {
     return when (name) {
       "coffee" -> R.drawable.eepy_shortcut_coffee
+      "inbed" -> R.drawable.eepy_shortcut_inbed
       "nap" -> R.drawable.eepy_shortcut_nap
       "late" -> R.drawable.eepy_shortcut_late
       else -> R.drawable.eepy_shortcut_checkin

@@ -21,6 +21,9 @@ describe('parseQuickAction', () => {
     expect(parseQuickAction('tonight')).toBe('late');
     expect(parseQuickAction('check-in')).toBe('checkin');
     expect(parseQuickAction('sounds')).toBe('sounds');
+    expect(parseQuickAction('inbed')).toBe('inbed');
+    expect(parseQuickAction('In-Bed')).toBe('inbed');
+    expect(parseQuickAction('bed')).toBe('inbed');
     expect(parseQuickAction('')).toBeUndefined();
     expect(parseQuickAction('bogus')).toBeUndefined();
     expect(parseQuickAction(undefined)).toBeUndefined();
@@ -35,9 +38,9 @@ describe('parseQuickAction', () => {
 });
 
 describe('app-icon shortcuts', () => {
-  it('are the four one-tap actions, each on its own eepy:// link', () => {
-    expect(APP_SHORTCUTS.map((s) => s.longLabel)).toEqual(['Log my usual coffee', 'Start a nap', 'Running late', 'Check in']);
-    expect(APP_SHORTCUTS.map((s) => s.link)).toEqual(['eepy://quick/coffee', 'eepy://quick/nap', 'eepy://quick/late', 'eepy://quick/checkin']);
+  it('are the five one-tap actions, each on its own eepy:// link — "I\'m in bed" among the first four', () => {
+    expect(APP_SHORTCUTS.map((s) => s.longLabel)).toEqual(['Log my usual coffee', "I'm in bed", 'Start a nap', 'Running late', 'Check in']);
+    expect(APP_SHORTCUTS.map((s) => s.link)).toEqual(['eepy://quick/coffee', 'eepy://quick/inbed', 'eepy://quick/nap', 'eepy://quick/late', 'eepy://quick/checkin']);
     expect(new Set(APP_SHORTCUTS.map((s) => s.id)).size).toBe(APP_SHORTCUTS.length);
     // Launchers truncate long short labels.
     for (const s of APP_SHORTCUTS) expect(s.shortLabel.length).toBeLessThanOrEqual(12);
@@ -120,6 +123,16 @@ describe('decideQuickAction', () => {
     expect(decideQuickAction('checkin', base, now)).toEqual({ redirect: '/checkin' });
     expect(decideQuickAction('sounds', base, now)).toEqual({ sheet: 'sounds' });
     expect(decideQuickAction(undefined, base, now)).toEqual({ redirect: '/' });
+  });
+
+  it('"I\'m in bed" starts the session in the evening and at night — else shows the one running, or the Nap coach', () => {
+    expect(decideQuickAction('inbed', { ...base, inBed: { open: false, available: true } }, now)).toEqual({ sheet: 'inbed' });
+    expect(decideQuickAction('inbed', { ...base, inBed: { open: true, available: true } }, now)).toEqual({ sheet: 'inbed-open' });
+    // The middle of the day: that's a nap.
+    expect(decideQuickAction('inbed', { ...base, inBed: { open: false, available: false } }, now)).toEqual({ redirect: '/nap' });
+    // No plan yet (no nights): Today explains how to get started.
+    expect(decideQuickAction('inbed', base, now)).toEqual({ redirect: '/' });
+    expect(decideQuickAction('inbed', { ...base, onboarded: false, inBed: { open: false, available: true } }, now)).toEqual({ redirect: '/onboarding' });
   });
 
   it('is decided at the time of the tap', () => {

@@ -59,6 +59,8 @@ const SOURCE_LABEL: Record<BoundarySource, string> = {
   journal: 'journal',
   caffeine: 'drink log',
   steps: 'steps',
+  up: 'your tap',
+  inbed: 'your tap',
 };
 
 const CONFIDENCE_COLOR: Record<Confidence, string> = { high: colors.good, medium: colors.textDim, low: colors.warn };
@@ -209,18 +211,24 @@ export function NightTimelineCard({ m, t }: { m: SessionMetrics; t?: NightTimeli
     ...t.onsetEvidence.filter((e) => t.onsetShiftMin < 10 || e !== t.onsetEvidence[0]),
   ].filter(Boolean);
   const late = t.askLate && t.usualWakeMin !== undefined ? clockDiff(t.usualWakeMin, minutesOfDay(t.woke.time)) : 0;
+  // "I'm in bed" (engine/wakeDetect.ts rule 14): your tap, and where the recording began if elsewhere.
+  const inBedBits =
+    t.inBed.source === 'inbed'
+      ? ['you tapped In bed', Math.abs(t.inBed.time - rec.start) >= MINUTE ? `${who.toLowerCase().replace('your ', 'the ')} started at ${formatTime(rec.start)}` : undefined].filter(Boolean)
+      : [];
   const tail = (t.outOfBed.time - t.woke.time) / MINUTE;
   const outBits = [
     t.upEvidence.join(', '),
     tail >= 1 ? `${formatDuration(tail)} awake in bed first` : undefined,
     t.trimmedMin >= 1 ? `recording ran on to ${formatTime(rec.end)}` : undefined,
+    t.outOfBed.time - rec.end >= MINUTE ? `recording ended ${formatTime(rec.end)}` : undefined,
   ].filter(Boolean);
   const shown = t.episodes.slice(0, MAX_EPISODES);
   const routine = t.routine;
   return (
     <Card>
       <CardTitle icon="timeline-clock-outline" title="Your night, step by step" />
-      <Step color={colors.textFaint} label="In bed" time={formatTime(t.inBed.time)} b={t.inBed} />
+      <Step color={colors.textFaint} label="In bed" time={formatTime(t.inBed.time)} detail={inBedBits.join(' · ') || undefined} b={t.inBed} />
       <Step color={colors.light} label="Fell asleep" time={formatTime(t.asleep.time)} detail={asleepBits.join(' · ') || undefined} b={t.asleep} />
       {shown.map((e) =>
         e.routine ? (

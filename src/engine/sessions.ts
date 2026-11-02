@@ -237,6 +237,12 @@ export interface SessionAnalyzeOptions {
 }
 
 /**
+ * Origin of a night saved from your "I'm in bed" / "I'm up" taps (engine/inBed.ts): a manual log,
+ * but only an estimate — the watch's night replaces it when it arrives.
+ */
+export const TAPS_ORIGIN = 'eepy.taps';
+
+/**
  * Removes duplicate recordings of the same sleep (e.g. phone + watch both writing to Health Connect),
  * keeping the most trustworthy one.
  */
@@ -244,7 +250,8 @@ export function dedupeSessions(sessions: SleepSession[], preferredOrigins: strin
   const score = (s: SleepSession) => {
     const idx = s.origin ? preferredOrigins.indexOf(s.origin) : -1;
     const pref = idx >= 0 ? 1000 - idx * 10 : 0;
-    const manual = s.source === 'manual' ? 500 : 0; // explicit user edits win over automatic data
+    // Explicit user edits win over automatic data; a night estimated from your taps doesn't.
+    const manual = s.source === 'manual' && s.origin !== TAPS_ORIGIN ? 500 : 0;
     const staged = s.stages.some((x) => x.stage === 'light' || x.stage === 'deep' || x.stage === 'rem') ? 100 : 0;
     return pref + manual + staged + (s.end - s.start) / (60 * MINUTE);
   };

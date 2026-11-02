@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,8 +7,9 @@ import { caffeineAt } from '@/engine/caffeine';
 import { drinkOptions, frequentDrinks, relativeTimeOptions, usualCaffeine, usualDose } from '@/engine/caffeineHabits';
 import { TAG_BY_ID } from '@/engine/tags';
 import { addDays, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
+import { endInBedSession } from '@/state/inBed';
 import { useStore } from '@/state/store';
-import { useNow } from '@/state/useAnalysis';
+import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Chip, Icon, Row, Screen, Section } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
 import { EnterView } from '@/ui/motion';
@@ -43,6 +44,9 @@ interface Toast {
 }
 
 export default function CheckInSheet() {
+  // `up`: opened by the wake alarm's "I'm up" (alarm = the full-screen alarm, watch = the watch buzz).
+  const { up } = useLocalSearchParams<{ up?: string }>();
+  const analysis = useAnalysis();
   const now = useNow(5000);
   // The "living" day: before 4am still counts as yesterday.
   const day = minutesOfDay(now) < 240 ? addDays(dateKey(now), -1) : dateKey(now);
@@ -66,6 +70,12 @@ export default function CheckInSheet() {
   const [agoMin, setAgoMin] = useState(0);
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
+  // "I'm up" on the wake alarm ends tonight's sleep session (sleep mode and sounds off) — once.
+  useEffect(() => {
+    if (up === 'alarm' || up === 'watch') endInBedSession(up, analysis).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [up]);
 
   // Log several things in one go: only the toast goes away, the sheet stays until Done.
   useEffect(() => {

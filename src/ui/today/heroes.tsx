@@ -4,7 +4,10 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/engine/dayPhase';
+import { isOpen, justNow, tapsNightOffer } from '@/engine/inBed';
 import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
+import { sessionFor } from '@/state/inBed';
+import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
 import { CalendarNote } from '@/ui/cards/CalendarNote';
@@ -16,14 +19,20 @@ import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components
 import { EnterView } from '@/ui/motion';
 import { colors, font, radius, space } from '@/ui/theme';
 import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, until, UsualCoffeeCard } from './cards';
+import { InBedButton, SessionHeader, TapsNightCard } from './InBed';
 
 type HeroProps = { a: Analysis; now: number };
 
 export function MorningHero({ a, now }: HeroProps) {
+  const session = useStore((s) => s.settings.session);
+  // No watch night, but you tapped "I'm in bed" and "I'm up": offer those times instead.
+  const fromTaps = !!tapsNightOffer(session, { day: a.day, lastNightIsCurrent: a.lastNightIsCurrent, latencyMin: a.latencyMin });
   return (
     <>
       {a.lastNightIsCurrent ? (
         <LastNightCard a={a} hero />
+      ) : fromTaps ? (
+        <TapsNightCard a={a} />
       ) : (
         <Card>
           <CardTitle icon="bed-outline" title="Last night" />
@@ -43,6 +52,7 @@ export function MorningHero({ a, now }: HeroProps) {
 export function DayHero({ a, now }: HeroProps) {
   return (
     <>
+      <TapsNightCard a={a} />
       <EnergyCard a={a} now={now} hero />
       <UsualCoffeeCard />
       <NapCard a={a} />
@@ -56,6 +66,8 @@ function CountdownCard({ a }: { a: Analysis }) {
   const now = useNow(1000);
   const { windDownStart, bedtime } = a.tonight;
   const winding = now >= windDownStart;
+  // From wind-down: the one tap that starts the night (unless you already did).
+  const inBed = useStore((s) => isOpen(sessionFor(s.settings.session, a)));
   const eveningStart = windDownStart - PHASE.eveningLeadH * HOUR;
   const progress = Math.max(0, Math.min(1, (now - eveningStart) / (bedtime - eveningStart)));
   return (
@@ -71,6 +83,7 @@ function CountdownCard({ a }: { a: Analysis }) {
           {a.tonight.adjusted ? `Adjusted for tonight (plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}) · change` : `Can't make ${formatTime(bedtime)}? Adjust tonight`}
         </Text>
       </Pressable>
+      {winding && !inBed ? <InBedButton a={a} /> : null}
       <View style={{ marginTop: space.md }}>
         <Meter value={progress} max={1} color={colors.light} height={6} />
       </View>
@@ -125,8 +138,16 @@ export function EveningHero({ a, now }: HeroProps) {
 
 const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
 
-/** Dimmed, minimal view after lights-out: when to wake if you fall asleep now. */
+/**
+ * Dimmed, minimal view after lights-out: the big "I'm in bed" (or, once tapped, the running sleep
+ * session) and when to wake if you fall asleep now.
+ */
 export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput }) {
+  const stored = useStore((s) => s.settings.session);
+  const session = sessionFor(stored, a);
+  // The session header covers a session that runs, or ended a moment ago (its Undo) — on its own 10-s clock.
+  const clock = useNow(10_000);
+  const showSession = !!session && (isOpen(session) || (session.closed === 'up' && justNow(session.closedAt, clock)));
   const afterBedtime = now >= input.bedtime;
   const alarm = nightWakeTarget(now, input);
   // The smart alarm sits in a window before the target wake-up; anything up to the target is fine.
@@ -139,19 +160,28 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
   const shown = [...fitting.slice(-3), ...(late && fitting.length ? [late] : [])];
   return (
     <EnterView>
-      <View style={{ alignItems: 'center', paddingVertical: space.lg }}>
-        <Icon name="moon-waning-crescent" size={44} color={colors.light} />
-        <Text style={[font.h1, { color: colors.textDim, marginTop: space.sm }]}>Time to sleep</Text>
-        <Text style={[font.small, { textAlign: 'center', marginTop: 4 }]}>
-          It's {formatTime(now)}
-          {afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm {formatTime(alarm)}
-        </Text>
-        {afterBedtime ? (
-          <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
-            <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Still up? Re-plan the rest of the night</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      {showSession ? (
+        <SessionHeader a={a} />
+      ) : (
+        <View style={{ alignItems: 'center', paddingTop: space.lg, paddingBottom: space.md }}>
+          <Icon name="moon-waning-crescent" size={44} color={colors.light} />
+          <Text style={[font.h1, { color: colors.textDim, marginTop: space.sm }]}>Time to sleep</Text>
+          <Text style={[font.small, { textAlign: 'center', marginTop: 4 }]}>
+            It's {formatTime(now)}
+            {afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm {formatTime(alarm)}
+          </Text>
+          {afterBedtime ? (
+            <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
+              <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Still up? Re-plan the rest of the night</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+      {showSession ? null : (
+        <View style={{ marginBottom: space.lg }}>
+          <InBedButton a={a} night />
+        </View>
+      )}
       <Card style={NIGHT_CARD} animate={false}>
         <Text style={[font.small, { color: colors.textDim }]}>If you fall asleep now (≈{Math.round(a.latencyMin)} min to drift off), wake at the end of a cycle:</Text>
         {fitting.length === 0 ? (
@@ -201,7 +231,7 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
           <Icon name="chevron-right" color={colors.textFaint} />
         </Row>
       </Card>
-      {afterBedtime && now - input.bedtime > 2 * HOUR ? (
+      {afterBedtime && !showSession && now - input.bedtime > 2 * HOUR ? (
         <Note tone="info" icon="clock-outline">
           You're up {formatDuration((now - input.bedtime) / MINUTE)} past lights-out. Keep the screen short and dim.
         </Note>

@@ -3,6 +3,8 @@ import { useCallback, useContext, useState } from 'react';
 import { ActivityIndicator, RefreshControl, View } from 'react-native';
 
 import { dayPhase, DayPhase, phaseInputFor } from '@/engine/dayPhase';
+import { isOpen } from '@/engine/inBed';
+import { sessionFor } from '@/state/inBed';
 import { useStore } from '@/state/store';
 import { runSync } from '@/state/sync';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
@@ -28,6 +30,7 @@ import {
   TonightCard,
 } from '@/ui/today/cards';
 import { DayHero, EveningHero, MorningHero, NightMoreToggle, NightView } from '@/ui/today/heroes';
+import { UpCard } from '@/ui/today/InBed';
 import { QuickActions } from '@/ui/today/QuickActions';
 import { RoutineMorningNow } from '@/ui/cards/RoutineMorningNow';
 import { NightChromeContext } from '@/ui/QuickCheckInButton';
@@ -44,8 +47,12 @@ export default function Today() {
   const [syncMsg, setSyncMsg] = useState<string>();
   const [nightMore, setNightMore] = useState(false);
   const setNightChrome = useContext(NightChromeContext);
+  const session = useStore((s) => s.settings.session);
+  // In bed ("I'm in bed") a little before lights-out is night too: the calm view, the + and tab bar dimmed.
+  const inBed = !!a && isOpen(sessionFor(session, a));
+  const phaseNow = a ? dayPhase(now, phaseInputFor(a, profile)) : undefined;
   // Known before the early return below, so the hook order never changes.
-  const nightNow = !!a && dayPhase(now, phaseInputFor(a, profile)) === 'night';
+  const nightNow = phaseNow === 'night' || (inBed && phaseNow === 'evening');
   // While the night view is on screen, the floating button and tab bar dim too.
   useFocusEffect(
     useCallback(() => {
@@ -91,8 +98,8 @@ export default function Today() {
 
   const input = phaseInputFor(a, profile);
   const phase = dayPhase(now, input);
-  const night = phase === 'night';
-  const preDawn = night && now < input.bedtime;
+  const night = phase === 'night' || (inBed && phase === 'evening');
+  const preDawn = night && now < input.bedtime && phase === 'night';
 
   const notes = (
     <>
@@ -140,8 +147,8 @@ export default function Today() {
 
   return (
     <Screen
-      title={night ? (preDawn ? 'Still night' : 'Up late') : greeting(now)}
-      subtitle={`${night ? (preDawn ? 'Early morning' : 'Tonight') : `${dayLabel(a.day)} · ${PHASE_LABEL[phase]}`}${settings.lastSync ? ` · synced ${relativeTime(settings.lastSync, now)}` : ''}`}
+      title={night ? (inBed ? 'Good night' : preDawn ? 'Still night' : 'Up late') : greeting(now)}
+      subtitle={`${night ? (inBed ? 'Sleep session' : preDawn ? 'Early morning' : 'Tonight') : `${dayLabel(a.day)} · ${PHASE_LABEL[phase]}`}${settings.lastSync ? ` · synced ${relativeTime(settings.lastSync, now)}` : ''}`}
       right={header}
       tone={night ? 'night' : 'default'}
       refreshControl={settings.dataMode === 'live' ? <RefreshControl refreshing={syncing} onRefresh={sync} tintColor={colors.accent} /> : undefined}
@@ -158,7 +165,9 @@ export default function Today() {
       ) : (
         <>
           <RoutineMorningNow a={a} />
-          <QuickActions phase={phase} />
+          {/* Still in bed from last night: "I'm up" first. */}
+          <UpCard a={a} />
+          <QuickActions phase={phase} a={a} now={now} />
           <RecoveryAlertCard analysis={a} />
           {/* Keyed by phase so the hero re-enters when the day moves on. */}
           <View key={phase}>

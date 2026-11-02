@@ -10,6 +10,7 @@ import { addDays, dateKey, formatClock, formatDuration, formatTime, normalizeMin
 import type { DayWakePlan } from '@/engine/types';
 import type { UpcomingNight } from '@/engine/weekPlan';
 import { useStore } from '@/state/store';
+import { useAnalysis } from '@/state/useAnalysis';
 import { Button, Note, Row, Segmented, Stat, Stepper } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
@@ -120,7 +121,9 @@ export function NightBeforeStats({ night, needMin, isTonight }: { night: Upcomin
 }
 
 export function AdjustTonightButton({ primary }: { primary?: boolean }) {
-  const adjusted = useStore((s) => !!s.settings.tonight);
+  const a = useAnalysis();
+  // Only tonight's own times count (an earlier night's override — e.g. from "I'm in bed" — is ignored by the plan).
+  const adjusted = useStore((s) => !!s.settings.tonight && (!a || s.settings.tonight.wakeDate === a.tonight.wakeDate));
   return (
     <View style={{ marginTop: space.sm, alignItems: primary ? 'stretch' : 'flex-start' }}>
       <Button

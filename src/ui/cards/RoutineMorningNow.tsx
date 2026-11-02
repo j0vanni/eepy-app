@@ -5,7 +5,8 @@
  * time. The routine alarm's "I'm up" opens Today (fullScreenAlarm.ROUTINE_ALARM_LINK).
  *
  * Skipping uses WAKE_FINAL_SKIP_MARK: only the final alarm, and the morning isn't treated as a free
- * one. It re-plans the alarms right away and switches the phone's sleep mode off (on again on Undo).
+ * one. It re-plans the alarms right away and switches the phone's sleep mode off (on again on Undo),
+ * and ends a running sleep session ("I'm up"; Undo opens it again).
  */
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -15,6 +16,7 @@ import { formatTime } from '@/engine/time';
 import { routineNow, syncWakeAlarm, WAKE_FINAL_SKIP_MARK } from '@/notifications/fullScreenAlarm';
 import { replanNotifications } from '@/notifications/scheduler';
 import { hasSleepMode, startSleepModeNow, stopSleepModeNow } from '@/notifications/sleepMode';
+import { endInBedSession, undoEndInBedSession } from '@/state/inBed';
 import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Card, Icon, Row } from '@/ui/components';
@@ -48,6 +50,8 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
     if (skip) confirmHaptic();
     setMark(WAKE_FINAL_SKIP_MARK, skip ? r.date : undefined);
     replan();
+    // Staying up: that's "I'm up" for tonight's sleep session too.
+    await (skip ? endInBedSession('routine', analysis) : undoEndInBedSession()).catch(() => undefined);
     // Up for the day: lights on. Back to bed: sleep mode again until the final alarm.
     if (hasSleepMode() && settings.sleepMode.enabled) {
       await (skip ? stopSleepModeNow(r.date) : startSleepModeNow(r.date, r.finalAt)).catch(() => false);

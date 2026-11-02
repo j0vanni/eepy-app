@@ -394,6 +394,24 @@ A pass over every screen for one calm, consistent look. Nothing was removed.
 
 ---
 
+## NEW — I'm in bed
+
+*"Can you add an in bed button, to start the sleep sesh?"* One tap starts the night; "I'm up" ends it.
+
+| | Feature |
+| --- | --- |
+| ✅ | **"I'm in bed"** — a big button on Today from the start of wind-down (in the countdown card, and the last quick-action tile), in the night view and on the wind-down screen, with a small remembered **Start sleep sounds** switch (on by default) |
+| ✅ | **The tap is tonight's lights-out**: ≥ 10 min off the plan, it becomes the one-night "Adjust tonight" override, so the cycle-timed alarm counts its sleep cycles from the tap — still in the 30 min before your wake-up, never later; your wake-up (or one you moved yourself) stays. Two-step mornings keep working: the routine alarm is the cycle-timed first ring, the final alarm stays at the wake-up (lights-out too close to the routine → one alarm). After 4am the session belongs to this morning and nothing is re-timed |
+| ✅ | **Starts what helps**: your default sleep sound with its timer (unless something is already playing), and — with bedtime autopilot on — the phone's sleep mode until the alarm's first ring. Tonight's wind-down, lights-out, screens-off and phone-light reminders go quiet (the planners check the open session) and any already on screen are cleared |
+| ✅ | **Calm confirmation**: *"Sleep session started 10:45 PM · Alarm 6:34 AM (5 cycles) · sleep mode on · Brown noise · 45 min"* with **Undo** for two minutes (puts tonight's plan and your own adjustment back, forgets the tap, stops the sound and sleep mode it started); then *"In bed since 10:45 PM"* with **End session** / **Cancel**. Today switches to the dimmed night view ("Good night"), with the **+** and tab bar dimmed |
+| ✅ | **"I'm up"** on Today in the morning (big button), from the full-screen alarm's and the watch buzz's "I'm up" (the check-in ends the session), and "Staying up? Skip the alarm" on a two-step morning: records when you got up, stops sleep sounds and sleep mode; Undo opens the session again. Alarms are never silenced by it — one still to ring rings. A session nobody ended closes by itself 3 h after the wake-up (noon at the latest) |
+| ✅ | **Accuracy** (wake-up detection rules 14–15): "I'm in bed" starts time in bed — earlier than the watch's recording adds time awake in bed, later leaves out what came before — and sleep onset is never earlier than the tap + 5 min; "I'm up" is a high-confidence sign of getting up, with the same went-back-to-sleep guard (deep/REM after it), no corroboration needed on unstaged nights, and up to 45 min after the recording (no walking in between) it ends the night there. "Your night, step by step" shows *"In bed 12:10 AM — you tapped In bed · the watch started at 12:35 AM"* |
+| ✅ | **"Save last night from your taps"**: no watch night for that morning → in bed → up as a manual night with your usual time to fall asleep, in one tap; the watch's night replaces it if it arrives later |
+| ✅ | **"I'm in bed" on the wind-down / lights-out notifications and the live wind-down card** (next to "Running late"), the `eepy://quick/inbed` one-tap sheet (with Undo; in the middle of the day it opens the Nap coach) and a long-press **app-icon shortcut** ("In bed", second, so launchers that show four keep it). Search: "in bed", "sleep session" |
+| 🧪 | On a phone: sleep mode switching on at the tap and off at the alarm, Undo letting the autopilot switch it on again at lights-out (new native `undoSleepModeStart`; older APKs fall back to Stop, which keeps it off that night), the notification button cold-starting eepy into the sheet, the full-screen alarm's "I'm up" link (`eepy://checkin?up=alarm`, from the next alarm scheduled), the new shortcut icon, and sounds starting from a notification tap |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

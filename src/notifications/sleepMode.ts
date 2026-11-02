@@ -138,6 +138,19 @@ export async function stopSleepModeNow(night: string): Promise<boolean> {
   return (await native()?.stopSleepModeNow(night).catch(() => false)) ?? false;
 }
 
+/**
+ * Undo of a "Start now" ("I'm in bed" cancelled): off now, and the night's own plan can switch it on
+ * again at its time (the next syncSleepMode re-sends it). APKs without the native call: Stop now.
+ */
+export async function undoSleepModeStart(night: string): Promise<boolean> {
+  const n = native();
+  if (!n) return false;
+  if (typeof n.undoSleepModeStart !== 'function') return stopSleepModeNow(night);
+  const ok = await n.undoSleepModeStart(night).catch(() => false);
+  resetSleepModeMemo();
+  return ok;
+}
+
 /** Removes the "Sleep mode on — play sleep sounds?" notification (the sounds were started). */
 export async function dismissSleepModePrompt(): Promise<void> {
   await native()?.dismissSleepModePrompt().catch(() => undefined);

@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { pruneSpo2Curves } from '../engine/breathing';
 import type { DrinkPreset } from '../engine/caffeine';
+import type { InBedSession } from '../engine/inBed';
 import type { TonightOverride } from '../engine/schedule';
 import type { CalibrationResult } from '../engine/calibration';
 import type { CbtiProgram } from '../engine/cbti';
@@ -129,6 +130,10 @@ export interface Settings {
   customDrinks: DrinkPreset[];
   /** "Adjust tonight": this night's own bedtime / wake-up (ignored once that night is over). */
   tonight?: TonightOverride;
+  /** The sleep session: "I'm in bed" → "I'm up" (engine/inBed.ts, state/inBed.ts); the last one stays until the next starts. */
+  session?: InBedSession;
+  /** "I'm in bed" also starts your default sleep sound with its timer (on when missing). */
+  inBedSounds?: boolean;
   /** Dim and warm eepy itself in the evening (its own window only). */
   screenDim: boolean;
   /** Wind-down timeline: screens off this many minutes before lights-out. */

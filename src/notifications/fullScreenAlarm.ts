@@ -24,7 +24,8 @@ export const WAKE_ALARM_ID = 'eepy-wake';
 export const WAKE_ROUTINE_ALARM_ID = 'eepy-wake-routine';
 /** Where "I'm up" takes you (expo-router routes /nap and /checkin). */
 export const NAP_ALARM_LINK = 'eepy://nap';
-export const WAKE_ALARM_LINK = 'eepy://checkin';
+/** `up=alarm`: the check-in logs the "I'm up" and ends tonight's sleep session (state/inBed.ts). */
+export const WAKE_ALARM_LINK = 'eepy://checkin?up=alarm';
 /** The routine alarm's "I'm up" opens Today (the routine card), not "How did you sleep?". */
 export const ROUTINE_ALARM_LINK = 'eepy://';
 /** Mirrors AlarmSpec.SNOOZE_MINUTES in the native module. */

@@ -38,13 +38,13 @@ afterAll(() => {
 });
 
 describe('app-icon shortcuts', () => {
-  it('publishes the four shortcuts once per app start', async () => {
+  it('publishes the five shortcuts once per app start', async () => {
     expect(await refreshAppShortcuts()).toBe(true);
     await refreshAppShortcuts();
     expect(mockNative.setShortcuts).toHaveBeenCalledTimes(1);
     const sent = JSON.parse(mockNative.setShortcuts.mock.calls[0][0]);
     expect(sent).toEqual(APP_SHORTCUTS);
-    for (const s of sent) expect(s.link).toMatch(/^eepy:\/\/quick\/(coffee|nap|late|checkin)$/);
+    for (const s of sent) expect(s.link).toMatch(/^eepy:\/\/quick\/(coffee|inbed|nap|late|checkin)$/);
   });
 
   it('tries again next time when Android refused (rate limit) or the call failed', async () => {

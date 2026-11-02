@@ -1,11 +1,13 @@
 /**
  * eepy://quick/<action> — one-tap actions from the long-press app-icon shortcuts, the "Log coffee"
- * Quick Settings tile and the sleep-mode "play sleep sounds?" notification. A small sheet over
- * whatever was open (see src/shortcuts/quickActions.ts for what each action decides):
+ * Quick Settings tile, the sleep-mode "play sleep sounds?" notification and the "I'm in bed" button
+ * on the wind-down / lights-out notifications. A small sheet over whatever was open (see
+ * src/shortcuts/quickActions.ts for what each action decides):
  * - coffee: logs the usual drink at its usual time, with Undo and Change time, then closes itself
  * - nap: offers the recommended nap right away, or opens the Nap coach
  * - late → Adjust tonight, checkin → Quick check-in
  * - sounds: starts the default sleep sound with its timer
+ * - inbed: starts the sleep session ("Sleep session started 11:42 PM · alarm 6:52 AM"), with Undo
  */
 import { Redirect, router, useCanGoBack, useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -16,11 +18,13 @@ import { soundPlayer } from '@/audio/player';
 import { usePlayback } from '@/audio/useSoundPlayer';
 import type { UsualCaffeine } from '@/engine/caffeineHabits';
 import type { NapOption } from '@/engine/nap';
+import { isOpen, sessionDetails } from '@/engine/inBed';
 import { formatTime, MINUTE } from '@/engine/time';
 import type { CaffeineDose } from '@/engine/types';
 import { startNapTimer } from '@/notifications/alarms';
 import { dismissSleepModePrompt, sleepSoundsLabel } from '@/notifications/sleepMode';
 import { anotherDose, decideQuickAction, parseQuickAction, type QuickDecision } from '@/shortcuts/quickActions';
+import { cancelInBedSession, inBedAvailable, sessionAlarm, sessionFor, startInBedSession } from '@/state/inBed';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { Button, Icon, IconButton, Row } from '@/ui/components';
@@ -34,7 +38,9 @@ type Sheet =
   | { kind: 'logged'; dose: CaffeineDose; usual: UsualCaffeine; undone: boolean }
   | { kind: 'already'; dose: CaffeineDose; usual: UsualCaffeine }
   | { kind: 'nap'; option: NapOption; headline: string }
-  | { kind: 'sounds' };
+  | { kind: 'sounds' }
+  /** `already`: the session was running before this tap (nothing started). */
+  | { kind: 'inbed'; already: boolean; undone: boolean };
 
 function initialSheet(d: QuickDecision): Sheet | undefined {
   if ('redirect' in d) return undefined;
@@ -47,6 +53,9 @@ function initialSheet(d: QuickDecision): Sheet | undefined {
       return { kind: 'nap', option: d.option, headline: d.headline };
     case 'sounds':
       return { kind: 'sounds' };
+    case 'inbed':
+    case 'inbed-open':
+      return { kind: 'inbed', already: d.sheet === 'inbed-open', undone: false };
   }
 }
 
@@ -62,15 +71,18 @@ export default function QuickActionScreen() {
   const addCaffeine = useStore((s) => s.addCaffeine);
   const removeCaffeine = useStore((s) => s.removeCaffeine);
   const audio = useStore((s) => s.settings.audio);
+  const settings = useStore((s) => s.settings);
   const playback = usePlayback();
 
   // Decided once: re-renders (a new analysis, the logged drink) must not change what this tap meant.
   const [decision] = useState<QuickDecision>(() => {
     const s = useStore.getState();
+    const now = Date.now();
+    const inBed = analysis ? { open: isOpen(sessionFor(s.settings.session, analysis)), available: inBedAvailable(analysis, s.profile, now) } : undefined;
     return decideQuickAction(
       parseQuickAction(params.action),
-      { onboarded: s.profile.onboarded, caffeine: s.caffeine, napRunning: !!s.settings.napTimer, nap: analysis?.nap },
-      Date.now(),
+      { onboarded: s.profile.onboarded, caffeine: s.caffeine, napRunning: !!s.settings.napTimer, nap: analysis?.nap, inBed },
+      now,
     );
   });
   const [sheet, setSheet] = useState<Sheet | undefined>(() => initialSheet(decision));
@@ -94,13 +106,19 @@ export default function QuickActionScreen() {
       void soundPlayer.play(useStore.getState().settings.audio);
       dismissSleepModePrompt().catch(() => undefined);
       confirmHaptic();
+    } else if (decision.sheet === 'inbed' && analysis) {
+      startInBedSession(analysis).catch((e) => console.warn('in-bed start failed', e));
+      confirmHaptic();
     }
+    // Decided and done once, with the analysis of that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decision, addCaffeine]);
 
   // Confirmations close by themselves.
   useEffect(() => {
     if (!sheet || stay) return;
-    const ms = sheet.kind === 'logged' ? (sheet.undone ? 1200 : 3200) : sheet.kind === 'sounds' ? 2600 : 0;
+    const ms =
+      sheet.kind === 'logged' || sheet.kind === 'inbed' ? (sheet.undone ? 1200 : sheet.kind === 'inbed' ? 4000 : 3200) : sheet.kind === 'sounds' ? 2600 : 0;
     if (!ms) return;
     const id = setTimeout(close, ms);
     return () => clearTimeout(id);
@@ -206,6 +224,51 @@ export default function QuickActionScreen() {
             }}
           />
           <Button small kind="secondary" icon="sleep" label="Nap coach" style={{ flex: 1 }} onPress={() => router.replace('/nap')} />
+        </Row>
+      </>
+    );
+  } else if (sheet.kind === 'inbed') {
+    const s = analysis ? sessionFor(settings.session, analysis) : undefined;
+    const details = s && analysis ? sessionDetails(s, sessionAlarm(analysis, settings, s, Date.now()), { soundsPlaying: playback.status === 'playing' }) : '';
+    body = sheet.undone ? (
+      <Row gap={space.md} style={styles.head}>
+        <Icon name="undo" size={22} color={colors.textDim} />
+        <Text style={[font.body, { flex: 1 }]}>Undone — tonight's plan is back.</Text>
+      </Row>
+    ) : !s ? (
+      <Row gap={space.md} style={styles.head}>
+        <Icon name="moon-waning-crescent" size={22} color={colors.light} />
+        <Text style={[font.body, { flex: 1 }]}>Starting your sleep session…</Text>
+      </Row>
+    ) : (
+      <>
+        <Row gap={space.md} style={[styles.head, { alignItems: 'flex-start' }]}>
+          <Icon name="moon-waning-crescent" size={22} color={colors.light} />
+          <View style={{ flex: 1 }}>
+            <Text style={[font.body, { fontWeight: '600' }]}>
+              {sheet.already ? `In bed since ${formatTime(s.inBedAt)}` : `Sleep session started ${formatTime(s.inBedAt)}`}
+            </Text>
+            <Text style={font.small}>{details ? details[0].toUpperCase() + details.slice(1) : ''}</Text>
+            {sheet.already ? null : <Text style={font.tiny}>Tonight's reminders are off. Sleep well.</Text>}
+          </View>
+        </Row>
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
+          {sheet.already ? (
+            <Button small kind="secondary" icon="weather-night" label="Wind-down" style={{ flex: 1 }} onPress={() => router.replace('/winddown')} />
+          ) : (
+            <Button
+              small
+              kind="secondary"
+              icon="undo"
+              label="Undo"
+              style={{ flex: 1 }}
+              onPress={() => {
+                cancelInBedSession().catch(() => undefined);
+                setSheet({ ...sheet, undone: true });
+              }}
+            />
+          )}
+          <Button small kind="secondary" icon="home-variant-outline" label="Today" style={{ flex: 1 }} onPress={() => router.replace('/')} />
         </Row>
       </>
     );
