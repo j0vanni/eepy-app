@@ -685,7 +685,8 @@ export function correctedMetrics(data: SleepDataset, sessions: SleepSession[], o
     if (!routineCache.has(wakeDate)) routineCache.set(wakeDate, routineWindowFor(data.profile, wakeDate, wakeTargetFor(data.profile, wakeDate)));
     return routineCache.get(wakeDate);
   };
-  const routineWindows = data.profile.twoStepMorning
+  const anyTwoStep = !!data.profile.twoStepMorning || Object.values(data.profile.wakePlan ?? {}).some((p) => p.twoStep);
+  const routineWindows = anyTwoStep
     ? [...new Set(sessions.map((s) => dateKey(s.end)))].map(routineFor).filter((w): w is RoutineWindow => !!w)
     : [];
   const raw = analyzeSessions(sessions, routineWindows.length ? { ...opts, routineWindows: [...(opts.routineWindows ?? []), ...routineWindows] } : opts);

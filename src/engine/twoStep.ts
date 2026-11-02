@@ -12,7 +12,9 @@
  *
  * Which mornings: those with a fixed wake-up (a workday, or a time set in the calendar) on the
  * chosen days (default: your workdays). The gap between the two wake-ups (workday wake-up − first
- * wake-up) is kept before calendar wake-ups; free days never use it.
+ * wake-up) is kept before calendar wake-ups; free days never use it. A single date can switch it on
+ * or off for that morning (`DayWakePlan.twoStep` in the calendar) — on works on any morning with an
+ * alarm, even outside the chosen days or while the weekly setting is off.
  *
  * Wake-up detection (wakeDetect.ts) treats the routine as a planned time awake: it isn't the final
  * wake-up as long as some sleep follows it, it doesn't count as waking in the night or as time
@@ -97,11 +99,30 @@ export interface MorningTarget {
   noAlarm?: boolean;
 }
 
-/** The two-step setting for one morning, if that morning uses it: a fixed wake-up on one of its days. */
-export function twoStepFor(profile: Pick<Profile, 'twoStepMorning' | 'workWakeMin' | 'workdays'>, wakeDate: string, target: MorningTarget): TwoStepConfig | undefined {
+type TwoStepProfile = Pick<Profile, 'twoStepMorning' | 'workWakeMin' | 'workdays'> & Partial<Pick<Profile, 'wakePlan'>>;
+
+/** What a single date in the calendar says: true = routine alarm that morning, false = not that morning, undefined = the weekly setting. */
+export function twoStepChoice(profile: Partial<Pick<Profile, 'wakePlan'>>, wakeDate: string): boolean | undefined {
+  return profile.wakePlan?.[wakeDate]?.twoStep;
+}
+
+/** Whether a morning is two-step by the weekly setting alone (on, valid, a fixed wake-up on one of its days). */
+export function twoStepByWeek(profile: TwoStepProfile, wakeDate: string, target: MorningTarget): boolean {
   const c = twoStepConfig(profile);
-  if (!c || !target.isWorkday || target.noAlarm) return undefined;
-  return c.days.includes(weekdayOfKey(wakeDate)) ? c : undefined;
+  return !!c && target.isWorkday && !target.noAlarm && c.days.includes(weekdayOfKey(wakeDate));
+}
+
+/**
+ * The two-step setting for one morning, if that morning uses it: a fixed wake-up on one of its
+ * days — unless that date says otherwise. A date switched on uses the routine even off its days or
+ * with the weekly setting off (the times must still work); free days (no alarm) never do.
+ */
+export function twoStepFor(profile: TwoStepProfile, wakeDate: string, target: MorningTarget): TwoStepConfig | undefined {
+  if (target.noAlarm) return undefined;
+  const choice = twoStepChoice(profile, wakeDate);
+  if (choice === false) return undefined;
+  if (choice === true) return twoStepConfig({ ...profile, twoStepMorning: { ...twoStepSetting(profile), enabled: true } });
+  return twoStepByWeek(profile, wakeDate, target) ? twoStepConfig(profile) : undefined;
 }
 
 /** A planned two-step morning (all times epoch ms); the final wake-up is the plan's `wake`. */
@@ -228,11 +249,12 @@ function wasOn(s: TwoStepMorning, wakeDate: string): boolean {
 
 /**
  * The routine window for a morning, if it was a two-step morning: on one of its days while the
- * setting was on (from `since`, or in a `past` period), with the current times.
+ * setting was on (from `since`, or in a `past` period), or a date switched on in the calendar,
+ * with the current times. A date switched off never has one.
  */
-export function routineWindowFor(profile: Pick<Profile, 'twoStepMorning' | 'workWakeMin' | 'workdays'>, wakeDate: string, target: MorningTarget): RoutineWindow | undefined {
+export function routineWindowFor(profile: TwoStepProfile, wakeDate: string, target: MorningTarget): RoutineWindow | undefined {
   const s = twoStepSetting(profile);
-  if (!wasOn(s, wakeDate)) return undefined;
+  if (twoStepChoice(profile, wakeDate) !== true && !wasOn(s, wakeDate)) return undefined;
   const c = twoStepFor({ ...profile, twoStepMorning: { ...s, enabled: true } }, wakeDate, target);
   if (!c) return undefined;
   const finalWake = atMinutes(wakeDate, target.wakeMin);

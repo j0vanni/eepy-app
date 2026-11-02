@@ -33,6 +33,7 @@ export default function PlannerScreen() {
   const a = useAnalysis();
   const { show, date } = useLocalSearchParams<{ show?: string; date?: string }>();
   const skippedDate = useStore((s) => s.settings.marks[WAKE_SKIP_MARK]);
+  const twoStepOn = useStore((s) => !!s.profile.twoStepMorning?.enabled);
   const scroll = useRef<ScrollViewInstance>(null);
   const offsets = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<string>();
@@ -96,7 +97,7 @@ export default function PlannerScreen() {
         ) : (
           <Row gap={space.sm} style={{ paddingHorizontal: 2 }}>
             <Icon name="gesture-tap" size={18} color={colors.accent} />
-            <Text style={[font.small, { flex: 1 }]}>Tap a day to see its plan, change its wake-up or make it a free day.</Text>
+            <Text style={[font.small, { flex: 1 }]}>{`Tap a day to see its plan, change its wake-up${twoStepOn ? ', skip the routine alarm' : ''} or make it a free day.`}</Text>
           </Row>
         )}
       </View>

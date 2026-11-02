@@ -86,7 +86,7 @@ export function CalendarView({ a, initialDate }: { a: Analysis; initialDate?: st
                 date={key}
                 row={key ? byDate.get(key) : undefined}
                 night={key ? upcoming.get(key) : undefined}
-                planned={key ? wakePlan?.[key] : undefined}
+                planned={key ? setsWake(wakePlan?.[key]) : undefined}
                 need={need}
                 today={key === today}
                 selected={key === selected}
@@ -125,6 +125,11 @@ function Legend({ color, icon, label }: { color?: string; icon?: string; label: 
       <Text style={font.tiny}>{label}</Text>
     </Row>
   );
+}
+
+/** A date's plan when it sets the wake-up (a time or a free day) — a routine-only choice doesn't mark the day. */
+function setsWake(p: DayWakePlan | undefined): DayWakePlan | undefined {
+  return p && (p.free || p.wakeMin !== undefined) ? p : undefined;
 }
 
 function DayCell(props: { date?: string; row?: TrendRow; night?: UpcomingNight; planned?: DayWakePlan; need: number; today: boolean; selected: boolean; onPress: () => void }) {

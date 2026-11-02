@@ -37,7 +37,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Date, 'now').mockReturnValue(NOW);
   useStore.getState().loadDemo(NOW);
-  useStore.getState().setProfile({ onboarded: true, wakePlan: {}, workdays: [1, 2, 3, 4, 5] });
+  useStore.getState().setProfile({ onboarded: true, wakePlan: {}, workdays: [1, 2, 3, 4, 5], workWakeMin: 7 * 60, twoStepMorning: undefined });
   root = createRoot();
 });
 afterEach(async () => {
@@ -98,6 +98,35 @@ describe('Planner day card', () => {
     expect(useStore.getState().profile.wakePlan?.[night.wakeDate]).toEqual({ wakeMin: 7 * 60 });
     await press('Usual · ');
     expect(useStore.getState().profile.wakePlan?.[night.wakeDate]).toBeUndefined();
+  });
+
+  it('switches the routine alarm on or off for one morning', async () => {
+    const a = analysis();
+    // Tuesday and Thursday are two-step mornings; Wednesday isn't.
+    useStore.getState().setProfile({ workWakeMin: 6 * 60, twoStepMorning: { enabled: true, firstWakeMin: 5 * 60, routineMin: 20, days: [2, 4] } });
+    const tue = a.upcoming.find((n) => n.wakeDate === '2026-11-03')!;
+    await render(<DayCard night={tue} needMin={a.need.needMin} isTonight />);
+    expect(text()).toContain('Routine alarm this morning');
+    expect(text()).toContain('as usual for Tuesdays');
+    await press('Routine alarm this morning');
+    expect(useStore.getState().profile.wakePlan?.['2026-11-03']).toEqual({ twoStep: false });
+    expect(text()).toContain('just this morning');
+    // Changing the wake-up keeps the choice; back to the weekly setting forgets it.
+    await press('Set a time');
+    expect(useStore.getState().profile.wakePlan?.['2026-11-03']).toEqual({ twoStep: false, wakeMin: 6 * 60 });
+    await press('Usual · ');
+    await press('Routine alarm this morning');
+    expect(useStore.getState().profile.wakePlan?.['2026-11-03']).toBeUndefined();
+
+    const wed = a.upcoming.find((n) => n.wakeDate === '2026-11-04')!;
+    await render(<DayCard night={wed} needMin={a.need.needMin} isTonight={false} />);
+    await press('Routine alarm this morning');
+    expect(useStore.getState().profile.wakePlan?.['2026-11-04']).toEqual({ twoStep: true });
+    expect(analysis().upcoming.find((n) => n.wakeDate === '2026-11-04')?.twoStep).toBeDefined();
+    // A free day has no alarms, so no routine either.
+    await press('Free day');
+    expect(useStore.getState().profile.wakePlan?.['2026-11-04']).toEqual({ free: true });
+    expect(text()).not.toContain('Routine alarm this morning');
   });
 
   it("offers Adjust tonight on tonight's card", async () => {

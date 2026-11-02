@@ -194,7 +194,8 @@ export interface Profile {
 /**
  * "Two-step morning": a first alarm for a short routine (washing, moisturiser), back to sleep, and
  * the day's normal wake-up as the final alarm. The gap between the two is kept before calendar
- * wake-ups too; mornings without a fixed wake-up (free days) never use it.
+ * wake-ups too; mornings without a fixed wake-up (free days) never use it. Single dates can switch
+ * it on or off (`DayWakePlan.twoStep`).
  */
 export interface TwoStepMorning {
   enabled: boolean;
@@ -210,10 +211,14 @@ export interface TwoStepMorning {
   past?: [string, string][];
 }
 
-/** One morning in the calendar: a fixed wake-up time, or a free day with no alarm. */
+/**
+ * One morning in the calendar: a fixed wake-up time, or a free day with no alarm — and/or the
+ * two-step routine alarm switched on or off for just that morning (undefined = the weekly setting).
+ */
 export interface DayWakePlan {
   wakeMin?: number;
   free?: boolean;
+  twoStep?: boolean;
 }
 
 export const DEFAULT_PROFILE: Profile = {

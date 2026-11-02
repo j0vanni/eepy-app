@@ -36,7 +36,7 @@ function listDays(days: number[]): string {
 function Preview({ a }: { a: Analysis }) {
   const next = a.upcoming.find((n) => n.twoStep);
   if (!next?.twoStep) {
-    return <Text style={font.small}>No two-step mornings in the next two weeks — free days and days off in the calendar keep one alarm.</Text>;
+    return <Text style={font.small}>No two-step mornings in the next two weeks — free days, days off and dates you switched the routine off for keep one alarm.</Text>;
   }
   const two = next.twoStep;
   const sleep = twoStepSleep(next.bedtime, two, a.latencyMin, a.efficiency);
@@ -129,6 +129,7 @@ export function TwoStepMorningCard({ embedded = false }: { embedded?: boolean })
               {listDays(offDays)} {offDays.length > 1 ? "aren't workdays" : "isn't a workday"} — only two-step when you set a wake-up for it in the calendar.
             </Text>
           ) : null}
+          <Text style={[font.tiny, { marginTop: space.xs }]}>Want it on or off for one date? Tap that morning in the Planner's week (or use Tonight's plan) → "Routine alarm this morning".</Text>
           <View style={{ marginTop: space.md }}>
             {!check.ok ? (
               <Note tone="warn">{check.reason}</Note>

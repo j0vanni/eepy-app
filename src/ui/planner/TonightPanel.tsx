@@ -13,7 +13,7 @@ import { PlanCalendarLines } from '@/ui/cards/CalendarNote';
 import { Card, Icon, Note, Row, Stat } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
-import { AdjustTonightButton, NightNotes } from './DayPlan';
+import { AdjustTonightButton, NightNotes, RoutineChoice } from './DayPlan';
 import { DAY_NAMES, ordinal } from './planText';
 
 export function TonightPanel({ a }: { a: Analysis }) {
@@ -53,6 +53,7 @@ export function TonightPanel({ a }: { a: Analysis }) {
           {t.twoStep ? ` Then back to bed — the final alarm rings at ${formatTime(t.wake)}.` : ''}
         </Text>
       ) : null}
+      {!t.noAlarm ? <RoutineChoice date={t.wakeDate} /> : null}
       <Pressable
         onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'alarms' } })}
         hitSlop={6}

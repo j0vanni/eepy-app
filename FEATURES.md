@@ -394,6 +394,14 @@ A pass over every screen for one calm, consistent look. Nothing was removed.
 
 ---
 
+## 29. New in 0.10 — routine alarm per date
+
+| | Feature |
+| --- | --- |
+| ✅ | **Routine alarm on or off for one morning**: tap a day in the Planner's week strip (or the month calendar) → *Routine alarm this morning*. Off skips the routine alarm that morning (one alarm, lights-out 30 min later, wake-up detection reads the early wake-up as the real one); on adds it to a morning outside your two-step days, a weekend with an alarm, or a single date while the weekly setting is off. The row says what it does (*"Up 5:00 AM for your 20-min routine, back to sleep until 6:00 AM · just this morning"*); switching back to what your week says forgets the choice, changing that morning's wake-up keeps it, and a free day (no alarms) drops it. Saved as `wakePlan[date].twoStep`; a routine-only choice doesn't mark the day as a set wake-up in the calendar |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

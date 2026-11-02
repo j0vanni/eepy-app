@@ -122,7 +122,8 @@ export function planUpcomingNights(input: UpcomingInput): UpcomingNight[] {
       windDownStart: bedtime,
       sleepMin: 0,
       isWorkday,
-      custom: !!profile.wakePlan?.[wakeDate],
+      // A routine-only choice (twoStep on/off) isn't a wake-up you set.
+      custom: profile.wakePlan?.[wakeDate]?.free === true || profile.wakePlan?.[wakeDate]?.wakeMin !== undefined,
       noAlarm,
       extraForDebtMin: extra,
       preShiftMin: 0,

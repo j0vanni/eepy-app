@@ -72,6 +72,16 @@ describe('wake-up detection on a two-step morning', () => {
     expect(t.routine).toBeUndefined();
   });
 
+  it('follows a date switched on or off in the calendar', () => {
+    // Weekly setting never set up, but on for this one morning.
+    const once = run([session(BACK_TO_SLEEP)], { ...OFF, wakePlan: { [WAKE_DAY]: { twoStep: true } } });
+    expect(once.m.finalWake).toBe(at(6, 5));
+    // A usual two-step morning switched off for the date: the early wake-up was the real one.
+    const skipped = run([session(BACK_TO_SLEEP)], { ...ON, wakePlan: { [WAKE_DAY]: { twoStep: false } } });
+    expect(skipped.m.finalWake).toBe(at(4, 47));
+    expect(skipped.t.routine).toBeUndefined();
+  });
+
   it('with it, the routine is not the final wake-up — the night ends at the final alarm', () => {
     const { m, t } = run([session(BACK_TO_SLEEP)], ON);
     expect(m.finalWake).toBe(at(6, 5));

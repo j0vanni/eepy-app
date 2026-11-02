@@ -110,6 +110,29 @@ describe('planning a two-step night', () => {
     expect(event.twoStep?.firstWake).toBe(fri(265));
   });
 
+  it('a single date can switch the routine off, or on outside its days', () => {
+    // Friday is a usual two-step morning — off for just that date: one alarm, lights out 30 min later.
+    const skip = planTonight({ ...BASE, profile: userProfile({ wakePlan: { [FRI]: { twoStep: false } } }) });
+    expect(skip.twoStep).toBeUndefined();
+    expect(skip.wake).toBe(off.wake);
+    expect(skip.bedtime).toBe(off.bedtime);
+    // Not one of its days (Mon–Wed only) — on for just Friday.
+    const p = userProfile({ twoStepMorning: { ...TWO, days: [1, 2, 3] }, wakePlan: { [FRI]: { twoStep: true } } });
+    expect(planTonight({ ...BASE, profile: p }).twoStep?.firstWake).toBe(fri(300));
+    // Works with a set time too, keeping the gap.
+    const custom = planTonight({ ...BASE, profile: userProfile({ twoStepMorning: { ...TWO, days: [1] }, wakePlan: { [FRI]: { wakeMin: 7 * 60, twoStep: true } } }) });
+    expect(custom.twoStep?.firstWake).toBe(fri(7 * 60 - 65));
+    // Even while the weekly setting is off.
+    const weeklyOff = userProfile({ twoStepMorning: { ...TWO, enabled: false }, wakePlan: { [FRI]: { twoStep: true } } });
+    expect(planTonight({ ...BASE, profile: weeklyOff }).twoStep).toBeDefined();
+    // A day off in the calendar has no alarms at all.
+    expect(twoStepFor(userProfile({ wakePlan: { [FRI]: { free: true, twoStep: true } } }), FRI, { wakeMin: 425, isWorkday: false, noAlarm: true })).toBeUndefined();
+    // On a weekend morning (an alarm, just a later one).
+    expect(twoStepFor(userProfile({ wakePlan: { '2026-10-24': { twoStep: true } } }), '2026-10-24', { wakeMin: 425, isWorkday: false })).toBeDefined();
+    // The times still have to work.
+    expect(twoStepFor(userProfile({ workWakeMin: 4 * 60, wakePlan: { [FRI]: { twoStep: true } } }), FRI, { wakeMin: 240, isWorkday: true })).toBeUndefined();
+  });
+
   it('only on the chosen days', () => {
     const p = userProfile({ twoStepMorning: { ...TWO, days: [1, 2, 3] } });
     expect(planTonight({ ...BASE, profile: p }).twoStep).toBeUndefined(); // Friday
@@ -202,5 +225,12 @@ describe('two-step mornings in the analysis', () => {
       routineMin: 20,
       allowanceMin: 45,
     });
+  });
+
+  it('follows single dates: none on a date switched off, one on a date switched on', () => {
+    const p = userProfile({ twoStepMorning: { ...TWO, since: FRI }, wakePlan: { [FRI]: { twoStep: false }, [THU]: { twoStep: true } } });
+    expect(routineWindowFor(p, FRI, { wakeMin: 365, isWorkday: true })).toBeUndefined();
+    // Before `since`, but switched on for that date.
+    expect(routineWindowFor(p, THU, { wakeMin: 365, isWorkday: true })?.firstWake).toBe(atMinutes(THU, 300));
   });
 });
