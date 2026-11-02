@@ -20,6 +20,7 @@ import {
   startCbtiProgram,
   stimulusControlRules,
 } from '@/engine/cbti';
+import { eReaderIfOn } from '@/engine/eReader';
 import { formatClock, formatDuration, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
@@ -226,7 +227,8 @@ function Dashboard({ a, program }: { a: Analysis; program: CbtiProgram }) {
   const s = useMemo(() => cbtiStatus(program, a.nights, a.day), [program, a.nights, a.day]);
   const [lessonWeek, setLessonWeek] = useState<number | undefined>();
   const lesson = CBTI_LESSONS[(lessonWeek ?? Math.min(s.week, CBTI_WEEKS)) - 1];
-  const rules = stimulusControlRules(program.wakeMin);
+  const eReader = eReaderIfOn(useStore((st) => st.settings.eReader));
+  const rules = stimulusControlRules(program.wakeMin, { eReader });
 
   const [markDay, markBits] = typeof rulesMark === 'string' ? rulesMark.split(':') : [];
   const checked = markDay === a.day ? Number(markBits) || 0 : 0;

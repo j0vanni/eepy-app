@@ -100,6 +100,7 @@ const SETTINGS_ITEMS: Feature[] = [
   { id: 's-shortcuts', title: 'Shortcuts & Quick Settings tile', where: inSettings('notifications'), icon: 'gesture-tap-hold', href: settingsPage('notifications'), keywords: ['app icon', 'long-press', 'log coffee tile', 'home screen'] },
   { id: 's-winddown-length', title: 'Wind-down length', where: inSettings('winddown'), icon: 'timer-sand', href: settingsPage('winddown'), keywords: ['how long', 'minutes before bed', 'routine'] },
   { id: 's-screens-off', title: 'Screens off before lights-out', where: inSettings('winddown'), icon: 'cellphone-off', href: settingsPage('winddown'), keywords: ['phone away', 'screen time'] },
+  { id: 's-e-reader', title: 'E-ink reader (Kindle, Kobo, Boox)', where: inSettings('winddown'), icon: 'book-open-variant', href: settingsPage('winddown'), keywords: ['e-reader', 'ereader', 'e-ink', 'eink', 'kindle', 'kobo', 'boox', 'reading', 'read in bed', 'book', 'frontlight', 'front light', 'warm light', 'amber'] },
   { id: 's-dim-eepy', title: 'Dim & warm eepy in the evening', where: inSettings('winddown'), icon: 'brightness-4', href: settingsPage('winddown'), keywords: ['tint', 'dim', 'warm', 'night'] },
   { id: 's-half-life', title: 'Caffeine half-life', where: inSettings('caffeine'), icon: 'coffee-outline', href: settingsPage('caffeine'), keywords: ['how fast', 'wears off', 'sensitive'] },
   { id: 's-drinks', title: 'Your own drinks', where: inSettings('caffeine'), icon: 'star-outline', href: settingsPage('caffeine'), keywords: ['custom', 'instant coffee', 'mg'] },

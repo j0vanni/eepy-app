@@ -3,6 +3,7 @@ import { CalendarSection } from './CalendarSection';
 import { AboutSection } from './AboutSection';
 import { CaffeineSection } from './CaffeineSection';
 import { DataSourcesSection, YourDataSection } from './DataSection';
+import { EReaderSection } from './EReaderSection';
 import { LearningSection } from './LearningSection';
 import { BackgroundSection, NotificationsSection, WakeAlarmSection } from './NotificationsSection';
 import { AboutYouSection, SleepNeedSection } from './ProfileSection';
@@ -51,6 +52,7 @@ export function SettingsPage({ id }: { id: SettingsSectionId }) {
         <>
           <WindDownLengthSection />
           <WindDownSection />
+          <EReaderSection />
           <SleepModeSection />
         </>
       );

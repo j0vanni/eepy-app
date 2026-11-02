@@ -23,6 +23,15 @@ const TABS: { icon: string; title: string; text: string }[] = [
   { icon: 'dots-horizontal-circle-outline', title: 'More', text: 'Coach, body clock, wind-down, programmes, journal, reports — with a search box.' },
 ];
 
+/** Smaller additions since this sheet was written. */
+const NEW: { icon: string; title: string; text: string }[] = [
+  {
+    icon: 'book-open-variant',
+    title: 'E-ink reader',
+    text: 'Read on a Kindle, Kobo or Boox? Turn on "I read on an e-ink reader" in Settings → Wind-down & phone light: your wind-down gets reading time after screens-off, with frontlight tips.',
+  },
+];
+
 const MOVED: [string, string][] = [
   ['Plan tab', 'Planner tab'],
   ['Trends tab', 'Sleep tab → Trends'],
@@ -43,6 +52,20 @@ export function WhatsNewContent() {
       <Text style={[font.small, { marginTop: 4 }]}>Nothing was removed — some things just moved. Five tabs at the bottom:</Text>
       <View style={{ marginTop: space.md, gap: space.md }}>
         {TABS.map((t) => (
+          <Row key={t.title} gap={space.md} style={{ alignItems: 'flex-start' }}>
+            <View style={styles.icon}>
+              <Icon name={t.icon} size={18} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={font.h3}>{t.title}</Text>
+              <Text style={font.small}>{t.text}</Text>
+            </View>
+          </Row>
+        ))}
+      </View>
+      <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>ALSO NEW</Text>
+      <View style={{ gap: space.md }}>
+        {NEW.map((t) => (
           <Row key={t.title} gap={space.md} style={{ alignItems: 'flex-start' }}>
             <View style={styles.icon}>
               <Icon name={t.icon} size={18} color={colors.accent} />

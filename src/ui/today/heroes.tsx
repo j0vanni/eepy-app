@@ -15,6 +15,7 @@ import { WindDownCard } from '@/ui/cards/WindDownCard';
 import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
 import { EnterView } from '@/ui/motion';
 import { colors, font, radius, space } from '@/ui/theme';
+import { CantSleepTip } from './CantSleepTip';
 import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, until, UsualCoffeeCard } from './cards';
 
 type HeroProps = { a: Analysis; now: number };
@@ -196,7 +197,7 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
           <Icon name="weather-night" size={22} color={colors.textFaint} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { color: colors.textDim }]}>Can't sleep?</Text>
-            <Text style={font.tiny}>Breathing and soft noise. If you've been awake 20+ min, get up in dim light until sleepy.</Text>
+            <CantSleepTip />
           </View>
           <Icon name="chevron-right" color={colors.textFaint} />
         </Row>

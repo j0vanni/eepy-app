@@ -311,6 +311,16 @@ describe('CBT-I content', () => {
     expect(rules.find((r) => r.id === 'wake')!.title).toBe('Get up at 06:30 every day');
     expect(stimulusControlRules().find((r) => r.id === 'wake')!.title).toBe('Same wake time every day');
   });
+
+  it('suggests the e-reader for the get-up spot (not in bed) when you read on one', () => {
+    const plain = stimulusControlRules(WAKE);
+    expect(plain.find((r) => r.id === 'get-up')!.detail).not.toMatch(/e-reader/);
+    const warm = stimulusControlRules(WAKE, { eReader: { warmLight: true } });
+    expect(warm.map((r) => r.id)).toEqual(plain.map((r) => r.id));
+    expect(warm.find((r) => r.id === 'get-up')!.detail).toMatch(/another dim room and read on your e-reader — frontlight at its lowest and warmest — until you're sleepy/);
+    expect(warm.find((r) => r.id === 'bed-only')!.detail).toMatch(/reading \(your e-reader too\)/);
+    expect(stimulusControlRules(WAKE, { eReader: { warmLight: false } }).find((r) => r.id === 'get-up')!.detail).toMatch(/lowest, or by a dim lamp/);
+  });
 });
 
 describe('CBT-I safety', () => {

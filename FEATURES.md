@@ -394,6 +394,21 @@ A pass over every screen for one calm, consistent look. Nothing was removed.
 
 ---
 
+## NEW — E-ink reader
+
+For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light like paper instead of shining a backlight at you, so with the frontlight low (and warm, if it can be) an e-reader is fine after screens-off — unlike a phone or tablet, which delays melatonin and sleep compared with a printed book (Chang et al., 2015).
+
+| | Feature |
+| --- | --- |
+| ✅ | **Settings → Wind-down & phone light → E-ink reader**: *I read on an e-ink reader* (off by default) and *It has a warm / amber light*, with a short explainer, tonight's reading time (*phone away at 10:30 PM, then read until lights-out at 11:15 PM*) and a reminder to keep it to reading — on Android readers like Boox, browser and other apps closed, notifications off at night. Search finds it as e-reader, e-ink, Kindle, Kobo, Boox, reading, book, frontlight or warm light |
+| ✅ | **Wind-down timeline** (Today in the evening, the wind-down routine, Planner → Tonight): *Screens off* says phone, tablet, TV and laptop off — your e-reader is fine (teeth and skin care now); the screen-free routine becomes **Read on your e-reader** from 10 min after screens-off until lights-out, with the frontlight advice; *Lights out* starts with **put the e-reader down**. No room for reading on a very short evening → no reading step |
+| ✅ | **E-reader frontlight targets** (`engine/eReader.ts`, the same phases as the phone): daytime and evening — anything comfortable, frontlight off in daylight or a lit room (warmth going up in the evening); wind-down — frontlight ≤ 30%, warmth well up; screens-off → lights-out — the lowest you can read (about 10–20%), warmth all the way up, dark mode if the reader has it; night — e-reader down in bed, or read in another room until sleepy. Without a warm light: keep it low — a bedside lamp on the page beats the frontlight |
+| ✅ | **Phone light card**: an *E-reader* block with the frontlight target right now; the full card (wind-down routine, Planner → More planning tools → Phone light) adds the rest of the evening |
+| ✅ | **Middle of the night**: the night view's *Can't sleep?*, the lights-out step and the insomnia programme's stimulus-control rules say: after ~20 min awake, get up, sit somewhere dim in another room and read on your e-reader — frontlight at its lowest and warmest — until you're sleepy (and, in the programme, no reading in bed, e-reader included) |
+| 🧪 | **Screens-off reminder**: *Phone down — e-reader's fine, frontlight low and warm* (just *frontlight low* without a warm light) |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

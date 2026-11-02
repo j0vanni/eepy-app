@@ -12,6 +12,7 @@
  * - Each completed week, by that week's sleep efficiency (time asleep ÷ time in bed):
  *   ≥ 90% → 15 min more (earlier bedtime), 85–90% → unchanged, < 85% → 15 min less.
  */
+import { EReader, eReaderLowLight } from './eReader';
 import { scoreQuiz } from './screening';
 import type { Night } from './sessions';
 import { addDays, atMinutes, clamp, daysBetween, formatClock, formatDuration, MINUTE, normalizeMinutes } from './time';
@@ -504,15 +505,25 @@ export interface CbtiRule {
   detail: string;
 }
 
-/** Stimulus-control rules (Bootzin 1972), with the user's wake time filled in. */
-export function stimulusControlRules(wakeMin?: number): CbtiRule[] {
+/**
+ * Stimulus-control rules (Bootzin 1972), with the user's wake time filled in. With an e-reader,
+ * "get up" suggests reading on it in the get-up spot (frontlight lowest and warmest) — not in bed.
+ */
+export function stimulusControlRules(wakeMin?: number, opts: { eReader?: EReader } = {}): CbtiRule[] {
+  const e = opts.eReader;
   return [
     { id: 'sleepy', title: 'Go to bed only when sleepy', detail: 'Sleepy, not just tired, and not before your window opens.' },
-    { id: 'bed-only', title: 'Bed is for sleep (and sex) only', detail: 'No phone, TV, reading, work or worrying in bed.' },
+    {
+      id: 'bed-only',
+      title: 'Bed is for sleep (and sex) only',
+      detail: e ? 'No phone, TV, reading (your e-reader too), work or worrying in bed.' : 'No phone, TV, reading, work or worrying in bed.',
+    },
     {
       id: 'get-up',
       title: "Can't sleep? Get up",
-      detail: 'After about 20 minutes awake (don\'t watch the clock), go to another dim room and do something calm until you\'re sleepy.',
+      detail: e
+        ? `After about 20 minutes awake (don't watch the clock), go to another dim room and read on your e-reader — ${eReaderLowLight(e)} — until you're sleepy.`
+        : 'After about 20 minutes awake (don\'t watch the clock), go to another dim room and do something calm until you\'re sleepy.',
     },
     { id: 'repeat', title: 'Repeat as often as needed', detail: 'Including when you wake in the night and can\'t get back to sleep.' },
     {

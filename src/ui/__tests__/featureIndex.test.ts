@@ -68,6 +68,10 @@ describe('searchFeatures', () => {
     expect(ids('coffee')).toEqual(expect.arrayContaining(['log-drink', 'caffeine-curve', 'settings-caffeine']));
     expect(ids('backup')).toContain('s-backup');
     expect(ids('do not disturb')).toContain('autopilot');
+    expect(ids('kindle')[0]).toBe('s-e-reader');
+    expect(ids('e-ink')[0]).toBe('s-e-reader');
+    expect(ids('kobo')).toContain('s-e-reader');
+    expect(ids('frontlight')).toContain('s-e-reader');
   });
 
   it('matches word starts, plurals and any letter case', () => {

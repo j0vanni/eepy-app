@@ -1,12 +1,14 @@
 /**
  * Phone light: what the screen should be like right now (brightness and blue-light filter), how
  * it compares with the phone's actual brightness, and shortcuts to Android's Night Light and
- * Extra dim. `full` adds the whole evening schedule and the Night Light times to set.
+ * Extra dim. `full` adds the whole evening schedule and the Night Light times to set. With the
+ * e-ink reader setting on, an "E-reader" block adds its frontlight target (engine/eReader.ts).
  */
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
+import { EReader, eReaderIfOn, eReaderSchedule, eReaderTargetAt } from '@/engine/eReader';
 import { judgeScreenBrightness, nightLightSchedule, ScreenPlanInput, screenLightSchedule, screenTargetAt } from '@/engine/screenLight';
 import { formatTime } from '@/engine/time';
 import { screensOffAt } from '@/engine/windDownPlan';
@@ -25,7 +27,7 @@ import {
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
-import { AppSwitch, Button, Card, CardTitle, Note, Row } from '@/ui/components';
+import { AppSwitch, Button, Card, CardTitle, Icon, Note, Row } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 const FILTER_LABEL = { off: 'No filter needed', warm: 'Night Light on', warmest: 'Night Light warmest + Extra dim' } as const;
@@ -140,11 +142,43 @@ function BrightnessCheck({ target, brightness }: { target: ReturnType<typeof scr
   );
 }
 
+/** The e-reader's frontlight target now; `full` adds the rest of the evening. */
+function EReaderBlock({ plan, now, eReader, full }: { plan: ScreenPlanInput; now: number; eReader: EReader; full?: boolean }) {
+  const target = eReaderTargetAt(plan, now, eReader);
+  const upcoming = eReaderSchedule(plan, eReader).filter((t) => t.until > now && t.phase !== 'day');
+  return (
+    <View style={{ marginTop: space.md, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+      <Row gap={space.sm}>
+        <Icon name="book-open-variant" size={18} color={colors.light} />
+        <Text style={[font.label, { flex: 1 }]}>E-READER</Text>
+        <Text style={[font.small, { flexShrink: 1, textAlign: 'right' }]}>{target.summary}</Text>
+      </Row>
+      <Text style={[font.body, { fontWeight: '600', marginTop: space.xs }]}>{target.title}</Text>
+      {full ? (
+        <>
+          <Text style={[font.small, { marginTop: 2 }]}>{target.advice}</Text>
+          <View style={{ marginTop: space.sm, gap: 4 }}>
+            {upcoming.map((t) => (
+              <Row key={t.phase} gap={space.sm}>
+                <Text style={[font.small, { width: 84, color: t.phase === target.phase ? colors.text : colors.textDim, fontWeight: t.phase === target.phase ? '700' : '400' }]}>
+                  {t.phase === target.phase ? 'Now' : formatTime(t.from)}
+                </Text>
+                <Text style={[font.small, { flex: 1 }]}>{t.summary}</Text>
+              </Row>
+            ))}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 /** `embedded` drops the card frame and title, for use inside a section that already says "Phone light". */
 export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boolean; embedded?: boolean }) {
   const now = useNow(30_000);
   const [phone, patchPhone, refreshPhone] = usePhoneScreen();
   const screensOffMin = useStore((st) => st.settings.screensOffMin);
+  const eReader = eReaderIfOn(useStore((st) => st.settings.eReader));
   const plan = screenPlanFor(a, screensOffMin);
   const target = screenTargetAt(plan, now);
   const evening = target.phase === 'evening' || target.phase === 'winddown' || target.phase === 'night';
@@ -194,6 +228,8 @@ export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boo
           {target.maxBrightness < 1 ? <Button small kind="ghost" icon="brightness-5" label="Dim eepy now" onPress={() => dimEepy(target.maxBrightness)} /> : null}
         </Row>
       ) : null}
+
+      {eReader ? <EReaderBlock plan={plan} now={now} eReader={eReader} full={full} /> : null}
     </>
   );
   return embedded ? <View>{body}</View> : <Card>{body}</Card>;
