@@ -74,6 +74,8 @@ jobs:
           else
             CHANGES=$(git log --no-merges -n 15 --format='- %s')
           fi
+          # Drop CI markers like "[skip ci]" from commit subjects.
+          CHANGES=$(printf '%s\n' "$CHANGES" | sed -E 's/ *\[(skip ci|ci skip|no ci|skip actions|actions skip)\]//Ig')
           [ -n "$CHANGES" ] || CHANGES="- Rebuild of ${GITHUB_SHA::7}"
           {
             echo "## What's new"
