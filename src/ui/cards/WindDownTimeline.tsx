@@ -30,7 +30,7 @@ export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: bo
         icon="timeline-clock-outline"
         title={compact ? 'Tonight, step by step' : "Tonight's wind-down"}
         color={colors.light}
-        right={next ? <Text style={font.small}>{`${next.title.toLowerCase()} in ${formatDuration(Math.max(1, Math.round((next.at - now) / MINUTE)))}`}</Text> : undefined}
+        sub={next ? `Next: ${next.title.toLowerCase()} in ${formatDuration(Math.max(1, Math.round((next.at - now) / MINUTE)))}` : undefined}
       />
       <View style={{ gap: space.sm }}>
         {shown.map((s) => {
@@ -59,7 +59,7 @@ export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: bo
         </View>
       ) : off ? (
         <Text style={[font.tiny, { marginTop: space.md }]}>
-          Screens off {screensOffMin} min before lights-out (change it in Settings → Wind-down & phone light). What's on the screen keeps you up as much as its light does.
+          Screens off {screensOffMin} min before lights-out — what's on the screen keeps you up as much as its light. Change it in Settings → Wind-down & phone light.
         </Text>
       ) : null}
     </Card>

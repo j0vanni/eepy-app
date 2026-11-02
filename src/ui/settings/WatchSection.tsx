@@ -54,8 +54,7 @@ export function WatchSection() {
       <Card>
         <CardTitle icon="watch-variant" title="Alarms on your wrist" />
         <Text style={font.small}>
-          The CMF Watch 3 Pro can't run other apps, but Nothing X shows eepy's notifications on it. Watch-first alarms use that: the watch buzzes silently three times, one minute
-          apart, and the phone alarm rings only if you haven't tapped "I'm up" — handy next to a sleeping partner.
+          With "Watch first" the watch buzzes silently three times, a minute apart; the phone only rings if you haven't tapped "I'm up". Handy next to a sleeping partner.
         </Text>
 
         <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Nap alarm</Text>
@@ -97,11 +96,18 @@ export function WatchSection() {
 
       <Card>
         <CardTitle icon="music-note-outline" title="Also on the watch" />
-        <Text style={font.small}>
-          • Sleep sounds show up in the watch's music controls — pause or stop the noise from your wrist without unlocking the phone.{'\n'}• Alertness pings, the morning report and
-          reminders buzz the watch too; tap them on the phone to answer.{'\n'}• Sleep, heart rate, HRV, SpO₂ and steps come from the watch through Health Connect (Settings → Health Connect &
-          data).
-        </Text>
+        <View style={{ gap: space.sm }}>
+          {[
+            'Sleep sounds appear in the watch’s music controls — pause them from your wrist.',
+            'Check-in pings, the morning report and reminders buzz the watch too; answer them on the phone.',
+            'Sleep, heart rate, HRV, SpO₂ and steps come from the watch through Health Connect (Settings → Health Connect & data).',
+          ].map((t) => (
+            <Row key={t} gap={space.sm} style={{ alignItems: 'flex-start' }}>
+              <Text style={[font.small, { color: colors.accent }]}>•</Text>
+              <Text style={[font.small, { flex: 1 }]}>{t}</Text>
+            </Row>
+          ))}
+        </View>
       </Card>
     </Section>
   );

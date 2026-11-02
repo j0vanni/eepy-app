@@ -12,8 +12,9 @@ import { formatClock, formatDuration } from '@/engine/time';
 import { selectDataset, useStore } from '@/state/store';
 import { BreathingTrendCard } from '@/ui/cards/BreathingCard';
 import { DurationBars, LineChart, SleepTimeline } from '@/ui/charts';
-import { Button, Card, CardTitle, Row, Section, Segmented, Stat } from '@/ui/components';
+import { Button, Card, CardTitle, Chip, Row, Section, Stat } from '@/ui/components';
 import { dayLabel, shortDate, weekdayInitial } from '@/ui/format';
+import { InsightCard } from '@/ui/InsightCard';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
 export function TrendsView({ a }: { a: Analysis }) {
@@ -36,18 +37,14 @@ export function TrendsView({ a }: { a: Analysis }) {
 
   return (
     <>
-      <Segmented
-        value={days}
-        onChange={setDays}
-        options={[
-          { label: '7d', value: 7 },
-          { label: '14d', value: 14 },
-          { label: '30d', value: 30 },
-          { label: '60d', value: 60 },
-        ]}
-      />
+      {/* A filter, so it looks lighter than the Trends / Calendar / Nights tabs above it. */}
+      <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
+        {[7, 14, 30, 60].map((d) => (
+          <Chip key={d} label={`${d} days`} selected={days === d} onPress={() => setDays(d)} />
+        ))}
+      </Row>
 
-      <Text style={[font.small, { marginTop: space.sm }]}>{`${withSleep.length} of ${days} nights recorded`}</Text>
+      <Text style={[font.small, { marginTop: space.md }]}>{`${withSleep.length} of ${days} nights recorded`}</Text>
       <Card style={{ marginTop: space.sm }}>
         <Row>
           <Stat label="Avg sleep" value={avgSleep ? formatDuration(avgSleep) : '–'} sub={`need ${formatDuration(a.need.needMin)}`} />
@@ -173,11 +170,7 @@ export function TrendsView({ a }: { a: Analysis }) {
           </Card>
         ) : (
           a.insights.map((i) => (
-            <Card key={i.id} accent={i.kind === 'negative' ? colors.warn : i.kind === 'positive' ? colors.good : undefined}>
-              <Text style={font.h3}>{i.title}</Text>
-              <Text style={[font.small, { marginTop: 4 }]}>{i.detail}</Text>
-              {i.evidence ? <Text style={[font.tiny, { marginTop: 6 }]}>{i.evidence}</Text> : null}
-            </Card>
+            <InsightCard key={i.id} insight={i} />
           ))
         )}
       </Section>

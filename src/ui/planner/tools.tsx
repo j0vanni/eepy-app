@@ -68,7 +68,7 @@ export function BedtimeCalculator({ a }: { a: Analysis }) {
           <Text style={[font.small, { flex: 1 }]}>
             {o.cycles} cycles · {formatDuration(o.sleepMin)} asleep
           </Text>
-          {o.recommended ? <Text style={[font.tiny, { color: colors.accent }]}>BEST FIT</Text> : o.meetsNeed ? <Icon name="check" color={colors.good} size={16} /> : null}
+          {o.recommended ? <Text style={[font.label, { color: colors.accent }]}>BEST FIT</Text> : o.meetsNeed ? <Icon name="check" color={colors.good} size={16} /> : null}
         </Row>
       ))}
       <Text style={[font.tiny, { marginTop: space.sm }]}>

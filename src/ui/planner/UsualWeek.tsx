@@ -41,9 +41,8 @@ export function UsualWeekCard() {
 
   return (
     <Card>
-      <CardTitle icon="calendar-week" title="Workdays and wake-up times" />
-      <Text style={font.small}>Tap the days you have to be up at a fixed time (work, school, kids).</Text>
-      <Row gap={4} style={{ marginTop: space.sm, marginBottom: space.sm }}>
+      <CardTitle icon="calendar-week" title="Workdays and wake-up times" sub="Tap the days you have to be up at a fixed time (work, school, kids)." />
+      <Row gap={4} style={{ marginBottom: space.xs }}>
         {WEEK_ORDER.map((i) => {
           const on = workdays.includes(i);
           return (
@@ -55,7 +54,7 @@ export function UsualWeekCard() {
               accessibilityState={{ checked: on }}
               accessibilityLabel={`${DAY_NAMES[i]}: ${on ? 'workday' : 'not a workday'}`}
             >
-              <Text style={[styles.dayText, on ? { color: '#140F33' } : null]}>{DAY_SHORT[i]}</Text>
+              <Text style={[styles.dayText, on ? { color: colors.onAccent } : null]}>{DAY_SHORT[i]}</Text>
             </Pressable>
           );
         })}
@@ -104,19 +103,19 @@ export function UsualWeekCard() {
                   onInc={() => setDay(d, value + 15)}
                 />
                 {own !== undefined ? (
-                  <Pressable onPress={() => resetDay(d)} hitSlop={6} accessibilityRole="button" style={{ marginTop: -6, marginBottom: 4 }}>
-                    <Text style={[font.tiny, { color: colors.accent }]}>Use the usual {kind} time ({formatClock(usualFor(d))})</Text>
+                  <Pressable onPress={() => resetDay(d)} hitSlop={8} accessibilityRole="button" style={{ marginTop: -4, marginBottom: 6 }}>
+                    <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Use the usual {kind} time ({formatClock(usualFor(d))})</Text>
                   </Pressable>
                 ) : null}
               </View>
             );
           })}
-          <Text style={font.tiny}>Days you don't change keep the workday or day-off time above. A single date can still be changed in the week strip.</Text>
+          <Text style={[font.tiny, { marginTop: space.xs }]}>Days you don't change keep the time above. One single date can still be changed in the week strip.</Text>
         </View>
       ) : null}
       <Text style={[font.tiny, { marginTop: space.sm }]}>
-        eepy's alarm rings on other days too, just later — sleeping in more than an hour or so shifts your body clock. For a morning with no alarm at all, tap that day above and
-        choose "Free day".
+        On other days the alarm still rings, just later — sleeping in much more than an hour shifts your body clock. For no alarm at all, tap that day in the week strip and choose
+        "Free day".
       </Text>
       <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
         <ListRow
@@ -134,8 +133,9 @@ const styles = StyleSheet.create({
   day: {
     flex: 1,
     minWidth: 0,
+    minHeight: 44,
     alignItems: 'center',
-    paddingVertical: 9,
+    justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -143,5 +143,5 @@ const styles = StyleSheet.create({
   },
   dayOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   dayText: { color: colors.text, fontWeight: '700', fontSize: 13 },
-  perDay: { marginTop: space.xs, paddingLeft: space.sm, borderLeftWidth: 2, borderLeftColor: colors.accentSoft },
+  perDay: { marginTop: space.xs, paddingLeft: space.md, borderLeftWidth: 2, borderLeftColor: colors.accentSoft },
 });

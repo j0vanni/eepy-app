@@ -183,7 +183,7 @@ function Intro({ a, previous }: { a: Analysis; previous?: CbtiProgram }) {
             </Row>
           ) : null}
           <View style={{ marginTop: space.lg, padding: space.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md }}>
-            <Text style={font.tiny}>STARTING WINDOW</Text>
+            <Text style={font.label}>STARTING WINDOW</Text>
             <Text style={[font.stat, { marginTop: 2 }]}>
               {formatClock(bedMin)} → {formatClock(wakeMin)}
             </Text>
@@ -269,7 +269,7 @@ function Dashboard({ a, program }: { a: Analysis; program: CbtiProgram }) {
           </Text>
         </Row>
         <Meter value={Math.min(s.week - 1 + (7 - s.daysLeftInWeek) / 7, CBTI_WEEKS)} max={CBTI_WEEKS} height={6} />
-        <Text style={[font.tiny, { marginTop: space.lg }]}>TONIGHT IN BED</Text>
+        <Text style={[font.label, { marginTop: space.lg }]}>TONIGHT IN BED</Text>
         <Text style={[font.stat, { fontSize: 36, marginTop: 2 }]}>
           {formatClock(s.bedMin)} → {formatClock(s.wakeMin)}
         </Text>

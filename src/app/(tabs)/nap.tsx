@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { NapOption, UpcomingDemand } from '@/engine/nap';
 import { dateKey, formatTime } from '@/engine/time';
@@ -8,8 +8,9 @@ import { stopNapTimer } from '@/notifications/napTimer';
 import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Card, CardTitle, Chip, Empty, Icon, Meter, Note, Ring, Row, Screen, Section } from '@/ui/components';
+import { Disclosure } from '@/ui/Disclosure';
 import { countdown } from '@/ui/format';
-import { colors, font, space } from '@/ui/theme';
+import { colors, font, radius, space } from '@/ui/theme';
 
 const KSS = [
   { v: 1, l: 'Extremely alert' },
@@ -62,7 +63,7 @@ export default function NapScreen() {
     <Screen title="Nap coach" subtitle="Should you nap, when, and for how long?">
       {timer ? (
         <Card accent={colors.accent} style={{ alignItems: 'center' }}>
-          <Text style={font.tiny}>{timer.label.toUpperCase()}</Text>
+          <Text style={font.label}>{timer.label.toUpperCase()}</Text>
           <Ring value={Math.min(1, (now - timer.start) / (timer.alarmAt - timer.start)) * 100} size={170} stroke={12}>
             <Text style={[font.stat, { fontSize: 38 }]}>{countdown(timer.alarmAt - now)}</Text>
             <Text style={font.small}>{timer.backupAt ? `watch ${formatTime(timer.alarmAt)} · phone ${formatTime(timer.backupAt)}` : `alarm ${formatTime(timer.alarmAt)}`}</Text>
@@ -72,8 +73,8 @@ export default function NapScreen() {
               ? 'Lie down somewhere dark and quiet. Even if you only doze, you still benefit.'
               : 'Time to get up! Get some light and move around for a few minutes.'}
           </Text>
-          <Row>
-            <Button label="I'm up — log nap" icon="check" onPress={() => stop(true)} />
+          <Row gap={space.sm} style={{ alignSelf: 'stretch' }}>
+            <Button label="I'm up — log nap" icon="check" onPress={() => stop(true)} style={{ flex: 1 }} />
             <Button label="Cancel" kind="ghost" onPress={() => stop(false)} />
           </Row>
         </Card>
@@ -83,7 +84,7 @@ export default function NapScreen() {
         <Row gap={space.md}>
           <Ring value={a.nap.needScore} color={verdictColor} size={84}>
             <Text style={[font.h2]}>{a.nap.needScore}</Text>
-            <Text style={font.tiny}>NEED</Text>
+            <Text style={font.label}>NEED</Text>
           </Ring>
           <View style={{ flex: 1 }}>
             <Text style={[font.h2, { color: verdictColor }]}>{VERDICT_TITLE[a.nap.verdict]}</Text>
@@ -109,10 +110,26 @@ export default function NapScreen() {
       ) : null}
 
       <Section title="How sleepy are you right now?">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {KSS.map((k) => (
-            <Chip key={k.v} label={`${k.v} · ${k.l}`} selected={recentKss === k.v} onPress={() => logDay(today, { sleepiness: k.v, sleepinessAt: Date.now() })} />
-          ))}
+        {/* Even tiles (like the check-in screen) instead of chips of very different lengths. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: space.sm }}>
+          {KSS.map((k) => {
+            const on = recentKss === k.v;
+            return (
+              <Pressable
+                key={k.v}
+                onPress={() => logDay(today, { sleepiness: k.v, sleepinessAt: Date.now() })}
+                style={({ pressed }) => [styles.kss, on ? styles.kssOn : null, pressed && !on ? { backgroundColor: colors.surfaceAlt } : null]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${k.v}: ${k.l}`}
+              >
+                <Text style={[font.h3, { color: on ? colors.onAccent : colors.text, fontVariant: ['tabular-nums'] }]}>{k.v}</Text>
+                <Text style={[font.tiny, { color: on ? colors.onAccent : colors.textDim }]} numberOfLines={2}>
+                  {k.l}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
         <Text style={[font.tiny, { marginTop: 6 }]}>Karolinska Sleepiness Scale. Your answer counts for 3 hours.</Text>
       </Section>
@@ -137,7 +154,7 @@ export default function NapScreen() {
             <CardTitle
               icon={{ power: 'flash', coffee: 'coffee', recovery: 'autorenew', prophylactic: 'shield-moon' }[o.type]}
               title={`${o.label} · ${o.alarmAfterMin} min`}
-              right={a.nap.best?.type === o.type && a.nap.verdict !== 'skip' ? <Text style={[font.tiny, { color: colors.accent }]}>BEST</Text> : null}
+              right={a.nap.best?.type === o.type && a.nap.verdict !== 'skip' ? <Text style={[font.label, { color: colors.accent }]}>BEST</Text> : null}
             />
             <Text style={font.small}>{o.description}</Text>
             <Row gap={space.lg} style={{ marginTop: space.sm }}>
@@ -164,8 +181,7 @@ export default function NapScreen() {
             {c}
           </Note>
         ))}
-        <Card onPress={() => setShowScience(!showScience)}>
-          <CardTitle icon="flask-outline" title="How eepy decides" right={<Icon name={showScience ? 'chevron-up' : 'chevron-down'} />} />
+        <Disclosure icon="flask-outline" title="How eepy decides" sub="What goes into nap need, timing and each option" open={showScience} onToggle={() => setShowScience(!showScience)}>
           {showScience ? (
             <View style={{ gap: space.sm }}>
               <Text style={font.small}>
@@ -182,8 +198,22 @@ export default function NapScreen() {
               </Text>
             </View>
           ) : null}
-        </Card>
+        </Disclosure>
       </Section>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  kss: {
+    width: '32%',
+    minHeight: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  kssOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+});

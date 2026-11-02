@@ -14,7 +14,7 @@ export function CountdownHero({ analysis, now }: { analysis: Analysis | undefine
     return (
       <Card style={styles.hero}>
         <Row icon="weather-night" ring={0}>
-          <Text style={font.tiny}>WIND DOWN</Text>
+          <Text style={font.label}>WIND DOWN</Text>
           <Text style={styles.big}>Tonight</Text>
           <Text style={font.small}>Sync a few nights from your watch for a personal lights-out time. Everything below works already.</Text>
         </Row>
@@ -28,10 +28,11 @@ export function CountdownHero({ analysis, now }: { analysis: Analysis | undefine
     return (
       <Card style={styles.hero}>
         <Row icon="weather-sunset-down" ring={lead} color={colors.light}>
-          <Text style={font.tiny}>WIND-DOWN STARTS IN</Text>
+          <Text style={font.label}>WIND-DOWN STARTS IN</Text>
           <Text style={styles.big}>{formatDuration(s.minToWindDown)}</Text>
+          <Text style={font.small}>at {formatTime(t.windDownStart)}</Text>
           <Text style={font.small}>
-            at {formatTime(t.windDownStart)} · lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
+            lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
           </Text>
         </Row>
       </Card>
@@ -41,7 +42,7 @@ export function CountdownHero({ analysis, now }: { analysis: Analysis | undefine
     return (
       <Card style={styles.hero} accent={colors.accent}>
         <Row icon="weather-night" ring={s.progress} color={colors.accent}>
-          <Text style={[font.tiny, { color: colors.accent }]}>LIGHTS OUT IN</Text>
+          <Text style={[font.label, { color: colors.accent }]}>LIGHTS OUT IN</Text>
           <Text style={styles.big}>{formatDuration(s.minToBedtime)}</Text>
           <Text style={font.small}>
             Lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
@@ -53,7 +54,7 @@ export function CountdownHero({ analysis, now }: { analysis: Analysis | undefine
   return (
     <Card style={styles.hero} accent={colors.deep}>
       <Row icon="sleep" ring={1} color={colors.deep}>
-        <Text style={font.tiny}>PAST LIGHTS-OUT</Text>
+        <Text style={font.label}>PAST LIGHTS-OUT</Text>
         <Text style={styles.big}>Time to sleep</Text>
         <Text style={font.small}>
           Lights out was {formatTime(t.bedtime)} ({formatDuration(-s.minToBedtime)} ago) · wake {formatTime(t.wake)}. Put the phone face down — sounds keep playing.

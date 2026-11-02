@@ -1,16 +1,39 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ageBaseline } from '@/engine/sleepNeed';
 import { formatClock, normalizeMinutes } from '@/engine/time';
 import { ensureNotificationPermission } from '@/state/notifications';
 import { useStore } from '@/state/store';
-import { Button, Card, Chip, Icon, Row, Screen, Stepper } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { Button, Card, Icon, Row, Screen, Stepper } from '@/ui/components';
+import { colors, font, radius, space } from '@/ui/theme';
 import { markWhatsNewSeen } from '@/ui/WhatsNew';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Monday first, like the Planner's usual week. */
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** "Step 2 of 3" as dots. */
+function Progress({ step }: { step: number }) {
+  return (
+    <Row gap={6} style={{ marginBottom: space.lg }}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={[styles.dot, i === step ? styles.dotOn : i < step ? styles.dotDone : null]} />
+      ))}
+      <Text style={[font.tiny, { marginLeft: space.xs }]}>{`Step ${step} of 3`}</Text>
+    </Row>
+  );
+}
+
+function BackNext({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  return (
+    <Row gap={space.sm} style={{ marginTop: space.lg }}>
+      <Button kind="ghost" label="Back" onPress={onBack} />
+      <Button label="Next" onPress={onNext} style={{ flex: 1 }} />
+    </Row>
+  );
+}
 
 const FEATURES = [
   { icon: 'scale-balance', text: 'Learns how much sleep you personally need' },
@@ -46,12 +69,16 @@ export default function Onboarding() {
     <Screen>
       {step === 0 ? (
         <View style={{ paddingTop: space.xl }}>
-          <Icon name="weather-night" size={56} color={colors.accent} />
-          <Text style={[font.h1, { fontSize: 40, marginTop: space.md }]}>eepy</Text>
-          <Text style={[font.body, { color: colors.textDim, marginTop: space.sm, marginBottom: space.xl }]}>Sleep science for the way you actually live.</Text>
+          <View style={styles.logo}>
+            <Icon name="weather-night" size={40} color={colors.accent} />
+          </View>
+          <Text style={[font.h1, { fontSize: 40, lineHeight: 46, marginTop: space.md }]}>eepy</Text>
+          <Text style={[font.body, { color: colors.textDim, marginTop: space.xs, marginBottom: space.xl }]}>Sleep science for the way you actually live.</Text>
           {FEATURES.map((f) => (
             <Row key={f.text} gap={space.md} style={{ marginBottom: space.md }}>
-              <Icon name={f.icon} color={colors.accent} size={22} />
+              <View style={styles.featureIcon}>
+                <Icon name={f.icon} color={colors.accent} size={20} />
+              </View>
               <Text style={[font.body, { flex: 1 }]}>{f.text}</Text>
             </Row>
           ))}
@@ -63,6 +90,7 @@ export default function Onboarding() {
 
       {step === 1 ? (
         <View style={{ paddingTop: space.xl }}>
+          <Progress step={1} />
           <Text style={font.h1}>About you</Text>
           <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>Sleep need changes with age; it's our starting point before your own data takes over.</Text>
           <Card>
@@ -74,29 +102,34 @@ export default function Onboarding() {
               onInc={() => setProfile({ birthYear: Math.min(year - 10, profile.birthYear + 1) })}
             />
           </Card>
-          <Text style={[font.small, { marginBottom: space.lg }]}>Recommended for {base.label}.</Text>
-          <Row gap={space.sm}>
-            <Button kind="ghost" label="Back" onPress={() => setStep(0)} />
-            <Button label="Next" onPress={() => setStep(2)} />
-          </Row>
+          <Text style={font.small}>Recommended for {base.label}.</Text>
+          <BackNext onBack={() => setStep(0)} onNext={() => setStep(2)} />
         </View>
       ) : null}
 
       {step === 2 ? (
         <View style={{ paddingTop: space.xl }}>
+          <Progress step={2} />
           <Text style={font.h1}>Your schedule</Text>
-          <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>Which days have a fixed wake-up (work, school, kids)? You can change this any time in Planner → Your usual week.</Text>
+          <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>Which days do you have to be up at a fixed time (work, school, kids)? You can change this later in Planner → Your usual week.</Text>
           <Card>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md }}>
-              {DAYS.map((d, i) => (
-                <Chip
-                  key={d}
-                  label={d}
-                  selected={profile.workdays.includes(i)}
-                  onPress={() => setProfile({ workdays: profile.workdays.includes(i) ? profile.workdays.filter((x) => x !== i) : [...profile.workdays, i].sort() })}
-                />
-              ))}
-            </View>
+            <Row gap={4} style={{ marginBottom: space.sm }}>
+              {WEEK_ORDER.map((i) => {
+                const on = profile.workdays.includes(i);
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => setProfile({ workdays: on ? profile.workdays.filter((x) => x !== i) : [...profile.workdays, i].sort() })}
+                    style={({ pressed }) => [styles.day, on ? styles.dayOn : null, pressed ? { opacity: 0.7 } : null]}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={DAYS[i]}
+                  >
+                    <Text style={[styles.dayText, on ? { color: colors.onAccent } : null]}>{DAYS[i]}</Text>
+                  </Pressable>
+                );
+              })}
+            </Row>
             <Stepper
               label="Wake-up time on those days"
               value={formatClock(profile.workWakeMin)}
@@ -104,15 +137,13 @@ export default function Onboarding() {
               onInc={() => setProfile({ workWakeMin: normalizeMinutes(profile.workWakeMin + 15) })}
             />
           </Card>
-          <Row gap={space.sm}>
-            <Button kind="ghost" label="Back" onPress={() => setStep(1)} />
-            <Button label="Next" onPress={() => setStep(3)} />
-          </Row>
+          <BackNext onBack={() => setStep(1)} onNext={() => setStep(3)} />
         </View>
       ) : null}
 
       {step === 3 ? (
         <View style={{ paddingTop: space.xl }}>
+          <Progress step={3} />
           <Text style={font.h1}>Your sleep data</Text>
           <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>
             {Platform.OS === 'android'
@@ -125,8 +156,32 @@ export default function Onboarding() {
             <Button label="Log sleep manually" icon="pencil" kind="secondary" onPress={() => finish('manual')} />
             <Button label="Skip for now" kind="ghost" onPress={() => finish('home')} />
           </View>
+          <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
+            <Button small kind="ghost" label="Back" icon="arrow-left" onPress={() => setStep(2)} />
+          </View>
         </View>
       ) : null}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  logo: { width: 72, height: 72, borderRadius: 24, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  featureIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 22, height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dotOn: { backgroundColor: colors.accent },
+  dotDone: { backgroundColor: colors.accentSoft },
+  day: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  dayOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dayText: { color: colors.text, fontWeight: '700', fontSize: 13 },
+});

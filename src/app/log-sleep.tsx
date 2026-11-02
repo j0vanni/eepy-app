@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, Text } from 'react-native';
 
 import { addDays, atMinutes, dateKey, formatClock, formatDuration, MINUTE, normalizeMinutes } from '@/engine/time';
 import type { SleepSession } from '@/engine/types';
 import { writeSleepToHealthConnect } from '@/integrations/healthConnect';
 import { useStore } from '@/state/store';
 import { Button, Card, Row, Screen, Segmented, Stepper } from '@/ui/components';
+import { Toggle } from '@/ui/settings/Toggle';
 import { dayLabel } from '@/ui/format';
 import { colors, font, space } from '@/ui/theme';
 
@@ -117,13 +118,7 @@ export default function LogSleepScreen() {
 
       {Platform.OS === 'android' ? (
         <Card>
-          <Row>
-            <View style={{ flex: 1 }}>
-              <Text style={font.body}>Also save to Health Connect</Text>
-              <Text style={font.small}>So other health apps see it too.</Text>
-            </View>
-            <Switch value={toHc} onValueChange={setToHc} trackColor={{ true: colors.accent, false: colors.border }} thumbColor={colors.text} />
-          </Row>
+          <Toggle label="Also save to Health Connect" sub="So other health apps see it too." value={toHc} onChange={setToHc} />
         </Card>
       ) : null}
 

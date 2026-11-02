@@ -1,11 +1,12 @@
 import { memo, ReactNode, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import type { AlertnessPoint } from '../engine/alertness';
 import type { StageMinutes } from '../engine/sessions';
 import { clamp, formatClock, formatDuration, formatHourLabel, formatTime, getClockFormat, HOUR, minutesOfDay, MINUTE } from '../engine/time';
 import type { StageSegment } from '../engine/types';
+import { ChartText, edgeAnchor } from './chartText';
 import { FillPath, PulseCircle, Reveal } from './motion';
 import { ScrubSurface, ScrubTooltip, useScrub } from './scrub';
 import { colors, font, STAGE_COLOR, STAGE_LABEL } from './theme';
@@ -70,9 +71,9 @@ const HypnogramLayer = memo(function HypnogramLayer({ segments, start, end, heig
     <Svg width={width} height={height}>
       {['Awake', 'REM', 'Light', 'Deep'].map((l, i) => (
         <G key={l}>
-          <SvgText x={0} y={i * rowH + rowH / 2 + 4} fill={colors.textFaint} fontSize={10}>
+          <ChartText x={0} y={i * rowH + rowH / 2 + 4}>
             {l}
-          </SvgText>
+          </ChartText>
           <Line x1={HYP.labelW} x2={width} y1={(i + 1) * rowH} y2={(i + 1) * rowH} stroke={colors.border} strokeWidth={0.5} />
         </G>
       ))}
@@ -82,9 +83,9 @@ const HypnogramLayer = memo(function HypnogramLayer({ segments, start, end, heig
         return <Rect key={i} x={x(s.start)} y={row * rowH + 3} width={w} height={rowH - 6} rx={2} fill={STAGE_COLOR[s.stage]} />;
       })}
       {hourTicks(start, end, (end - start) / HOUR > 10 ? 2 : 1).map((t) => (
-        <SvgText key={t} x={x(t)} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
+        <ChartText key={t} {...edgeAnchor(x(t), width, 8)} y={height - 4}>
           {hourLabel(t)}
-        </SvgText>
+        </ChartText>
       ))}
     </Svg>
   );
@@ -237,9 +238,9 @@ const EnergyLayer = memo(function EnergyLayer({ points, now, dip, focusWindows, 
         </G>
       ) : null}
       {hourTicks(start, end, 3).map((t) => (
-        <SvgText key={t} x={x(t)} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
+        <ChartText key={t} {...edgeAnchor(x(t), width)} y={height - 4}>
           {formatHourLabel(minutesOfDay(t))}
-        </SvgText>
+        </ChartText>
       ))}
     </Svg>
   );
@@ -337,14 +338,14 @@ const BarsLayer = memo(function BarsLayer({ data, need, height, width, selected 
         );
       })}
       <Line x1={0} x2={width} y1={y(need)} y2={y(need)} stroke={colors.good} strokeWidth={1.2} strokeDasharray="5,4" />
-      <SvgText x={width - 2} y={y(need) - 4} fill={colors.good} fontSize={10} textAnchor="end">
+      <ChartText x={width - 2} y={y(need) - 4} fill={colors.good} textAnchor="end">
         need {formatDuration(need)}
-      </SvgText>
+      </ChartText>
       {data.map((d, i) =>
         i % every === 0 ? (
-          <SvgText key={`l${i}`} x={i * slot + slot / 2} y={height - 3} fill={selected === i ? colors.text : colors.textFaint} fontSize={9} textAnchor="middle">
+          <ChartText key={`l${i}`} x={i * slot + slot / 2} y={height - 3} fill={selected === i ? colors.text : colors.textFaint} textAnchor="middle">
             {d.label}
-          </SvgText>
+          </ChartText>
         ) : null,
       )}
     </Svg>
@@ -410,7 +411,7 @@ interface LineProps {
   tooltipFormat?: (v: number) => string;
 }
 
-const LINE = { axisH: 16, top: 12, labelW: 30 };
+const LINE = { axisH: 16, top: 12, labelW: 30, padR: 6 };
 
 const roundFormat = (v: number) => String(Math.round(v));
 
@@ -441,7 +442,7 @@ type LineBodyProps = LineProps & { height: number; color: string; format: (v: nu
 const LineLayer = memo(function LineLayer(props: LineBodyProps) {
   const { values, labels, color, height, format, band, reference, width } = props;
   const { lo, hi, pad, y } = lineScale(props);
-  const plotW = width - LINE.labelW;
+  const plotW = width - LINE.labelW - LINE.padR;
   const x = (i: number) => LINE.labelW + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW);
   let d = '';
   let pen = false;
@@ -460,23 +461,23 @@ const LineLayer = memo(function LineLayer(props: LineBodyProps) {
       {reference ? (
         <G>
           <Line x1={LINE.labelW} x2={width} y1={y(reference.value)} y2={y(reference.value)} stroke={colors.good} strokeDasharray="4,4" />
-          <SvgText x={width - 2} y={y(reference.value) - 4} fill={colors.good} fontSize={10} textAnchor="end">
+          <ChartText x={width - 2} y={y(reference.value) - 4} fill={colors.good} textAnchor="end">
             {reference.label}
-          </SvgText>
+          </ChartText>
         </G>
       ) : null}
       {[lo + pad, (lo + hi) / 2, hi - pad].map((v, i) => (
-        <SvgText key={i} x={0} y={y(v) + 4} fill={colors.textFaint} fontSize={9}>
+        <ChartText key={i} x={0} y={y(v) + 4}>
           {format(v)}
-        </SvgText>
+        </ChartText>
       ))}
       <Path d={d} stroke={color} strokeWidth={2} fill="none" />
       {values.map((v, i) => (v === undefined ? null : <Circle key={i} cx={x(i)} cy={y(v)} r={values.length > 40 ? 1.5 : 2.5} fill={color} />))}
       {labels.map((l, i) =>
         i % every === 0 ? (
-          <SvgText key={`l${i}`} x={x(i)} y={height - 3} fill={colors.textFaint} fontSize={9} textAnchor="middle">
+          <ChartText key={`l${i}`} {...edgeAnchor(x(i), width, 12)} y={height - 3}>
             {l}
-          </SvgText>
+          </ChartText>
         ) : null,
       )}
     </Svg>
@@ -486,7 +487,7 @@ const LineLayer = memo(function LineLayer(props: LineBodyProps) {
 function LineBody(props: LineBodyProps) {
   const { values, labels, color, height, format, width, tooltipLabels, tooltipFormat } = props;
   const { y } = lineScale(props);
-  const plotW = width - LINE.labelW;
+  const plotW = width - LINE.labelW - LINE.padR;
   const n = values.length;
   const x = (i: number) => LINE.labelW + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
   const { selection, panHandlers } = useScrub({
@@ -524,7 +525,7 @@ function LineBody(props: LineBodyProps) {
 export function SleepTimeline({ rows, height = 180 }: { rows: { label: string; onsetMin?: number; wakeMin?: number }[]; height?: number }) {
   const axisH = 16;
   const top = 8;
-  const labelW = 34;
+  const labelW = 40;
   const toY = (m: number) => ((m - 20 * 60 + 1440) % 1440) / (16 * 60); // 20:00 → 0, 12:00 → 1
   return (
     <ChartFrame height={height}>
@@ -541,9 +542,9 @@ export function SleepTimeline({ rows, height = 180 }: { rows: { label: string; o
                 return (
                   <G key={h}>
                     <Line x1={labelW} x2={width} y1={yy} y2={yy} stroke={colors.border} strokeWidth={0.5} />
-                    <SvgText x={0} y={yy + 4} fill={colors.textFaint} fontSize={9}>
+                    <ChartText x={0} y={yy + 4}>
                       {formatHourLabel(h * 60)}
-                    </SvgText>
+                    </ChartText>
                   </G>
                 );
               })}
@@ -556,9 +557,9 @@ export function SleepTimeline({ rows, height = 180 }: { rows: { label: string; o
               })}
               {rows.map((r, i) =>
                 i % every === 0 ? (
-                  <SvgText key={`l${i}`} x={labelW + i * slot + slot / 2} y={height - 3} fill={colors.textFaint} fontSize={9} textAnchor="middle">
+                  <ChartText key={`l${i}`} x={labelW + i * slot + slot / 2} y={height - 3} textAnchor="middle">
                     {r.label}
-                  </SvgText>
+                  </ChartText>
                 ) : null,
               )}
             </Svg>

@@ -25,11 +25,11 @@ export function WindDownSection() {
           The default for your wind-down routine and the evening card on Today. Plays with the screen off and fades out gently at the end of the timer.
         </Text>
         <SoundPicker value={settings.sound} onChange={sound.setSound} playing={sound.playing} />
-        <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>VOLUME</Text>
+        <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>VOLUME</Text>
         <VolumeSlider value={settings.volume} onChange={(v) => soundPlayer.setVolume(v)} onCommit={sound.setVolume} />
-        <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>SLEEP TIMER</Text>
+        <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>SLEEP TIMER</Text>
         <TimerPicker value={settings.timerMin} onChange={sound.setTimer} />
-        <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>SCREENS OFF BEFORE LIGHTS-OUT</Text>
+        <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>SCREENS OFF BEFORE LIGHTS-OUT</Text>
         <Segmented
           value={screensOffMin}
           onChange={(v) => setSettings({ screensOffMin: v })}

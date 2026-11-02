@@ -23,7 +23,7 @@ import { dismissSleepModePrompt, sleepSoundsLabel } from '@/notifications/sleepM
 import { anotherDose, decideQuickAction, parseQuickAction, type QuickDecision } from '@/shortcuts/quickActions';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Icon, Row } from '@/ui/components';
+import { Button, Icon, IconButton, Row } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
 import { EnterView } from '@/ui/motion';
 import { colors, font, radius, space } from '@/ui/theme';
@@ -115,13 +115,13 @@ export default function QuickActionScreen() {
   if (sheet.kind === 'logged') {
     const { dose } = sheet;
     body = sheet.undone ? (
-      <Row gap={space.md}>
+      <Row gap={space.md} style={styles.head}>
         <Icon name="undo" size={22} color={colors.textDim} />
         <Text style={[font.body, { flex: 1 }]}>Undone — nothing logged.</Text>
       </Row>
     ) : (
       <>
-        <Row gap={space.md}>
+        <Row gap={space.md} style={styles.head}>
           <Icon name="check-circle" size={22} color={colors.good} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { fontWeight: '600' }]}>
@@ -130,19 +130,19 @@ export default function QuickActionScreen() {
             <Text style={font.tiny}>{stay ? 'Your usual coffee · logged' : 'Your usual coffee · logged · closing…'}</Text>
           </View>
         </Row>
-        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
           <Button
             small
             kind="secondary"
             icon="undo"
             label="Undo"
+            style={{ flex: 1 }}
             onPress={() => {
               removeCaffeine(dose.id);
               setSheet({ ...sheet, undone: true });
             }}
           />
-          <Button small kind="secondary" icon="clock-edit-outline" label="Change time" onPress={() => changeTime(dose.id)} />
-          <Button small kind="ghost" label="Done" onPress={close} />
+          <Button small kind="secondary" icon="clock-edit-outline" label="Change time" style={{ flex: 1 }} onPress={() => changeTime(dose.id)} />
         </Row>
       </>
     );
@@ -150,7 +150,7 @@ export default function QuickActionScreen() {
     const { dose, usual } = sheet;
     body = (
       <>
-        <Row gap={space.md}>
+        <Row gap={space.md} style={styles.head}>
           <Icon name="coffee" size={22} color={colors.caffeine} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { fontWeight: '600' }]}>Already logged today</Text>
@@ -159,11 +159,12 @@ export default function QuickActionScreen() {
             </Text>
           </View>
         </Row>
-        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
           <Button
             small
             icon="plus"
             label="Log another now"
+            style={{ flex: 1 }}
             onPress={() => {
               const another = anotherDose(usual, Date.now());
               addCaffeine(another);
@@ -171,8 +172,7 @@ export default function QuickActionScreen() {
               setSheet({ kind: 'logged', dose: another, usual, undone: false });
             }}
           />
-          <Button small kind="secondary" icon="clock-edit-outline" label="Change time" onPress={() => changeTime(dose.id)} />
-          <Button small kind="ghost" label="Done" onPress={close} />
+          <Button small kind="secondary" icon="clock-edit-outline" label="Change time" style={{ flex: 1 }} onPress={() => changeTime(dose.id)} />
         </Row>
       </>
     );
@@ -180,7 +180,7 @@ export default function QuickActionScreen() {
     const { option } = sheet;
     body = (
       <>
-        <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
+        <Row gap={space.md} style={[styles.head, { alignItems: 'flex-start' }]}>
           <Icon name="sleep" size={22} color={colors.accent} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { fontWeight: '600' }]}>
@@ -192,20 +192,20 @@ export default function QuickActionScreen() {
             </Text>
           </View>
         </Row>
-        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
           <Button
             small
             icon="alarm"
             label={busy ? 'Starting…' : 'Start nap'}
             disabled={busy}
+            style={{ flex: 1 }}
             onPress={async () => {
               setBusy(true);
               await startNapTimer(useStore.getState(), option).catch((e) => console.warn('nap start failed', e));
               router.replace('/nap');
             }}
           />
-          <Button small kind="secondary" label="Nap coach" onPress={() => router.replace('/nap')} />
-          <Button small kind="ghost" label="Not now" onPress={close} />
+          <Button small kind="secondary" icon="sleep" label="Nap coach" style={{ flex: 1 }} onPress={() => router.replace('/nap')} />
         </Row>
       </>
     );
@@ -213,7 +213,7 @@ export default function QuickActionScreen() {
     const playing = playback.status === 'playing';
     body = (
       <>
-        <Row gap={space.md}>
+        <Row gap={space.md} style={styles.head}>
           <Icon name="music-note" size={22} color={colors.accent} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { fontWeight: '600' }]}>{sleepSoundsLabel(audio)}</Text>
@@ -222,19 +222,19 @@ export default function QuickActionScreen() {
             </Text>
           </View>
         </Row>
-        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
-          <Button small kind="secondary" icon="weather-night" label="Wind-down" onPress={() => router.replace('/winddown')} />
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
+          <Button small kind="secondary" icon="weather-night" label="Wind-down" style={{ flex: 1 }} onPress={() => router.replace('/winddown')} />
           <Button
             small
             kind="secondary"
             icon="stop"
             label="Stop"
+            style={{ flex: 1 }}
             onPress={() => {
               soundPlayer.stop();
               close();
             }}
           />
-          <Button small kind="ghost" label="Done" onPress={close} />
         </Row>
       </>
     );
@@ -247,6 +247,9 @@ export default function QuickActionScreen() {
         <Pressable onPressIn={() => setStay(true)} accessible={false}>
           {body}
         </Pressable>
+        <View style={styles.close}>
+          <IconButton icon="close" label={sheet.kind === 'nap' ? 'Not now' : 'Done'} onPress={close} color={colors.textFaint} />
+        </View>
       </EnterView>
     </View>
   );
@@ -254,8 +257,10 @@ export default function QuickActionScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: space.lg, backgroundColor: 'rgba(5, 7, 15, 0.55)' },
+  close: { position: 'absolute', top: 6, right: 6 },
+  head: { paddingRight: 36 },
   sheet: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radius.lg,

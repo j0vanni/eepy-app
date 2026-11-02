@@ -4,7 +4,7 @@
  * Extra dim. `full` adds the whole evening schedule and the Night Light times to set.
  */
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Switch, Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { judgeScreenBrightness, nightLightSchedule, ScreenPlanInput, screenLightSchedule, screenTargetAt } from '@/engine/screenLight';
@@ -25,7 +25,7 @@ import {
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
-import { Button, Card, CardTitle, Note, Row } from '@/ui/components';
+import { AppSwitch, Button, Card, CardTitle, Note, Row } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 const FILTER_LABEL = { off: 'No filter needed', warm: 'Night Light on', warmest: 'Night Light warmest + Extra dim' } as const;
@@ -95,15 +95,14 @@ function PhoneBrightness({ target, phone, patch, refresh }: { target?: number; p
         {phone.canSet && phone.auto !== undefined ? (
           <Row gap={6}>
             <Text style={font.small}>Auto</Text>
-            <Switch
+            <AppSwitch
               value={phone.auto}
-              onValueChange={async (on) => {
+              label="Automatic brightness"
+              onChange={async (on) => {
                 patch({ auto: on });
                 await setAutoBrightness(on);
                 refresh();
               }}
-              trackColor={{ true: colors.accent, false: colors.border }}
-              thumbColor={colors.text}
             />
           </Row>
         ) : null}
@@ -141,7 +140,8 @@ function BrightnessCheck({ target, brightness }: { target: ReturnType<typeof scr
   );
 }
 
-export function ScreenLightCard({ a, full }: { a: Analysis; full?: boolean }) {
+/** `embedded` drops the card frame and title, for use inside a section that already says "Phone light". */
+export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boolean; embedded?: boolean }) {
   const now = useNow(30_000);
   const [phone, patchPhone, refreshPhone] = usePhoneScreen();
   const screensOffMin = useStore((st) => st.settings.screensOffMin);
@@ -152,14 +152,14 @@ export function ScreenLightCard({ a, full }: { a: Analysis; full?: boolean }) {
   const nl = nightLightSchedule(plan);
   const android = screenControlsSupported();
 
-  return (
-    <Card>
-      <CardTitle
-        icon={evening ? 'cellphone-cog' : 'cellphone'}
-        title="Phone light"
-        color={colors.light}
-        right={<Text style={font.small}>{target.maxBrightness < 1 ? `≤ ${Math.round(target.maxBrightness * 100)}% · ${FILTER_LABEL[target.filter]}` : FILTER_LABEL.off}</Text>}
-      />
+  const status = target.maxBrightness < 1 ? `≤ ${Math.round(target.maxBrightness * 100)}% · ${FILTER_LABEL[target.filter]}` : FILTER_LABEL.off;
+  const body = (
+    <>
+      {embedded ? (
+        <Text style={[font.label, { marginBottom: space.xs }]}>{`NOW · ${status.toUpperCase()}`}</Text>
+      ) : (
+        <CardTitle icon={evening ? 'cellphone-cog' : 'cellphone'} title="Phone light" color={colors.light} right={<Text style={font.small}>{status}</Text>} />
+      )}
       <Text style={font.h3}>{target.title}</Text>
       <Text style={[font.small, { marginTop: 2 }]}>{target.advice}</Text>
       <BrightnessCheck target={target} brightness={phone.brightness} />
@@ -194,6 +194,7 @@ export function ScreenLightCard({ a, full }: { a: Analysis; full?: boolean }) {
           {target.maxBrightness < 1 ? <Button small kind="ghost" icon="brightness-5" label="Dim eepy now" onPress={() => dimEepy(target.maxBrightness)} /> : null}
         </Row>
       ) : null}
-    </Card>
+    </>
   );
+  return embedded ? <View>{body}</View> : <Card>{body}</Card>;
 }

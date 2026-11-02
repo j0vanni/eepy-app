@@ -45,7 +45,7 @@ export default function QuizScreen() {
       <Screen>
         <Stack.Screen options={{ title: quiz.title }} />
         <Card>
-          <Text style={font.tiny}>YOUR SCORE</Text>
+          <Text style={font.label}>YOUR SCORE</Text>
           <Text style={[font.stat, { marginVertical: 4 }]}>
             {score}
             <Text style={font.small}> / {max}</Text>

@@ -1,4 +1,4 @@
-import { Switch, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { defaultGoalTarget, GOAL_DEFS, GoalDef, GoalProgress, MAX_GOALS, setGoalTarget, toggleGoal } from '@/engine/goals';
 import { formatClock, normalizeMinutes } from '@/engine/time';
@@ -6,7 +6,7 @@ import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { GOAL_STATUS_TEXT, GoalDots } from '@/ui/coach/Dots';
 import { useGoalInput, useGoalsSummary } from '@/ui/coach/hooks';
-import { Button, Card, Empty, Icon, Meter, Note, Row, Screen, Section, Stat, Stepper } from '@/ui/components';
+import { AppSwitch, Button, Card, Empty, Icon, Meter, Note, Row, Screen, Section, Stat, Stepper } from '@/ui/components';
 import { colors, font, scoreColor, space } from '@/ui/theme';
 
 function GoalParam({ def, progress }: { def: GoalDef; progress: GoalProgress }) {
@@ -78,7 +78,7 @@ export default function GoalsScreen() {
         <Card>
           <Row>
             <Stat label="This week" value={summary.weeklyScore !== undefined ? `${summary.weeklyScore}%` : '–'} color={summary.weeklyScore !== undefined ? scoreColor(summary.weeklyScore) : undefined} sub="of goal-days met" />
-            <Stat label="Longest streak now" value={`${Math.max(0, ...summary.goals.map((g) => g.currentStreak))}`} sub="days" />
+            <Stat label="Best streak" value={`${Math.max(0, ...summary.goals.map((g) => g.currentStreak))}`} sub="days, running now" />
             <Stat label="Goals" value={`${summary.goals.length}/${MAX_GOALS}`} />
           </Row>
           {summary.weeklyScore !== undefined ? (
@@ -107,14 +107,7 @@ export default function GoalsScreen() {
                   <Text style={font.h3}>{def.title}</Text>
                   <Text style={[font.small, { marginTop: 2 }]}>{def.description}</Text>
                 </View>
-                <Switch
-                  value={on}
-                  disabled={full}
-                  onValueChange={(v) => toggle(def.id, v)}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                  thumbColor={colors.text}
-                  accessibilityLabel={`${def.title} goal`}
-                />
+                <AppSwitch value={on} disabled={full} onChange={(v) => toggle(def.id, v)} label={`${def.title} goal`} />
               </Row>
               {progress && st ? (
                 <View style={{ marginTop: space.md }}>

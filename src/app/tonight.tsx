@@ -140,11 +140,12 @@ export default function AdjustTonight() {
         <CardTitle icon="crystal-ball" title="What it means" />
         <Row>
           <Stat label="Sleep" value={formatDuration(mine.sleep.sleepMin)} sub={shortBy ? `${signed(-shortBy)} vs plan` : `need ${formatDuration(a.need.needMin)}`} color={shortBy >= 45 ? colors.warn : undefined} />
-          <Stat label="Tomorrow's energy" value={String(Math.round(mine.tomorrow.avgEnergy))} sub={`plan ${Math.round(plan.tomorrow.avgEnergy)}`} />
+          <Stat label="Energy" value={String(Math.round(mine.tomorrow.avgEnergy))} sub={`plan ${Math.round(plan.tomorrow.avgEnergy)}`} />
           <Stat label="Debt after" value={formatDuration(mine.debtMin)} sub={`plan ${formatDuration(plan.debtMin)}`} />
         </Row>
         <Text style={[font.tiny, { marginTop: space.sm }]}>
-          Focus time tomorrow: {mine.tomorrow.focusHours.toFixed(1)} h (plan {plan.tomorrow.focusHours.toFixed(1)} h). Expected sleep score {Math.round(mine.score.total)}.
+          Energy is tomorrow's average. Focus time tomorrow: {mine.tomorrow.focusHours.toFixed(1)} h (plan {plan.tomorrow.focusHours.toFixed(1)} h). Expected sleep score{' '}
+          {Math.round(mine.score.total)}.
         </Text>
       </Card>
 

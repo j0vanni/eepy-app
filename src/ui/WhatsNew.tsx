@@ -54,7 +54,7 @@ export function WhatsNewContent() {
           </Row>
         ))}
       </View>
-      <Text style={[font.tiny, { marginTop: space.lg, marginBottom: space.sm, fontWeight: '600' }]}>WHERE THINGS MOVED</Text>
+      <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>WHERE THINGS MOVED</Text>
       <View style={styles.table}>
         {MOVED.map(([from, to], i) => (
           <Row key={from} gap={space.sm} style={[styles.moveRow, i ? { borderTopWidth: 1, borderTopColor: colors.border } : null]}>

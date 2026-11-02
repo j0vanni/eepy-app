@@ -1,10 +1,11 @@
 import { memo, useMemo, useRef, useState } from 'react';
 import { PanResponder, Text, View } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import type { AlertnessPoint } from '../engine/alertness';
 import { formatClock, formatHourLabel, formatTime, HOUR, minutesOfDay } from '../engine/time';
 import { ChartFrame } from './charts';
+import { ChartText, edgeAnchor } from './chartText';
 import { colors, font, space } from './theme';
 
 /** Local clock hours between start and end that are multiples of `every`. */
@@ -109,9 +110,9 @@ export const CompareChart = memo(function CompareChart({
                   <G>
                     <Rect x={0} y={top} width={width} height={y(focusEnergy) - top} fill={colors.good} opacity={0.07} />
                     <Line x1={0} x2={width} y1={y(focusEnergy)} y2={y(focusEnergy)} stroke={colors.good} strokeWidth={0.8} strokeDasharray="4,4" opacity={0.7} />
-                    <SvgText x={width - 2} y={y(focusEnergy) - 4} fill={colors.textDim} fontSize={9} textAnchor="end">
+                    <ChartText x={width - 2} y={y(focusEnergy) - 4} fill={colors.textDim} textAnchor="end">
                       focus zone
-                    </SvgText>
+                    </ChartText>
                   </G>
                 ) : null}
                 {sleepEnd > from ? <Rect x={0} y={top} width={x(sleepEnd)} height={plotH} fill={colors.deep} opacity={0.25} /> : null}
@@ -131,9 +132,9 @@ export const CompareChart = memo(function CompareChart({
                   </G>
                 ) : null}
                 {hourTicks(from, to, 3).map((t) => (
-                  <SvgText key={t} x={Math.min(width - 14, Math.max(14, x(t)))} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
+                  <ChartText key={t} {...edgeAnchor(x(t), width)} y={height - 4}>
                     {formatHourLabel(minutesOfDay(t))}
-                  </SvgText>
+                  </ChartText>
                 ))}
               </Svg>
             );

@@ -41,11 +41,13 @@ export function NightsList({ a }: { a: Analysis }) {
               accessibilityLabel={`${nightLabel(r.date)}, ${formatDuration(main)}${r.score !== undefined ? `, score ${r.score}` : ''}`}
             >
               <View style={{ flex: 1 }}>
-                <Text style={font.body}>{nightLabel(r.date)}</Text>
-                <Text style={font.small}>
-                  {dayLabel(r.date)}
-                  {r.onsetMin !== undefined && r.wakeMin !== undefined ? ` · ${formatClock(r.onsetMin)} → ${formatClock(r.wakeMin)}` : ''}
+                <Text style={font.body}>
+                  {nightLabel(r.date)}
+                  <Text style={font.small}>{` · ${dayLabel(r.date)}`}</Text>
                 </Text>
+                {r.onsetMin !== undefined && r.wakeMin !== undefined ? (
+                  <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>{`${formatClock(r.onsetMin)} → ${formatClock(r.wakeMin)}`}</Text>
+                ) : null}
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[font.h3, { color: short ? colors.warn : colors.text, fontVariant: ['tabular-nums'] }]}>{formatDuration(main)}</Text>

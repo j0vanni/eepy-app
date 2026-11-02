@@ -21,7 +21,7 @@ export default function NeedScreen() {
   return (
     <Screen>
       <Card>
-        <Text style={font.tiny}>YOU NEED ABOUT</Text>
+        <Text style={font.label}>YOU NEED ABOUT</Text>
         <Text style={[font.stat, { fontSize: 40, marginVertical: 4 }]}>{formatDuration(n.needMin)}</Text>
         <Text style={font.small}>of actual sleep per night{n.method !== 'override' ? ` (likely ${formatDuration(n.lowMin)}–${formatDuration(n.highMin)})` : ''}</Text>
         <Row style={{ marginTop: space.md }}>
@@ -51,7 +51,9 @@ export default function NeedScreen() {
             <Meter value={Math.min(n.naturalNightsUsed, n.naturalNightsWanted)} max={n.naturalNightsWanted} color={colors.good} />
           </View>
           <Text style={font.small}>
-            {n.naturalNightsUsed} of {n.naturalNightsWanted} nights where you woke without an alarm. Each morning, tap "Yes, naturally" in the Journal when that's the case —
+            {n.naturalNightsUsed >= n.naturalNightsWanted
+              ? `${n.naturalNightsUsed} nights where you woke without an alarm — enough for a solid estimate.`
+              : `${n.naturalNightsUsed} of ${n.naturalNightsWanted} nights where you woke without an alarm.`} Each morning, tap "Yes, naturally" in the Journal when that's the case —
             especially on weekends and holidays.
           </Text>
           <Text style={[font.small, { marginTop: space.md }]}>

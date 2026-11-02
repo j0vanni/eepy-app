@@ -79,6 +79,9 @@ describe('12-hour clock', () => {
   it('rewrites times inside fixed text, and leaves 24h text alone', () => {
     expect(localizeClockText('No caffeine after 14:00')).toBe(nb('No caffeine after 2:00 PM'));
     expect(localizeClockText('22:00–5:00')).toBe(nb('10:00 PM–5:00 AM'));
+    // Already in 12-hour form (an experiment target filled in with formatClock): not converted twice.
+    expect(localizeClockText(`Up at ${formatClock(7 * 60)} ±15 min`)).toBe(nb('Up at 7:00 AM ±15 min'));
+    expect(localizeClockText(`after ${formatClock(14 * 60)}, before 18:00`)).toBe(nb('after 2:00 PM, before 6:00 PM'));
     setClockFormat('24h');
     expect(localizeClockText('No caffeine after 14:00')).toBe('No caffeine after 14:00');
   });

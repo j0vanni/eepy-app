@@ -8,7 +8,7 @@ import { ensureNotificationPermission } from '../../notifications/channels';
 import { FullScreenAlarmStatus, getFullScreenAlarmStatus, openFullScreenAlarmSettings } from '../../notifications/fullScreenAlarm';
 import { formatClock } from '../../engine/time';
 import { NotificationPrefs, useStore } from '../../state/store';
-import { Button, Card, CardTitle, Note, Row, Section } from '../components';
+import { AppSwitch, Button, Card, CardTitle, Note, Row, Section } from '../components';
 import { notify } from '../confirm';
 import { relativeTime } from '../format';
 import { font, space } from '../theme';
@@ -100,7 +100,7 @@ export function WakeAlarmSection() {
       <Card>
         <Toggle
           label="Wake alarm (cycle-timed)"
-          sub="eepy rings at the end of a sleep cycle, in the 30 minutes before your wake-up time — so you wake up less groggy"
+          sub="Rings at the end of a sleep cycle in the 30 min before your wake-up, so you wake less groggy"
           value={smartAlarm}
           onChange={(v) => setNotif('smartAlarm', v)}
         />
@@ -199,9 +199,13 @@ export function BackgroundSection() {
   return (
     <Section title="While eepy is closed">
       <Card>
-        <CardTitle icon="sync" title="Background sync" />
-        <Toggle label="Background sync" sub="Pulls new nights from Health Connect and refreshes reminders" value={bg.enabled} onChange={(v) => setBackground({ enabled: v })} />
-        <Text style={[font.small, { marginBottom: space.sm }]}>{status}</Text>
+        <CardTitle
+          icon="sync"
+          title="Background sync"
+          sub="Pulls new nights from Health Connect and refreshes reminders"
+          right={<AppSwitch value={bg.enabled} onChange={(v) => setBackground({ enabled: v })} label="Background sync" />}
+        />
+        <Text style={[font.tiny, { marginBottom: space.sm }]}>{status}</Text>
         {bg.enabled && live && bgAllowed === false ? (
           <>
             <Note tone="warn">Health Connect only lets eepy read your data while it's open, until you allow background access.</Note>

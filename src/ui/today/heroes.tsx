@@ -60,7 +60,7 @@ function CountdownCard({ a }: { a: Analysis }) {
   const progress = Math.max(0, Math.min(1, (now - eveningStart) / (bedtime - eveningStart)));
   return (
     <Card accent={colors.light}>
-      <Text style={font.tiny}>{winding ? 'WIND-DOWN · LIGHTS OUT IN' : 'LIGHTS OUT IN'}</Text>
+      <Text style={font.label}>{winding ? 'WIND-DOWN · LIGHTS OUT IN' : 'LIGHTS OUT IN'}</Text>
       <Text style={[font.stat, { fontSize: 46, lineHeight: 54, color: colors.text, fontVariant: ['tabular-nums'] }]}>{until(bedtime - now)}</Text>
       <Text style={[font.small, { color: colors.text }]}>
         at {formatTime(bedtime)}
@@ -174,7 +174,9 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
                 opacity: o.fitsBeforeWake ? 1 : 0.5,
               }}
             >
-              <Text style={[font.h2, { color: o.best ? colors.light : colors.textDim, width: 70, fontVariant: ['tabular-nums'] }]}>{formatTime(o.wake)}</Text>
+              <Text style={[font.h2, { color: o.best ? colors.light : colors.textDim, width: 96, fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatTime(o.wake)}
+              </Text>
               <View style={{ flex: 1 }}>
                 <Text style={[font.small, { color: colors.textDim }]}>
                   {o.cycles} cycle{o.cycles > 1 ? 's' : ''} · {formatDuration(o.sleepMin)} sleep

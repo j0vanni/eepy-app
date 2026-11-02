@@ -78,7 +78,7 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
       <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
         <Icon name="face-woman-shimmer-outline" size={20} color={colors.light} />
         <View style={{ flex: 1 }}>
-          <Text style={font.tiny}>MORNING ROUTINE</Text>
+          <Text style={font.label}>MORNING ROUTINE</Text>
           <Text style={[font.h2, { color: colors.textDim, marginTop: 2 }]}>
             {backToBed ? `Back to bed by ${formatTime(r.backToBedBy)}` : 'Back to bed'} — alarm at {final}.
           </Text>

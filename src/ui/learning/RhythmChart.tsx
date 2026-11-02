@@ -1,11 +1,12 @@
 // OWNER: learning workstream. Today's predicted energy: average-person model vs. personal model, with check-ins.
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 
 import type { AlertnessPoint } from '@/engine/alertness';
 import { formatClock, formatHourLabel, HOUR, minutesOfDay, MINUTE } from '@/engine/time';
 import { ChartFrame } from '../charts';
+import { ChartText, edgeAnchor } from '../chartText';
 import { colors, font, space } from '../theme';
 
 export interface ChartCheckIn {
@@ -76,9 +77,9 @@ export function RhythmChart({
               {[25, 50, 75].map((v) => (
                 <G key={v}>
                   <Line x1={labelW} x2={width} y1={y(v)} y2={y(v)} stroke={colors.border} strokeWidth={0.5} strokeDasharray="3,4" />
-                  <SvgText x={0} y={y(v) + 3} fill={colors.textFaint} fontSize={9}>
+                  <ChartText x={0} y={y(v) + 3}>
                     {v}
-                  </SvgText>
+                  </ChartText>
                 </G>
               ))}
               {personal ? <Path d={pathOf(awake(population), x, y)} stroke={colors.textDim} strokeWidth={1.5} strokeDasharray="5,4" fill="none" opacity={0.8} /> : null}
@@ -100,9 +101,9 @@ export function RhythmChart({
                   />
                 ))}
               {hourTicks(start, end, 3).map((t) => (
-                <SvgText key={t} x={x(t)} y={height - 4} fill={colors.textFaint} fontSize={10} textAnchor="middle">
+                <ChartText key={t} {...edgeAnchor(x(t), width)} y={height - 4}>
                   {formatHourLabel(minutesOfDay(t))}
-                </SvgText>
+                </ChartText>
               ))}
             </Svg>
           );

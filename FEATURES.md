@@ -377,6 +377,23 @@ Built for a non-technical user who found it confusing where things were. Nothing
 
 ---
 
+## 28. New in 0.9 — UI polish
+
+A pass over every screen for one calm, consistent look. Nothing was removed.
+
+| | Feature |
+| --- | --- |
+| ✅ | **One visual system** (`src/ui/theme.ts`, `src/ui/components.tsx`): a type scale with line heights (h1 · h2 · h3 · body · small · tiny, plus a `label` style for every small uppercase caption), a 4-pt spacing scale, colour roles (accent purple = actions and your plan, energy yellow, caffeine brown, violet for evening light and wind-down) and a fainter-text colour that still passes 4.5:1 contrast |
+| ✅ | **Bigger touch targets**: buttons 48 dp (40 dp small, with extra hit area), chips 38 dp, steppers 40 dp, list rows 56 dp, header icons 44 dp; a whole settings row toggles its switch, not just the switch; switches use the accent colour everywhere |
+| ✅ | **Times never break mid-word** ("6:56 A / M"): wider time columns in the night view, *Your day*, the journal and the simulator; stat values stay on one line and stats line up at the top |
+| ✅ | **Charts**: one sans-serif face for every axis label, end labels kept inside the chart, room for the last point |
+| ✅ | **Tab bar** tall enough for its labels; the floating **+** and tab bar dim with the night view, and every tab scrolls its last card clear of the **+** |
+| ✅ | **Less repetition, shorter text**: cards no longer repeat their title in a toggle (two-step mornings, background sync), the phone-light tool isn't a card inside a card, single-group Settings pages drop the duplicate heading, long explanations (simulator, body clock, nap coach) fold away, the body-clock check-in list shows the latest five, and dense hints were shortened |
+| ✅ | **Screens read top-down**: the night report leads with the score, then the story; stack screens show their one-line intro (Coach, Journal, Goals, Experiments, Log a drink); insights use a quiet icon instead of a bright border; onboarding has step dots, a Monday-first day row and a full-width *Next* |
+| ✅ | Fixes: experiment rules no longer say "7:00 AM AM"; Sleep → Trends opened from a link no longer logs a navigation error; the quick coffee / nap sheets have a close button and two equal actions instead of wrapping buttons |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation
