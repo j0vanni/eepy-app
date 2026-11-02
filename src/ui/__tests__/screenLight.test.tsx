@@ -26,6 +26,7 @@ import { createRoot, Root, TestInstance } from 'test-renderer';
 import { analyze } from '../../engine/analysis';
 import { generateDemoData } from '../../engine/demo';
 import { atMinutes } from '../../engine/time';
+import { useStore } from '../../state/store';
 import { ScreenLightCard } from '../cards/ScreenLightCard';
 
 const NOW = atMinutes('2026-10-29', 21 * 60); // evening: target ≤ 50%
@@ -41,8 +42,8 @@ afterEach(async () => {
 });
 
 const a = analyze(generateDemoData(NOW), NOW);
-const render = async () => {
-  await act(async () => root.render(<ScreenLightCard a={a} />));
+const render = async (props: { full?: boolean } = {}) => {
+  await act(async () => root.render(<ScreenLightCard a={a} {...props} />));
   await act(async () => {
     await Promise.resolve();
   });
@@ -79,5 +80,36 @@ describe('Phone light card on Android', () => {
     mockScreen.getScreenBrightness.mockResolvedValue(undefined);
     await render();
     expect(text()).not.toContain('Phone brightness');
+  });
+});
+
+describe('E-reader block', () => {
+  afterEach(() => useStore.getState().setSettings({ eReader: { enabled: false, warmLight: false } }));
+
+  it('appears only when you read on an e-ink reader, with its frontlight target now', async () => {
+    await render();
+    expect(text()).not.toContain('E-READER');
+    await act(async () => useStore.getState().setSettings({ eReader: { enabled: true, warmLight: true } }));
+    expect(text()).toContain('E-READER');
+    expect(text()).toContain('Evening: anything comfortable');
+    // The compact card (Today) leaves the rest of the evening to the full one.
+    expect(text()).not.toContain('Frontlight 10–20% · warmest');
+  });
+
+  it('lists the rest of the evening in the full card', async () => {
+    useStore.getState().setSettings({ eReader: { enabled: true, warmLight: true } });
+    await render({ full: true });
+    expect(text()).toContain('Start turning the warmth up');
+    expect(text()).toContain('Frontlight ≤ 30% · warm');
+    expect(text()).toContain('Frontlight 10–20% · warmest');
+    expect(text()).toContain('E-reader down');
+  });
+
+  it('without a warm light, says keep it low', async () => {
+    useStore.getState().setSettings({ eReader: { enabled: true, warmLight: false } });
+    await render({ full: true });
+    expect(text()).toContain('Frontlight 10–20%');
+    expect(text()).not.toContain('Frontlight 10–20% · warmest');
+    expect(text()).not.toContain('Start turning the warmth up');
   });
 });

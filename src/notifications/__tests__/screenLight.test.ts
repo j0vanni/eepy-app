@@ -1,7 +1,7 @@
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 import { analyze } from '../../engine/analysis';
-import { MINUTE } from '../../engine/time';
+import { formatTime, MINUTE } from '../../engine/time';
 import { screenLight } from '../features/screenLight';
 import { screensOff } from '../features/screensOff';
 import { at, scenario, WORKDAY } from './helpers';
@@ -29,5 +29,22 @@ describe('screens-off reminder', () => {
     const [n] = screensOff.plan(ctx);
     expect(n).toMatchObject({ at: Math.max(ctx.analysis.tonight.windDownStart, ctx.analysis.tonight.bedtime - 60 * MINUTE), data: { route: '/winddown' } });
     expect(screensOff.plan(scenario(at(WORKDAY, 12), { prefs: { screensOff: false } }))).toEqual([]);
+  });
+
+  it('says the e-reader is fine when you read on one', () => {
+    const [plain] = screensOff.plan(scenario(at(WORKDAY, 12), { prefs: { screensOff: true } }));
+    expect(plain.body).toMatch(/^Send last messages/);
+    expect(plain.body).not.toMatch(/e-reader/);
+
+    const warm = scenario(at(WORKDAY, 12), { prefs: { screensOff: true }, settings: { eReader: { enabled: true, warmLight: true } } });
+    const [n] = screensOff.plan(warm);
+    expect(n.title).toBe('Screens off 📵');
+    expect(n.body).toBe(`Phone down — e-reader's fine, frontlight low and warm. Send last messages, check your alarm, then phone on the charger, face down — lights out at ${formatTime(warm.analysis.tonight.bedtime)}.`);
+
+    const [noWarm] = screensOff.plan(scenario(at(WORKDAY, 12), { prefs: { screensOff: true }, settings: { eReader: { enabled: true, warmLight: false } } }));
+    expect(noWarm.body).toMatch(/^Phone down — e-reader's fine, frontlight low\. /);
+    // Switched off again: back to the plain reminder.
+    const [off] = screensOff.plan(scenario(at(WORKDAY, 12), { prefs: { screensOff: true }, settings: { eReader: { enabled: false, warmLight: true } } }));
+    expect(off.body).toBe(plain.body);
   });
 });

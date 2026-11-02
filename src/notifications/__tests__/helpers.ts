@@ -33,6 +33,7 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
     updates: { autoCheck: true },
     sleepMode: { enabled: false, startAt: 'lightsout', offerSounds: true },
+    eReader: { enabled: false, warmLight: false },
     marks: {},
     ...over.settings,
   };

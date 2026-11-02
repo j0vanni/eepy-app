@@ -1,12 +1,14 @@
 /**
  * Tonight's wind-down, step by step (engine/windDownPlan.ts): evening light, last meal and
  * exercise, wind-down, screens off, the screen-free routine and lights-out — with what's
- * happening now and a countdown to the next step. `compact` shows only what's still ahead.
+ * happening now and a countdown to the next step. `compact` shows only what's still ahead. With
+ * the e-ink reader setting on, the routine becomes reading time on the e-reader.
  */
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
+import { eReaderIfOn } from '@/engine/eReader';
 import { formatDuration, formatTime, MINUTE } from '@/engine/time';
 import { currentWindDownStep, windDownTimeline } from '@/engine/windDownPlan';
 import { useStore } from '@/state/store';
@@ -17,12 +19,17 @@ import { colors, font, space } from '@/ui/theme';
 export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: boolean }) {
   const now = useNow(30_000);
   const screensOffMin = useStore((s) => s.settings.screensOffMin);
-  const steps = windDownTimeline(a.tonight, screensOffMin);
+  const eReaderSetting = useStore((s) => s.settings.eReader);
+  const eReader = eReaderIfOn(eReaderSetting);
+  const steps = windDownTimeline(a.tonight, screensOffMin, { eReader });
   const current = currentWindDownStep(steps, now);
   const next = steps.find((s) => s.at > now);
   const shown = compact ? steps.filter((s) => s.at > now || s === current).slice(0, 4) : steps;
   if (shown.length === 0) return null;
   const off = steps.find((s) => s.id === 'screens-off');
+  const eReaderNote = eReader
+    ? ` Your e-reader is fine after that: e-ink reflects light like paper, so keep the frontlight low${eReader.warmLight ? ' and warm' : ''} and stick to books.`
+    : '';
 
   return (
     <Card>
@@ -59,7 +66,8 @@ export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: bo
         </View>
       ) : off ? (
         <Text style={[font.tiny, { marginTop: space.md }]}>
-          Screens off {screensOffMin} min before lights-out — what's on the screen keeps you up as much as its light. Change it in Settings → Wind-down & phone light.
+          Screens off {screensOffMin} min before lights-out — what's on the screen keeps you up as much as its light.{eReaderNote} Change it in Settings → Wind-down &
+          phone light.
         </Text>
       ) : null}
     </Card>

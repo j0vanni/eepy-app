@@ -113,6 +113,14 @@ export interface SleepModeSettings {
   offerSounds: boolean;
 }
 
+/** E-ink reader (Kindle, Kobo, Boox…): fine after screens-off with the frontlight low (engine/eReader.ts). */
+export interface EReaderSettings {
+  /** "I read on an e-ink reader": the wind-down gets reading time and frontlight tips. */
+  enabled: boolean;
+  /** "It has a warm / amber light". */
+  warmLight: boolean;
+}
+
 export interface NapTimer {
   start: number;
   alarmAt: number;
@@ -152,6 +160,7 @@ export interface Settings {
   watch: WatchSettings;
   updates: UpdateSettings;
   sleepMode: SleepModeSettings;
+  eReader: EReaderSettings;
   /** Small bookkeeping values for features (e.g. last morning report sent). */
   marks: Record<string, string | number | undefined>;
 }
@@ -241,6 +250,7 @@ const DEFAULT_SETTINGS: Settings = {
   watch: { napAlarm: 'phone', wakeAlarm: 'phone', backupMin: 5 },
   updates: { autoCheck: true },
   sleepMode: { enabled: false, startAt: 'lightsout', offerSounds: true },
+  eReader: { enabled: false, warmLight: false },
   marks: {},
 };
 
@@ -422,6 +432,7 @@ export const useStore = create<AppState>()(
             watch: { ...DEFAULT_SETTINGS.watch, ...ps?.watch },
             updates: { ...DEFAULT_SETTINGS.updates, ...ps?.updates },
             sleepMode: { ...DEFAULT_SETTINGS.sleepMode, ...ps?.sleepMode },
+            eReader: { ...DEFAULT_SETTINGS.eReader, ...ps?.eReader },
             marks: { ...ps?.marks },
           },
         };
