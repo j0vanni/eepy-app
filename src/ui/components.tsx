@@ -189,7 +189,8 @@ export function Row({ children, style, gap = space.md }: { children: ReactNode; 
 const SMALL_SLOP = { top: 4, bottom: 4, left: 2, right: 2 };
 
 /**
- * Buttons: 48 dp tall (40 dp `small`, with hitSlop so the touch area still reaches ~48).
+ * Buttons: 48 dp tall (40 dp `small`, with hitSlop so the touch area still reaches ~48; 60 dp `big`
+ * for the one action a screen is there for, like "I'm in bed").
  * primary = the one main action on a card; secondary = other actions; ghost = quiet or dismiss;
  * danger = destructive. `style` is for layout only (e.g. `{ flex: 1 }` in a row of buttons).
  */
@@ -200,6 +201,7 @@ export function Button({
   kind = 'primary',
   disabled,
   small,
+  big,
   style,
 }: {
   label: string;
@@ -208,6 +210,7 @@ export function Button({
   kind?: 'primary' | 'secondary' | 'ghost' | 'danger';
   disabled?: boolean;
   small?: boolean;
+  big?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const bg = { primary: colors.accent, secondary: colors.surfaceAlt, ghost: 'transparent', danger: '#3A1B2A' }[kind];
@@ -222,13 +225,14 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         small && styles.buttonSmall,
+        big && styles.buttonBig,
         { backgroundColor: bg, opacity: disabled ? 0.4 : pressed ? 0.8 : 1 },
         kind !== 'primary' && { borderWidth: 1, borderColor: kind === 'danger' ? '#5A2A3C' : colors.border },
         style,
       ]}
     >
-      {icon ? <Icon name={icon} size={small ? iconSize.sm : 18} color={fg} /> : null}
-      <Text style={{ color: fg, fontWeight: '700', fontSize: small ? 13 : 15, flexShrink: 1, textAlign: 'center' }}>{label}</Text>
+      {icon ? <Icon name={icon} size={small ? iconSize.sm : big ? iconSize.lg : 18} color={fg} /> : null}
+      <Text style={{ color: fg, fontWeight: '700', fontSize: small ? 13 : big ? 17 : 15, flexShrink: 1, textAlign: 'center' }}>{label}</Text>
     </Pressable>
   );
 }
@@ -435,6 +439,7 @@ export const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   buttonSmall: { minHeight: 40, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  buttonBig: { minHeight: 60, paddingVertical: 16, paddingHorizontal: 24, gap: 10 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

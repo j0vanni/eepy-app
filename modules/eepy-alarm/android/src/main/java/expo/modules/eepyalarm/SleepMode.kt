@@ -374,6 +374,20 @@ internal object SleepMode {
     return setRuleState(context, false, true)
   }
 
+  /**
+   * Undo of "Start now" (Cancel / Undo of "I'm in bed"): off now, and the night is neither kept off
+   * nor counted as switched on, so its own plan (the next `schedule` for it) can switch it on at its time.
+   */
+  fun undoStart(context: Context, night: String): Boolean {
+    val p = prefs(context)
+    val edit = p.edit()
+    if (p.getString(KEY_APPLIED, null) == night) edit.remove(KEY_APPLIED)
+    if (p.getString(KEY_STOPPED, null) == night) edit.remove(KEY_STOPPED)
+    edit.apply()
+    dismissPrompt(context)
+    return setRuleState(context, false, true)
+  }
+
   /** An alarm from SleepModeReceiver. */
   fun onAlarm(context: Context, action: String?, night: String?) {
     if (night == null) return

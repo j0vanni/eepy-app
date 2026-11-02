@@ -269,6 +269,10 @@ export interface WakeLog {
   use: [number, number][];
   /** "I'm up" on the wake alarm (watch buzz), epoch ms. */
   ups: number[];
+  /** "I'm in bed" taps that started a sleep session (engine/inBed.ts), epoch ms. */
+  inBed?: number[];
+  /** "I'm up" taps that ended a sleep session (Today, Routine card), epoch ms. */
+  outOfBed?: number[];
   /** Corrections by main-sleep id. */
   fixes: Record<string, NightFix>;
 }

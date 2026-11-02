@@ -10,9 +10,10 @@ import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { WindDownTimelineCard } from '@/ui/cards/WindDownTimeline';
 import { Screen } from '@/ui/components';
+import { WindDownInBed } from '@/ui/today/InBed';
 import { font, space } from '@/ui/theme';
 
-/** Wind-down routine: countdown to lights-out, checklist, breathing, sleep sounds and a light check. */
+/** Wind-down routine: countdown to lights-out, "I'm in bed", checklist, breathing, sleep sounds and a light check. */
 export default function WindDownScreen() {
   const analysis = useAnalysis();
   const now = useNow(30_000);
@@ -26,6 +27,7 @@ export default function WindDownScreen() {
   return (
     <Screen>
       <CountdownHero analysis={analysis} now={now} />
+      {analysis ? <WindDownInBed a={analysis} /> : null}
       {analysis ? <WindDownTimelineCard a={analysis} /> : null}
       <Checklist key={nightKey} nightKey={nightKey} />
       <BreathingCard />

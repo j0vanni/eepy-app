@@ -10,6 +10,7 @@ import { syncWakeAlarm, WAKE_SKIP_MARK } from '@/notifications/fullScreenAlarm';
 import { syncSleepMode } from '@/notifications/sleepMode';
 import { refreshAppShortcuts } from '@/shortcuts/appShortcuts';
 import { applyClockSetting } from '@/state/clockFormat';
+import { useInBedAutoClose } from '@/state/inBed';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
 import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
@@ -27,18 +28,21 @@ const theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
-/** App-wide side effects: sync, notification planning, notification responses, background task, update checks, shortcuts, sleep mode. */
+/** App-wide side effects: sync, notification planning, notification responses, background task, update checks, shortcuts, sleep mode, the sleep session. */
 function Background() {
   useAutoSync();
   useUpdateChecks();
   useLearning();
   useAppUseLog();
+  useInBedAutoClose();
   const analysis = useAnalysis();
   const settings = useStore((s) => s.settings);
   const goals = useStore((s) => s.goals);
   const experiments = useStore((s) => s.experiments);
   const checkins = useStore((s) => s.checkins);
   const skippedAlarm = useStore((s) => s.settings.marks[WAKE_SKIP_MARK]);
+  // "I'm in bed" / "I'm up": tonight's reminders go quiet, an alarm "I'm up" switched off is cancelled.
+  const session = useStore((s) => s.settings.session);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -64,13 +68,14 @@ function Background() {
     replanNotifications(analysis, useStore.getState()).catch(() => undefined);
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, goals, experiments, checkins]);
+  }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, session, goals, experiments, checkins]);
 
   // Bedtime autopilot: after the wake alarm (its off time is the morning alarm). Cheap when nothing changed.
+  // `session`: after Undo of "I'm in bed" the night's own plan is sent again (state/inBed.ts).
   useEffect(() => {
     if (!analysis) return;
     syncSleepMode(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.sleepMode, settings.notifications.smartAlarm, settings.watch, skippedAlarm, settings.audio.sound, settings.audio.timerMin]);
+  }, [analysis, settings.sleepMode, settings.notifications.smartAlarm, settings.watch, skippedAlarm, settings.audio.sound, settings.audio.timerMin, session]);
   return null;
 }
 

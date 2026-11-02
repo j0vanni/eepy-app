@@ -8,9 +8,8 @@ import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
 import { buildNightStory, NightStory } from './nightStory';
 import { analyzeRegularity, RegularityResult } from './regularity';
-import { applyTonightOverride, planTonight, smartAlarm, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
+import { applyTonightOverride, planTonight, SmartAlarm, timeTonight, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
-import { retimeTwoStep } from './twoStep';
 import {
   buildNights,
   Night,
@@ -58,7 +57,7 @@ export interface Analysis {
    * The cycle-timed alarm that ends the main sleep. On a two-step morning that's the routine alarm
    * (`tonight.twoStep.firstAlarm`); the final alarm rings at `tonight.wake`.
    */
-  alarm: ReturnType<typeof smartAlarm>;
+  alarm: SmartAlarm;
   energy: EnergyForecast;
   caffeine: { nowMg: number; cutoff: CaffeineCutoff };
   nap: NapRecommendation;
@@ -183,8 +182,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   // Everything below (alarm, caffeine cut-off, forecast, nap advice) follows an adjusted night.
   const adjusted = applyTonightOverride(eased, opts.tonightOverride, profile.windDownMin);
   // Two-step morning: the cycle-timed alarm is the routine alarm before the first wake-up.
-  const alarm = smartAlarm(adjusted.bedtime, adjusted.twoStep?.firstWake ?? adjusted.wake, cycleMin, latencyMin);
-  const tonight: TonightPlan = adjusted.twoStep ? { ...adjusted, twoStep: retimeTwoStep(adjusted.twoStep, alarm.alarm, adjusted.wake, efficiency) } : adjusted;
+  const { tonight, alarm } = timeTonight(adjusted, cycleMin, latencyMin, efficiency);
   const upcoming = planUpcomingNights({ ...nightPlan, first: tonight, lockFirst: true });
   upcoming[0] = {
     ...upcoming[0],

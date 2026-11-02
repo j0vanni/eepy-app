@@ -117,7 +117,7 @@ describe('two alarms on a two-step morning', () => {
   it('schedules both native alarms under their own ids and records both', async () => {
     const c = eve();
     await syncWakeAlarm(c.analysis, c.state, c.now);
-    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, final, 'Good morning ☀️', 'Time to get up.', 'eepy://checkin');
+    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, final, 'Good morning ☀️', 'Time to get up.', 'eepy://checkin?up=alarm');
     expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(
       WAKE_ROUTINE_ALARM_ID,
       c.analysis.alarm.alarm,

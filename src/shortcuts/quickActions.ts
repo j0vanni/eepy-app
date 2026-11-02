@@ -1,14 +1,15 @@
 /**
  * One-tap actions behind eepy://quick/<action> — opened by the long-press app-icon shortcuts, the
- * "Log coffee" Quick Settings tile and the sleep-mode "play sleep sounds?" notification, and
- * handled by src/app/quick/[action].tsx. Pure: no React or native imports, so it's unit-testable.
+ * "Log coffee" Quick Settings tile, the sleep-mode "play sleep sounds?" notification and the
+ * "I'm in bed" button on the wind-down / lights-out notifications, and handled by
+ * src/app/quick/[action].tsx. Pure: no React or native imports, so it's unit-testable.
  */
 import { usualCaffeine, usualDose, type UsualCaffeine } from '../engine/caffeineHabits';
 import type { NapOption, NapRecommendation } from '../engine/nap';
 import { dateKey, MINUTE } from '../engine/time';
 import type { CaffeineDose } from '../engine/types';
 
-export type QuickAction = 'coffee' | 'nap' | 'late' | 'checkin' | 'sounds';
+export type QuickAction = 'coffee' | 'nap' | 'late' | 'checkin' | 'sounds' | 'inbed';
 
 const ALIASES: Record<string, QuickAction> = {
   coffee: 'coffee',
@@ -22,6 +23,10 @@ const ALIASES: Record<string, QuickAction> = {
   'check-in': 'checkin',
   sounds: 'sounds',
   'sleep-sounds': 'sounds',
+  inbed: 'inbed',
+  'in-bed': 'inbed',
+  bed: 'inbed',
+  bedtime: 'inbed',
 };
 
 /** The route param (string, repeated param or missing) as a known action. */
@@ -42,11 +47,13 @@ export interface AppShortcut {
   shortLabel: string;
   longLabel: string;
   link: string;
-  icon: 'coffee' | 'nap' | 'late' | 'checkin';
+  icon: 'coffee' | 'inbed' | 'nap' | 'late' | 'checkin';
 }
 
 export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'coffee', shortLabel: 'Coffee', longLabel: 'Log my usual coffee', link: quickLink('coffee'), icon: 'coffee' },
+  // Launchers often show only four: the nightly one goes near the top, check-in (the + button in eepy) last.
+  { id: 'inbed', shortLabel: 'In bed', longLabel: "I'm in bed", link: quickLink('inbed'), icon: 'inbed' },
   { id: 'nap', shortLabel: 'Nap', longLabel: 'Start a nap', link: quickLink('nap'), icon: 'nap' },
   { id: 'late', shortLabel: 'Running late', longLabel: 'Running late', link: quickLink('late'), icon: 'late' },
   { id: 'checkin', shortLabel: 'Check in', longLabel: 'Check in', link: quickLink('checkin'), icon: 'checkin' },
@@ -93,7 +100,10 @@ export type QuickDecision =
   | { sheet: 'coffee-already'; dose: CaffeineDose; usual: UsualCaffeine }
   /** Offer to start the recommended nap right away (or open the Nap coach). */
   | { sheet: 'nap'; option: NapOption; headline: string }
-  | { sheet: 'sounds' };
+  | { sheet: 'sounds' }
+  /** Start the sleep session ("I'm in bed"), with Undo — or show the one already running. */
+  | { sheet: 'inbed' }
+  | { sheet: 'inbed-open' };
 
 export interface QuickInput {
   onboarded: boolean;
@@ -101,6 +111,8 @@ export interface QuickInput {
   /** A nap timer is already running: just show it. */
   napRunning: boolean;
   nap?: Pick<NapRecommendation, 'best' | 'headline'>;
+  /** "I'm in bed": undefined before eepy has a plan; `available` in the evening and at night. */
+  inBed?: { open: boolean; available: boolean };
 }
 
 /** What eepy://quick/<action> does, decided once when it opens. */
@@ -123,6 +135,11 @@ export function decideQuickAction(action: QuickAction | undefined, input: QuickI
       return { redirect: '/checkin' };
     case 'sounds':
       return { sheet: 'sounds' };
+    case 'inbed':
+      // No plan yet: Today explains. The middle of the day: that's a nap.
+      if (!input.inBed) return { redirect: '/' };
+      if (input.inBed.open) return { sheet: 'inbed-open' };
+      return input.inBed.available ? { sheet: 'inbed' } : { redirect: '/nap' };
     default:
       return { redirect: '/' };
   }

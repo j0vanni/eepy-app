@@ -26,7 +26,7 @@ export interface EepyAlarmModule {
 
   /**
    * Replaces eepy's long-press app-icon shortcuts (ShortcutManager dynamic shortcuts) with `json`:
-   * a JSON array of { id, shortLabel, longLabel, link, icon } (icon: 'coffee' | 'nap' | 'late' | 'checkin').
+   * a JSON array of { id, shortLabel, longLabel, link, icon } (icon: 'coffee' | 'inbed' | 'nap' | 'late' | 'checkin').
    * Resolves false if Android refused (e.g. rate-limited while in the background).
    */
   setShortcuts(json: string): Promise<boolean>;
@@ -49,6 +49,12 @@ export interface EepyAlarmModule {
   startSleepModeNow(night: string, offAtMs: number): Promise<boolean>;
   /** Off now, and it stays off for the rest of `night`. */
   stopSleepModeNow(night: string): Promise<boolean>;
+  /**
+   * Undo of a "Start now" (Cancel / Undo of "I'm in bed"): off now, but unlike Stop the night isn't
+   * kept off — the night's own plan (scheduleSleepMode) may switch it on again at its time.
+   * Missing on APKs built before it existed (callers fall back to stopSleepModeNow).
+   */
+  undoSleepModeStart?(night: string): Promise<boolean>;
   dismissSleepModePrompt(): Promise<void>;
   /** The system list where the user allows eepy to control Do Not Disturb / Modes. */
   openSleepModeAccessSettings(): Promise<boolean>;

@@ -1,6 +1,6 @@
 import { MORNING_STARTS_MIN, shortTitle } from './calendarEvents';
 import { addDays, atMinutes, clamp, clockDiff, formatDuration, formatTime, HOUR, MINUTE, minutesOfDay, normalizeMinutes, weekdayOfKey } from './time';
-import { planTwoStep, shiftTwoStep, TWO_STEP, twoStepFor, TwoStepPlan, twoStepRationale } from './twoStep';
+import { planTwoStep, retimeTwoStep, shiftTwoStep, TWO_STEP, twoStepFor, TwoStepPlan, twoStepRationale } from './twoStep';
 import type { Profile } from './types';
 
 export interface CycleOption {
@@ -397,6 +397,20 @@ export function smartAlarm(
   }
   if (best) return { ...best, onBoundary: true };
   return { alarm: latestWake, cycles: Math.floor((latestWake - onset) / (cycleMin * MINUTE)), onBoundary: false };
+}
+
+export type SmartAlarm = ReturnType<typeof smartAlarm>;
+
+/**
+ * Tonight's cycle-timed alarm from its lights-out — never later than the wake-up. On a two-step
+ * morning that's the routine alarm before the first wake-up, and the routine is re-timed to it
+ * (the final alarm rings at `wake`). The analysis and "I'm in bed" (inBed.ts) both use this, so a
+ * tap's confirmation shows exactly the alarm that will ring.
+ */
+export function timeTonight(plan: TonightPlan, cycleMin: number, latencyMin: number, efficiency: number): { tonight: TonightPlan; alarm: SmartAlarm } {
+  const alarm = smartAlarm(plan.bedtime, plan.twoStep?.firstWake ?? plan.wake, cycleMin, latencyMin);
+  const tonight = plan.twoStep ? { ...plan, twoStep: retimeTwoStep(plan.twoStep, alarm.alarm, plan.wake, efficiency) } : plan;
+  return { tonight, alarm };
 }
 
 export interface ShiftDay {

@@ -9,8 +9,10 @@
  *
  * Evidence that you were awake
  * - Interactions (strong): eepy on screen (`wakeLog.use`, from an AppState listener), "I'm up" on the
- *   wake alarm (`wakeLog.ups`; the native alarm's "I'm up" opens eepy, so it lands in `use`),
- *   check-ins / ping answers, journal sleepiness ratings.
+ *   wake alarm (`wakeLog.ups`; the native alarm's "I'm up" opens eepy at the check-in, which logs it
+ *   too), "I'm up" ending a sleep session (`wakeLog.outOfBed`), check-ins / ping answers, journal
+ *   sleepiness ratings.
+ * - "I'm in bed" (`wakeLog.inBed`, engine/inBed.ts): when time in bed started — you were awake then.
  * - Caffeine logs (supporting only): drinks are often logged afterwards, or at the "usual" time.
  * - Steps from Health Connect (`NightVitals.stepCurve`, 10-min bins).
  * - Heart rate (`NightVitals.hrCurve`, supporting only — it never moves a boundary by itself).
@@ -57,6 +59,16 @@
  *     + 15 min is planned time awake — not waking in the night and not time in bed (sessions.ts).
  *     Two recordings either side of it are one night however long the gap.
  * 13. No sleep after the routine: it was the real wake-up for the day (rules 1–5 as usual).
+ * Sleep-session taps (engine/inBed.ts; with detection on)
+ * 14. "I'm in bed" starts time in bed: the latest tap from 3 h before the recording until 5 min before
+ *     its first deep/REM sleep (and within the onset window of rule 7) is the start of the night —
+ *     earlier than the recording adds time awake in bed, later leaves out what came before. You were
+ *     awake when you tapped, so sleep onset is never earlier than the tap + 5 min (high confidence).
+ *     A fell-asleep time you set that is earlier still wins.
+ * 15. "I'm up" is a got-up candidate like eepy use (rules 1–4, the same went-back-to-sleep guard; on
+ *     nights without stages it needs no corroboration — you said so). Tapped up to 45 min after the
+ *     recording ended, with < 20 steps in between, it ends the night there instead: you lay awake in
+ *     bed until then (time awake in bed, not sleep).
  */
 import { wakeTargetFor } from './schedule';
 import { analyzeSessions, computeSessionMetrics, SessionAnalyzeOptions, SessionMetrics } from './sessions';
@@ -98,12 +110,18 @@ export const WAKE_RULES = {
   useMaxMin: 45,
   /** Ask when the wake-up is this much later than usual for that kind of day. */
   askLateMin: 90,
+  /** "I'm in bed" up to this long before the recording starts still starts the night (rule 14). */
+  inBedLeadMin: 180,
+  /** Asleep no sooner than this after "I'm in bed". */
+  inBedLatencyMin: 5,
+  /** "I'm up" up to this long after the recording ended extends the night to it (rule 15). */
+  upExtendMin: 45,
 } as const;
 
 /** Days of app use / alarm taps kept (corrections are kept for good). */
 export const WAKE_LOG_DAYS = 60;
 
-export const EMPTY_WAKE_LOG: WakeLog = { detect: true, use: [], ups: [], fixes: {} };
+export const EMPTY_WAKE_LOG: WakeLog = { detect: true, use: [], ups: [], inBed: [], outOfBed: [], fixes: {} };
 
 // ---------------------------------------------------------------------------
 // The log (pure reducers; the store and the AppState listener call these)
@@ -135,10 +153,41 @@ export function logAppUse(log: WakeLog, start: number, end: number, now = end): 
   return { ...log, use: use.slice(-600) };
 }
 
+/** A list of taps with `t` added (kept 60 days, at most 200); the same list when it's already there. */
+function addTap(list: number[] | undefined, t: number): number[] | undefined {
+  const xs = list ?? [];
+  if (xs.includes(t)) return list;
+  return [...xs.filter((x) => x >= t - WAKE_LOG_DAYS * DAY), t].sort((a, b) => a - b).slice(-200);
+}
+
 /** Records "I'm up" on the wake alarm. */
 export function logUp(log: WakeLog, t: number): WakeLog {
-  if (log.ups.includes(t)) return log;
-  return { ...log, ups: [...log.ups.filter((x) => x >= t - WAKE_LOG_DAYS * DAY), t].sort((a, b) => a - b).slice(-200) };
+  const ups = addTap(log.ups, t);
+  return ups === log.ups ? log : { ...log, ups: ups ?? [] };
+}
+
+/** Records "I'm in bed" (a sleep session started). */
+export function logInBed(log: WakeLog, t: number): WakeLog {
+  const inBed = addTap(log.inBed, t);
+  return inBed === log.inBed ? log : { ...log, inBed };
+}
+
+/** Records "I'm up" that ended a sleep session. */
+export function logOutOfBed(log: WakeLog, t: number): WakeLog {
+  const outOfBed = addTap(log.outOfBed, t);
+  return outOfBed === log.outOfBed ? log : { ...log, outOfBed };
+}
+
+/** Forgets an "I'm in bed" tap (Cancel / Undo). */
+export function unlogInBed(log: WakeLog, t: number | undefined): WakeLog {
+  if (t === undefined || !log.inBed?.includes(t)) return log;
+  return { ...log, inBed: log.inBed.filter((x) => x !== t) };
+}
+
+/** Forgets an "I'm up" tap (Undo). */
+export function unlogOutOfBed(log: WakeLog, t: number | undefined): WakeLog {
+  if (t === undefined || !log.outOfBed?.includes(t)) return log;
+  return { ...log, outOfBed: log.outOfBed.filter((x) => x !== t) };
 }
 
 /** Saves (or with `undefined`, clears) your correction for a night. */
@@ -153,7 +202,8 @@ export function withFix(log: WakeLog, id: string, fix: NightFix | undefined): Wa
 // Evidence
 // ---------------------------------------------------------------------------
 
-export type SignalKind = 'app' | 'alarm' | 'checkin' | 'journal' | 'caffeine';
+/** `up` = "I'm up" ending a sleep session; `inbed` = "I'm in bed" (rule 14 only — not a sign of being up). */
+export type SignalKind = 'app' | 'alarm' | 'checkin' | 'journal' | 'caffeine' | 'up' | 'inbed';
 
 export interface WakeSignal {
   kind: SignalKind;
@@ -162,13 +212,15 @@ export interface WakeSignal {
   end: number;
 }
 
-const STRONG: ReadonlySet<SignalKind> = new Set<SignalKind>(['app', 'alarm', 'checkin', 'journal']);
+const STRONG: ReadonlySet<SignalKind> = new Set<SignalKind>(['app', 'alarm', 'checkin', 'journal', 'up']);
 
 /** Every timestamp that shows you were awake, oldest first. */
 export function collectSignals(data: Pick<SleepDataset, 'checkins' | 'caffeine' | 'dayLogs' | 'wakeLog'>): WakeSignal[] {
   const out: WakeSignal[] = [];
   for (const [s, e] of data.wakeLog?.use ?? []) out.push({ kind: 'app', time: s, end: Math.max(s, e) });
   for (const t of data.wakeLog?.ups ?? []) out.push({ kind: 'alarm', time: t, end: t });
+  for (const t of data.wakeLog?.outOfBed ?? []) out.push({ kind: 'up', time: t, end: t });
+  for (const t of data.wakeLog?.inBed ?? []) out.push({ kind: 'inbed', time: t, end: t });
   for (const c of data.checkins ?? []) out.push({ kind: 'checkin', time: c.time, end: c.time });
   for (const l of Object.values(data.dayLogs ?? {})) {
     if (l.sleepinessAt !== undefined) out.push({ kind: 'journal', time: l.sleepinessAt, end: l.sleepinessAt });
@@ -319,6 +371,8 @@ const EVIDENCE_LABEL: Record<SignalKind, string> = {
   checkin: 'checked in',
   journal: 'rated your sleepiness',
   caffeine: 'logged a drink',
+  up: "you tapped I'm up",
+  inbed: 'you tapped In bed',
 };
 
 /** Why onset moved: "you were still up until 11:40 PM (using eepy)". */
@@ -328,6 +382,8 @@ const ONSET_LABEL: Record<SignalKind | 'steps', string> = {
   checkin: 'checked in',
   journal: 'rated your sleepiness',
   caffeine: 'logged a drink',
+  up: "tapped I'm up",
+  inbed: 'you tapped In bed',
   steps: 'walking around',
 };
 
@@ -415,6 +471,21 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   };
   const hrRiseAt = (t: number) => hrAbove(t - 10 * MINUTE, t + 20 * MINUTE);
 
+  // --- "I'm in bed" (rule 14): the latest tap that can be this night's start, if any.
+  const inBedLimit = Math.min(
+    staged && firstDeep !== undefined ? firstDeep - R.inBedLatencyMin * MINUTE : Infinity,
+    rec.onset + (staged ? R.onsetWindowMin : R.onsetWindowUnstagedMin) * MINUTE,
+    rec.end - R.minSleepBeforeWakeMin * MINUTE,
+  );
+  const inBedTap = detect
+    ? input.signals
+        .filter((s) => s.kind === 'inbed' && s.time >= rec.start - R.inBedLeadMin * MINUTE && s.time <= inBedLimit)
+        .reduce<number | undefined>((t, s) => Math.max(t ?? -Infinity, s.time), undefined)
+    : undefined;
+  // A fell-asleep time you set before the tap wins (rule 10): the tap was off, the recording stands.
+  const inBedFromTap = inBedTap !== undefined && !(fix?.asleep !== undefined && fix.asleep < inBedTap);
+  const start = inBedTap !== undefined && inBedFromTap ? inBedTap : rec.start;
+
   // --- Two-step morning (rules 12–13): with sleep after it, the routine is planned time awake, not getting up.
   const routineSpan = input.routine ? findRoutine(segs, strong, steps, input.routine, rec.onset, detect) : undefined;
   const backAsleep = !!routineSpan && stageMin(segs, routineSpan.end, rec.end, isSleep) >= TWO_STEP.backAsleepMin;
@@ -429,7 +500,8 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     const cands: Candidate[] = [];
     for (const s of strong) {
       if (s.time < from || s.time > to || asleepAfter(s.time) || duringRoutine(s.time)) continue;
-      if (!staged) {
+      // "I'm up" is your own word for it (rule 15); other interactions need corroboration without stages.
+      if (!staged && s.kind !== 'up') {
         const w = s.time + R.corroborateMin * MINUTE;
         const other = strong.some((o) => o !== s && o.time > s.time && o.time <= w);
         if (!other && stepsIn(steps, s.time - BIN_MS, w) < R.upSteps && !hrRiseAt(s.time)) continue;
@@ -477,7 +549,7 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   let onsetConf: Confidence = longLight || hrNotDropped ? 'low' : staged ? 'medium' : 'low';
   const onsetEvidence: string[] = [];
   if (fix?.asleep !== undefined) {
-    onset = Math.min(Math.max(fix.asleep, rec.start), (fix.wake ?? detectedEnd ?? rec.end) - 30 * MINUTE);
+    onset = Math.min(Math.max(fix.asleep, start), (fix.wake ?? detectedEnd ?? rec.end) - 30 * MINUTE);
     onsetSource = 'you';
     onsetConf = 'high';
   } else if (awakeUntil && awakeUntil.at - rec.onset >= R.minChangeMin * MINUTE) {
@@ -485,6 +557,13 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     onsetSource = awakeUntil.kind;
     onsetConf = longLight || hrNotDropped ? 'high' : 'medium';
     onsetEvidence.push(ONSET_LABEL[awakeUntil.kind]);
+  }
+  // You were awake when you tapped "I'm in bed": asleep no sooner than a few minutes after it (rule 14).
+  if (fix?.asleep === undefined && inBedFromTap && onset < start + R.inBedLatencyMin * MINUTE) {
+    onset = start + R.inBedLatencyMin * MINUTE;
+    onsetSource = 'inbed';
+    onsetConf = 'high';
+    onsetEvidence.unshift(ONSET_LABEL.inbed);
   }
   if (longLight) onsetEvidence.push('long light sleep before deep sleep');
   if (hrNotDropped) onsetEvidence.push("heart rate hadn't dropped yet");
@@ -512,15 +591,25 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   } else if (detectedEnd !== undefined && up) {
     end = detectedEnd;
     outSource = up.kind;
+  } else if (detect) {
+    // "I'm up" a little after the recording ended, with no walking in between: awake in bed until then (rule 15).
+    const tap = input.signals.find((s) => s.kind === 'up' && s.time > rec.end && s.time <= rec.end + R.upExtendMin * MINUTE);
+    if (tap && stepsIn(steps, rec.end, tap.time) < R.upSteps) {
+      end = tap.time;
+      outSource = 'up';
+    }
   }
   if (wake !== undefined && wake > end) wake = end;
 
   // --- New stages: awake before onset and after the wake-up you gave; your times can also turn
   // recorded wakefulness into sleep; eepy use in the middle of the night is time awake (rule 9).
-  let out = segs
-    .map((s) => ({ stage: s.stage, start: Math.max(s.start, rec.start), end: Math.min(s.end, end) }))
+  let out: StageSegment[] = segs
+    .map((s) => ({ stage: s.stage, start: Math.max(s.start, start), end: Math.min(s.end, end) }))
     .filter((s) => s.end > s.start);
-  out = paint(out, rec.start, onset, 'awake');
+  // In bed before the recording started / still in bed after it ended (rules 14–15): awake.
+  if (start < rec.start) out = [{ stage: 'awake', start, end: rec.start }, ...out];
+  if (end > rec.end) out = [...out, { stage: 'awake', start: rec.end, end }];
+  out = paint(out, start, onset, 'awake');
   if (onset < rec.onset) out = paint(out, onset, rec.onset, 'asleep', (s) => s === 'awake');
   if (wake !== undefined) {
     if (wake > rec.finalWake) out = paint(out, rec.finalWake, wake, 'asleep', (s) => s === 'awake');
@@ -540,10 +629,10 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
     }
   }
 
-  const changed = end !== rec.end || onset !== rec.onset || wake !== undefined || marks.length > 0 || !!routine;
+  const changed = start !== rec.start || end !== rec.end || onset !== rec.onset || wake !== undefined || marks.length > 0 || !!routine;
   let metrics = m;
   if (changed) {
-    const session: SleepSession = { ...m.session, start: rec.start, end, stages: out };
+    const session: SleepSession = { ...m.session, start, end, stages: out };
     const planned = routine && input.routine ? { start: routine.start, end: Math.min(routine.end, routine.start + input.routine.allowanceMin * MINUTE) } : undefined;
     const next = computeSessionMetrics(session, { routine: planned });
     if (next) {
@@ -575,7 +664,8 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   else if (outSource !== 'recorded') {
     const near = nearUp(end);
     upEvidence = near.labels;
-    outConf = near.kinds.size >= 2 ? 'high' : 'medium';
+    // "I'm up" is your own word for it.
+    outConf = near.kinds.size >= 2 || outSource === 'up' ? 'high' : 'medium';
   } else {
     // Nothing cut: does anything confirm you got up when the recording ended?
     const near = nearUp(rec.end);
@@ -609,11 +699,13 @@ export function correctNight(m: SessionMetrics, input: NightInput): { metrics: S
   const timeline: NightTimeline = {
     id: m.id,
     recorded: rec,
-    inBed: { time: rec.start, source: staged ? 'watch' : 'recorded', confidence: rec.start === rec.onset && onset === rec.onset ? 'low' : 'medium' },
+    inBed: inBedFromTap
+      ? { time: start, source: 'inbed', confidence: 'high' }
+      : { time: rec.start, source: staged ? 'watch' : 'recorded', confidence: rec.start === rec.onset && onset === rec.onset ? 'low' : 'medium' },
     asleep: { time: metrics.sleepOnset, source: onsetSource, confidence: lift(onsetConf) },
     woke: { time: finalWake, source: wokeSource, confidence: lift(wokeConf) },
     outOfBed: { time: metrics.end, source: outSource, confidence: lift(outConf) },
-    trimmedMin: Math.round((rec.end - metrics.end) / MINUTE),
+    trimmedMin: Math.max(0, Math.round((rec.end - metrics.end) / MINUTE)),
     onsetShiftMin: Math.round((metrics.sleepOnset - rec.onset) / MINUTE),
     onsetEvidence,
     upEvidence,

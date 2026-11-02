@@ -6,6 +6,7 @@
  * need is high, the caffeine last call only after you've logged caffeine, nothing while a nap
  * timer is running, lights-out moved after a long nap, and copy that mentions late caffeine,
  * naps or high debt. Capped at DAILY_REMINDER_CAP per day so it stays quiet.
+ * Once you've tapped "I'm in bed" (engine/inBed.ts), tonight's wind-down and lights-out stay quiet.
  * Also routes taps on the nap-timer notifications (see ../napTimer.ts).
  * OWNER: background & notifications workstream.
  */
@@ -14,6 +15,7 @@ import type { Href } from 'expo-router';
 import { Platform } from 'react-native';
 
 import type { Analysis } from '../../engine/analysis';
+import { inBedTonight } from '../../engine/inBed';
 import { logUp } from '../../engine/wakeDetect';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
@@ -27,7 +29,7 @@ import {
   WAKE_ROUTINE_DONE_MARK,
   WRIST_BUZZ_OFFSETS_MIN,
 } from '../fullScreenAlarm';
-import { plannedId, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
+import { IN_BED_ACTION, IN_BED_LINK, plannedId, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
@@ -96,10 +98,12 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
   const t = a.tonight;
   const day = dayContext(a, state, now);
   const napping = (at: number) => day.adaptive && duringNap(day, at);
+  // In bed already ("I'm in bed"): wind-down and lights-out would only be noise now.
+  const inBed = inBedTonight(state.settings.session, t.wakeDate);
   const out: PlannedNotification[] = [];
 
   // The live wind-down card replaces the plain wind-down reminder (same moment, one notification).
-  if (prefs.windDown && !prefs.liveWindDown && !napping(t.windDownStart)) {
+  if (prefs.windDown && !prefs.liveWindDown && !inBed && !napping(t.windDownStart)) {
     out.push({
       id: 'winddown',
       at: t.windDownStart,
@@ -110,7 +114,7 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
     });
   }
   // During wind-down the live card is already scheduled to turn into "Lights out" at bedtime.
-  if (prefs.bedtime && !liveWindDownCoversBedtime(a, state, now, day) && !napping(day.lightsOut)) {
+  if (prefs.bedtime && !inBed && !liveWindDownCoversBedtime(a, state, now, day) && !napping(day.lightsOut)) {
     out.push({
       id: 'bedtime',
       at: day.lightsOut,
@@ -250,7 +254,13 @@ export const reminders: NotificationFeature = {
     },
     { id: NAP_ALARM_CATEGORY, actions: [{ id: 'nap-done', title: "I'm up — log nap" }] },
     { id: WRIST_WAKE_CATEGORY, actions: [{ id: 'wrist-up', title: "I'm up" }] },
-    { id: RUNNING_LATE_CATEGORY, actions: [{ id: RUNNING_LATE_ACTION, title: 'Running late' }] },
+    {
+      id: RUNNING_LATE_CATEGORY,
+      actions: [
+        { id: IN_BED_ACTION, title: "I'm in bed" },
+        { id: RUNNING_LATE_ACTION, title: 'Running late' },
+      ],
+    },
   ],
   async onResponse(r, state: AppState) {
     markResponseHandled();
@@ -275,11 +285,17 @@ export const reminders: NotificationFeature = {
         await stopWristWake(state, base, { routine });
       }
       // After the routine alarm: Today, with its "back to bed by …" card — not "How did you sleep?".
-      openFromNotification(routine ? '/' : '/checkin');
+      // The final alarm's "I'm up" also ends tonight's sleep session (the check-in does that: `up`).
+      openFromNotification(routine ? '/' : { pathname: '/checkin', params: { up: 'watch' } });
       return;
     }
     if (r.actionId === RUNNING_LATE_ACTION) {
       openFromNotification('/tonight');
+      return;
+    }
+    // Opens eepy and starts the sleep session there (it needs tonight's plan): src/app/quick/[action].tsx.
+    if (r.actionId === IN_BED_ACTION) {
+      openFromNotification(IN_BED_LINK as Href);
       return;
     }
     if (r.actionId === 'default' && typeof r.data.route === 'string' && ROUTES.has(r.data.route)) {

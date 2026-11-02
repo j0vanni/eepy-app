@@ -67,6 +67,10 @@ class EepyAlarmModule : Module() {
       SleepMode.stopNow(context, night)
     }
 
+    AsyncFunction("undoSleepModeStart") { night: String ->
+      SleepMode.undoStart(context, night)
+    }
+
     AsyncFunction("dismissSleepModePrompt") {
       SleepMode.dismissPrompt(context)
     }

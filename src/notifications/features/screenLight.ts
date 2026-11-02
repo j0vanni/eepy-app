@@ -1,8 +1,10 @@
 /**
  * Evening phone-light reminder (`screenLight`): when melatonin starts rising (~3 h before
  * lights-out, see engine/screenLight.ts) — "Night Light on, screen ≤ 40%". Its button opens
- * Android's Night Light settings; a tap opens the wind-down routine. Follows an adjusted night.
+ * Android's Night Light settings; a tap opens the wind-down routine. Follows an adjusted night;
+ * quiet once you're in bed ("I'm in bed").
  */
+import { inBedTonight } from '../../engine/inBed';
 import { screenLightSchedule } from '../../engine/screenLight';
 import { formatTime } from '../../engine/time';
 import { screensOffAt } from '../../engine/windDownPlan';
@@ -17,7 +19,7 @@ export const screenLight: NotificationFeature = {
   categories: [{ id: SCREEN_LIGHT_CATEGORY, actions: [{ id: 'night-light', title: 'Night Light settings' }] }],
 
   plan({ analysis: a, state }) {
-    if (!state.settings.notifications.screenLight) return [];
+    if (!state.settings.notifications.screenLight || inBedTonight(state.settings.session, a.tonight.wakeDate)) return [];
     const plan = { wakeTime: a.wakeTime, windDownStart: a.tonight.windDownStart, bedtime: a.tonight.bedtime, nextWake: a.tonight.wake, screensOff: screensOffAt(a.tonight, state.settings.screensOffMin) };
     const evening = screenLightSchedule(plan).find((t) => t.phase === 'evening');
     if (!evening) return [];

@@ -96,7 +96,7 @@ describe('holding the morning alarm across the 4am switch', () => {
     const eve = ctxAt(21, PHONE, { [WAKE_AT_MARK]: morning });
     await syncWakeAlarm(eve.analysis, eve.state, eve.now);
     expect(eve.state.setMark).toHaveBeenCalledWith(WAKE_AT_MARK, eve.analysis.alarm.alarm);
-    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, eve.analysis.alarm.alarm, expect.any(String), expect.any(String), 'eepy://checkin');
+    expect(mockNative.scheduleAlarm).toHaveBeenCalledWith(WAKE_ALARM_ID, eve.analysis.alarm.alarm, expect.any(String), expect.any(String), 'eepy://checkin?up=alarm');
   });
 
   it('forgets the mark when the alarm is off', async () => {

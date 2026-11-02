@@ -8,17 +8,21 @@
  *  - during wind-down (any re-plan — app opened or background sync): a notification with the same
  *    identifier is scheduled for lights-out, so at bedtime Android replaces the pinned card in
  *    place with a normal, swipeable "Lights out" message;
- *  - afterwards (or when switched off): any leftover card is dismissed on the next re-plan.
- * Tapping the card opens the wind-down screen (and, being auto-cancel, removes it).
+ *  - afterwards (or when switched off, or once you tapped "I'm in bed"): any leftover card is
+ *    dismissed on the next re-plan.
+ * Tapping the card opens the wind-down screen (and, being auto-cancel, removes it); its "I'm in bed"
+ * button opens eepy and starts the sleep session.
  * OWNER: background & notifications workstream.
  */
 import * as Notifications from 'expo-notifications';
+import type { Href } from 'expo-router';
 import { Platform } from 'react-native';
 
 import type { Analysis } from '../../engine/analysis';
+import { inBedTonight } from '../../engine/inBed';
 import { formatDuration, formatTime, MINUTE } from '../../engine/time';
 import type { AppState } from '../../state/store';
-import { RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
+import { IN_BED_ACTION, IN_BED_LINK, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
 import { DayContext, dayContext, duringNap } from './dayContext';
@@ -36,6 +40,8 @@ export type LivePhase = 'off' | 'before' | 'during' | 'after';
 
 export function liveWindDownPhase(a: Analysis, state: AppState, now: number, day: DayContext = dayContext(a, state, now)): LivePhase {
   if (!state.settings.notifications.liveWindDown) return 'off';
+  // In bed already: no countdown, no "Lights out".
+  if (inBedTonight(state.settings.session, a.tonight.wakeDate)) return 'off';
   const start = a.tonight.windDownStart;
   // Napping through the start of wind-down (adaptive): stay quiet rather than pin a card mid-nap.
   if (day.adaptive && duringNap(day, start) && now < start) return 'off';
@@ -129,6 +135,7 @@ export const liveWindDown: NotificationFeature = {
   onResponse(r) {
     markResponseHandled();
     if (r.actionId === RUNNING_LATE_ACTION) openFromNotification('/tonight');
+    else if (r.actionId === IN_BED_ACTION) openFromNotification(IN_BED_LINK as Href);
     else if (r.actionId === 'default' && r.data.route === '/winddown') openFromNotification('/winddown');
   },
 };

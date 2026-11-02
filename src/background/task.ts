@@ -23,6 +23,7 @@ import { replanNotifications } from '../notifications/scheduler';
 import { analyzeOptionsFor } from '../state/analysisOptions';
 import { applyClockSetting } from '../state/clockFormat';
 import { getFirstEventTomorrowDetails } from '../state/calendar';
+import { closeStaleInBed } from '../state/inBed';
 import { refitCalibration } from '../state/learning';
 import { selectDataset, useStore } from '../state/store';
 import { runSync } from '../state/sync';
@@ -123,6 +124,8 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
       //    missing-night nudge and tonight's reminders stay right).
       // Check-ins that were waiting for last night's data can count now.
       refitCalibration(useStore.getState());
+      // A sleep session nobody ended ("I'm up") closes by itself once it's stale.
+      closeStaleInBed(now);
       const state = useStore.getState();
       if (state.sessions.length > 0) {
         // Notification text uses the user's 12/24-hour choice (nothing else sets it headlessly).
