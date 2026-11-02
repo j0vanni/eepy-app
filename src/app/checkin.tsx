@@ -29,7 +29,8 @@ const KSS = [
 const KSS_COLOR = ['#5FD3A5', '#5FD3A5', '#7FD0B8', '#6CC6FF', '#9B8CFF', '#B48CF0', '#FFB86B', '#FF9E7A', '#FF7A90'];
 const ENERGY = ['Exhausted', 'Tired', 'OK', 'Good', 'Energised'];
 const QUICK_TAGS = ['alcohol', 'late-meal', 'exercise', 'stress', 'nap', 'outdoor-light', 'screens', 'late-caffeine'];
-const CLOSE_AFTER_MS = 2200;
+/** The "Saved" toast fades after this; the sheet itself stays open until you tap Done. */
+const TOAST_MS = 4000;
 
 const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '').replace('Espresso shot', 'Espresso');
 
@@ -60,19 +61,18 @@ export default function CheckInSheet() {
 
   const [kssId, setKssId] = useState<string>();
   const [toast, setToast] = useState<Toast>();
-  const [keepOpen, setKeepOpen] = useState(false);
   const [moreDrinks, setMoreDrinks] = useState(false);
   /** Minutes ago the drink was had (forgot to log it straight away?). */
   const [agoMin, setAgoMin] = useState(0);
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-  // Dismiss shortly after the last thing logged, unless asked to stay.
+  // Log several things in one go: only the toast goes away, the sheet stays until Done.
   useEffect(() => {
-    if (!toast || keepOpen) return;
-    const id = setTimeout(() => (router.canGoBack() ? router.back() : router.replace('/')), CLOSE_AFTER_MS);
+    if (!toast) return;
+    const id = setTimeout(() => setToast(undefined), TOAST_MS);
     return () => clearTimeout(id);
-  }, [toast, keepOpen]);
+  }, [toast]);
 
   const logged = (text: string, undo?: () => void, edit?: Toast['edit']) => {
     confirmHaptic();
@@ -236,7 +236,7 @@ export default function CheckInSheet() {
             <Text style={[font.body, { fontWeight: '600' }]} numberOfLines={toast.edit ? 2 : 1}>
               {toast.text}
             </Text>
-            <Text style={font.tiny}>{keepOpen ? 'Saved' : 'Saved · closing…'}</Text>
+            <Text style={font.tiny}>Saved · log more or tap Done</Text>
           </View>
           {toast.edit ? (
             <Pressable onPress={toast.edit.run} hitSlop={8} accessibilityRole="button">
@@ -248,17 +248,11 @@ export default function CheckInSheet() {
               onPress={() => {
                 toast.undo?.();
                 setToast(undefined);
-                setKeepOpen(true);
               }}
               hitSlop={8}
               accessibilityRole="button"
             >
               <Text style={[font.small, { color: colors.accent, fontWeight: '700' }]}>Undo</Text>
-            </Pressable>
-          ) : null}
-          {!keepOpen ? (
-            <Pressable onPress={() => setKeepOpen(true)} hitSlop={8} accessibilityRole="button">
-              <Text style={[font.small, { color: colors.textDim, fontWeight: '700' }]}>Keep open</Text>
             </Pressable>
           ) : null}
         </EnterView>

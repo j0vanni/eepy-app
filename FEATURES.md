@@ -368,6 +368,13 @@ Built for a non-technical user who found it confusing where things were. Nothing
 
 ---
 
+## 27. New in 0.8.1 — different wake-up times, calmer check-in
+
+| | Feature |
+| --- | --- |
+| ✅ | **Different wake-up times on different days**: Planner → Your usual week → *Different times on different days* gives every weekday its own time (e.g. Mon 6:05, Tue 7:30, Thu 8:00); days you don't change keep the workday / day-off time, and single dates in the week strip still win. Bedtimes, alarms, two-step mornings (same gap before each day's wake-up), the week strip and reminders all follow |
+| ✅ | **Check-in stays open** while you log several things (sleepiness, energy, coffee, tags); the "Saved" note with Undo fades and you leave with *Done* |
+
 ---
 
 ## Science behind it

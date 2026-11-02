@@ -180,6 +180,11 @@ export interface Profile {
   insomniaMode: boolean;
   screenings: Record<string, ScreeningResult | undefined>;
   onboarded: boolean;
+  /**
+   * Your own wake-up time for a weekday (0 = Sunday … 6 = Saturday), minutes after midnight. Days
+   * not listed use workWakeMin / freeWakeMin. Single dates in `wakePlan` still win.
+   */
+  dayWake?: Partial<Record<number, number>>;
   /** Calendar: per-morning wake plans (YYYY-MM-DD of the morning) that override the weekly pattern. */
   wakePlan?: Record<string, DayWakePlan>;
   /** Up early for a short routine, back to bed, up for good at the normal wake-up (engine/twoStep.ts). Off when missing. */

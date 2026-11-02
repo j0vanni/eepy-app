@@ -92,3 +92,23 @@ describe('upcoming nights', () => {
     expect(plain.upcoming[1].wakeDate).toBe(addDays(tomorrow, 1));
   });
 });
+
+describe('different wake-up times on different days', () => {
+  // 2026-11-03 is a Tuesday, 2026-11-07 a Saturday.
+  const profile: Profile = { ...DEFAULT_PROFILE, workWakeMin: 6 * 60 + 5, dayWake: { 2: 7 * 60 + 30, 6: 9 * 60 } };
+
+  it("uses a weekday's own time over the workday / day-off time, and a single date over both", () => {
+    expect(wakeTargetFor(profile, '2026-11-02')).toEqual({ wakeMin: 365, isWorkday: true });
+    expect(wakeTargetFor(profile, '2026-11-03')).toEqual({ wakeMin: 450, isWorkday: true });
+    expect(wakeTargetFor(profile, '2026-11-07')).toEqual({ wakeMin: 540, isWorkday: false });
+    expect(wakeTargetFor({ ...profile, wakePlan: { '2026-11-03': { wakeMin: 300 } } }, '2026-11-03').wakeMin).toBe(300);
+  });
+
+  it('plans tonight to that day’s time', () => {
+    const now = atMinutes('2026-11-02', 19 * 60); // Monday evening → Tuesday morning
+    const data = generateDemoData(now);
+    const a = analyze({ ...data, profile: { ...data.profile, dayWake: { 2: 9 * 60 + 15 } } }, now);
+    expect(formatTime(a.tonight.wake)).toBe('09:15');
+    expect(a.upcoming.find((n) => n.wakeDate === '2026-11-03')?.wake).toBe(a.tonight.wake);
+  });
+});

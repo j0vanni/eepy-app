@@ -145,7 +145,11 @@ export function wakeTargetFor(profile: Profile, dateKey: string): WakeTarget {
   if (plan?.wakeMin !== undefined) return { wakeMin: plan.wakeMin, isWorkday: true, custom: true };
   const freeWakeMin = profile.freeWakeMin ?? profile.workWakeMin + 60;
   if (plan?.free) return { wakeMin: freeWakeMin, isWorkday: false, custom: true, noAlarm: true };
-  const isWorkday = profile.workdays.includes(weekdayOfKey(dateKey));
+  const weekday = weekdayOfKey(dateKey);
+  const isWorkday = profile.workdays.includes(weekday);
+  // A time of your own for this weekday (e.g. Tuesdays 7:30) beats the workday / other-day time.
+  const own = profile.dayWake?.[weekday];
+  if (own !== undefined) return { wakeMin: own, isWorkday };
   if (isWorkday) return { wakeMin: profile.workWakeMin, isWorkday };
   // Free days: sleep in by at most an hour to limit social jet lag, unless the user set a time.
   return { wakeMin: freeWakeMin, isWorkday };
