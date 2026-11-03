@@ -2,7 +2,8 @@
  * Tonight's wind-down, step by step (engine/windDownPlan.ts): evening light, last meal and
  * exercise, wind-down, screens off, the screen-free routine and lights-out — with what's
  * happening now and a countdown to the next step. `compact` shows only what's still ahead. With
- * the e-ink reader setting on, the routine becomes reading time on the e-reader.
+ * the e-ink reader setting on, the routine becomes reading time on the e-reader. With the bedtime
+ * rundown on (the default) it shows that instead (ui/rundown/RundownCard.tsx).
  */
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
@@ -14,9 +15,15 @@ import { currentWindDownStep, windDownTimeline } from '@/engine/windDownPlan';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { Button, Card, CardTitle, Icon, Row } from '@/ui/components';
+import { RundownCard } from '@/ui/rundown/RundownCard';
 import { colors, font, space } from '@/ui/theme';
 
 export function WindDownTimelineCard({ a, compact }: { a: Analysis; compact?: boolean }) {
+  const rundown = useStore((s) => s.settings.rundown.enabled);
+  return rundown ? <RundownCard a={a} compact={compact} /> : <PlainTimeline a={a} compact={compact} />;
+}
+
+function PlainTimeline({ a, compact }: { a: Analysis; compact?: boolean }) {
   const now = useNow(30_000);
   const screensOffMin = useStore((s) => s.settings.screensOffMin);
   const eReaderSetting = useStore((s) => s.settings.eReader);

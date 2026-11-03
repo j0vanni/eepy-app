@@ -7,7 +7,7 @@
 import { Text, View } from 'react-native';
 
 import { formatTime } from '../../engine/time';
-import { screensOffAt } from '../../engine/windDownPlan';
+import { usePhoneDown } from '../../state/rundown';
 import { EReaderSettings, useStore } from '../../state/store';
 import { useAnalysis } from '../../state/useAnalysis';
 import { Card, CardTitle, Icon, Row, Section } from '../components';
@@ -16,12 +16,14 @@ import { Toggle } from './Toggle';
 
 export function EReaderSection() {
   const eReader = useStore((s) => s.settings.eReader);
-  const screensOffMin = useStore((s) => s.settings.screensOffMin);
+  const rundown = useStore((s) => s.settings.rundown);
   const setSettings = useStore((s) => s.setSettings);
   const analysis = useAnalysis();
   const set = (patch: Partial<EReaderSettings>) => setSettings({ eReader: { ...eReader, ...patch } });
   const tonight = analysis?.tonight;
-  const off = tonight ? screensOffAt(tonight, screensOffMin) : undefined;
+  const off = usePhoneDown(analysis);
+  // With the bedtime rundown, reading time is its own step (and can be none).
+  const reading = !rundown.enabled || rundown.readingMin > 0;
 
   return (
     <Section title="E-ink reader">
@@ -49,7 +51,9 @@ export function EReaderSection() {
               <Row gap={space.sm} style={{ marginTop: space.xs, alignItems: 'flex-start' }}>
                 <Icon name="clock-outline" size={18} color={colors.textDim} />
                 <Text style={[font.small, { flex: 1 }]}>
-                  Tonight: phone away at {formatTime(off)}, then read until lights-out at {formatTime(tonight.bedtime)}.
+                  {reading
+                    ? `Tonight: phone away at ${formatTime(off)}, then read until lights-out at ${formatTime(tonight.bedtime)}.`
+                    : `Tonight: phone away at ${formatTime(off)}. Reading time is off in your bedtime rundown.`}
                 </Text>
               </Row>
             ) : null}

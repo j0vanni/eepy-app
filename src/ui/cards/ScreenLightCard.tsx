@@ -11,7 +11,7 @@ import type { Analysis } from '@/engine/analysis';
 import { EReader, eReaderIfOn, eReaderSchedule, eReaderTargetAt } from '@/engine/eReader';
 import { judgeScreenBrightness, nightLightSchedule, ScreenPlanInput, screenLightSchedule, screenTargetAt } from '@/engine/screenLight';
 import { formatTime } from '@/engine/time';
-import { screensOffAt } from '@/engine/windDownPlan';
+import { phoneDownAt } from '@/engine/rundown';
 import {
   askPhoneBrightnessPermission,
   canSetPhoneBrightness,
@@ -25,20 +25,21 @@ import {
   setPhoneBrightness,
 } from '@/integrations/screen';
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
-import { useStore } from '@/state/store';
+import { Settings, useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { AppSwitch, Button, Card, CardTitle, Icon, Note, Row } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 const FILTER_LABEL = { off: 'No filter needed', warm: 'Night Light on', warmest: 'Night Light warmest + Extra dim' } as const;
 
-export function screenPlanFor(a: Analysis, screensOffMin?: number): ScreenPlanInput {
+/** Tonight's phone-light plan; the "screen away" phase starts at phone-down (the bedtime rundown's, or screens-off when it's off). */
+export function screenPlanFor(a: Analysis, s: Pick<Settings, 'rundown' | 'screensOffMin'>): ScreenPlanInput {
   return {
     wakeTime: a.wakeTime,
     windDownStart: a.tonight.windDownStart,
     bedtime: a.tonight.bedtime,
     nextWake: a.tonight.wake,
-    screensOff: screensOffAt(a.tonight, screensOffMin),
+    screensOff: phoneDownAt(a.tonight, s),
   };
 }
 
@@ -178,8 +179,9 @@ export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boo
   const now = useNow(30_000);
   const [phone, patchPhone, refreshPhone] = usePhoneScreen();
   const screensOffMin = useStore((st) => st.settings.screensOffMin);
+  const rundown = useStore((st) => st.settings.rundown);
   const eReader = eReaderIfOn(useStore((st) => st.settings.eReader));
-  const plan = screenPlanFor(a, screensOffMin);
+  const plan = screenPlanFor(a, { rundown, screensOffMin });
   const target = screenTargetAt(plan, now);
   const evening = target.phase === 'evening' || target.phase === 'winddown' || target.phase === 'night';
   const upcoming = screenLightSchedule(plan).filter((t) => t.until > now && (t.phase === 'evening' || t.phase === 'winddown' || t.phase === 'night'));

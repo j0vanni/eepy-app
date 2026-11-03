@@ -79,6 +79,14 @@ const SCREENS: Feature[] = [
 
   // More: wind-down & programmes
   { id: 'winddown', title: 'Wind-down routine', where: 'More › Wind-down', icon: 'weather-night', href: '/winddown', keywords: ['breathing', 'relax', 'sounds', 'white noise', "can't sleep", 'checklist', 'calm'] },
+  {
+    id: 'rundown',
+    title: 'Bedtime rundown (step by step)',
+    where: 'Today › evening · More › Wind-down',
+    icon: 'format-list-checks',
+    href: '/rundown',
+    keywords: ['bedtime routine', 'rundown', 'phone down', 'reading', 'e-book', 'kindle', 'shower', 'to-do list', 'checklist', 'start my rundown', 'guided', 'step by step', 'teeth', 'skin care', 'evening routine', 'night routine'],
+  },
   { id: 'sleep-sounds', title: 'Sleep sounds & timer', where: inSettings('winddown'), icon: 'music-note-outline', href: settingsPage('winddown'), keywords: ['white noise', 'brown noise', 'pink noise', 'rain', 'volume', 'sleep timer'] },
   { id: 'autopilot', title: 'Bedtime autopilot (phone sleep mode)', where: inSettings('winddown'), icon: 'moon-waning-crescent', href: settingsPage('winddown'), keywords: ['sleep mode', 'do not disturb', 'dnd', 'grayscale', 'modes', 'silence'] },
   { id: 'cbti', title: 'Insomnia programme', where: 'More › Programmes', icon: 'account-heart', href: '/cbti', keywords: ['cbt-i', 'insomnia', 'sleep restriction', '6 weeks', 'programme', 'program'] },
@@ -109,6 +117,14 @@ const SETTINGS_ITEMS: Feature[] = [
   { id: 's-shortcuts', title: 'Shortcuts & Quick Settings tile', where: inSettings('notifications'), icon: 'gesture-tap-hold', href: settingsPage('notifications'), keywords: ['app icon', 'long-press', 'log coffee tile', 'home screen'] },
   { id: 's-winddown-length', title: 'Wind-down length', where: inSettings('winddown'), icon: 'timer-sand', href: settingsPage('winddown'), keywords: ['how long', 'minutes before bed', 'routine'] },
   { id: 's-screens-off', title: 'Screens off before lights-out', where: inSettings('winddown'), icon: 'cellphone-off', href: settingsPage('winddown'), keywords: ['phone away', 'screen time'] },
+  {
+    id: 's-rundown',
+    title: 'Your bedtime rundown (customize)',
+    where: inSettings('winddown'),
+    icon: 'tune-variant',
+    href: settingsPage('winddown'),
+    keywords: ['bedtime routine', 'rundown', 'phone down', 'reading time', 'e-book', 'kindle', 'shower', 'to-do list', 'checklist', 'reorder', 'add a step', 'custom step', 'last drink', 'alcohol'],
+  },
   { id: 's-e-reader', title: 'E-ink reader (Kindle, Kobo, Boox)', where: inSettings('winddown'), icon: 'book-open-variant', href: settingsPage('winddown'), keywords: ['e-reader', 'ereader', 'e-ink', 'eink', 'kindle', 'kobo', 'boox', 'reading', 'read in bed', 'book', 'frontlight', 'front light', 'warm light', 'amber'] },
   { id: 's-dim-eepy', title: 'Dim & warm eepy in the evening', where: inSettings('winddown'), icon: 'brightness-4', href: settingsPage('winddown'), keywords: ['tint', 'dim', 'warm', 'night'] },
   { id: 's-half-life', title: 'Caffeine half-life', where: inSettings('caffeine'), icon: 'coffee-outline', href: settingsPage('caffeine'), keywords: ['how fast', 'wears off', 'sensitive'] },

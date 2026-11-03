@@ -66,10 +66,10 @@ export function sessionAlarm(a: Analysis, settings: AlarmSettings, s: InBedSessi
   return { state: 'set', at: w.base, wake, ...(cycles && !twoStep ? { cycles } : {}) };
 }
 
-/** Clears tonight's wind-down / lights-out / screens-off notifications already on screen. */
+/** Clears tonight's wind-down / lights-out / screens-off / rundown notifications already on screen. */
 function dismissEvening(wakeDate: string): void {
   if (Platform.OS === 'web') return;
-  for (const id of eveningNotificationIds(wakeDate)) Notifications.dismissNotificationAsync(id).catch(() => undefined);
+  for (const id of eveningNotificationIds(wakeDate, useStore.getState().settings.rundown.remind)) Notifications.dismissNotificationAsync(id).catch(() => undefined);
 }
 
 /** Patches the stored session if it's still the one started at `inBedAt`. */

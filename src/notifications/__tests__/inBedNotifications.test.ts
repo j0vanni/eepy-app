@@ -111,7 +111,10 @@ describe('while you are in bed', () => {
       plannedId('reminders', 'bedtime'),
       plannedId('screensOff', t.wakeDate),
       plannedId('screenLight', t.wakeDate),
+      plannedId('rundown', `${t.wakeDate}-soon`),
     ]);
+    // …and the bedtime rundown's step reminders you switched on.
+    expect(eveningNotificationIds(t.wakeDate, ['shower'])).toContain(plannedId('rundown', `${t.wakeDate}-shower`));
   });
 });
 

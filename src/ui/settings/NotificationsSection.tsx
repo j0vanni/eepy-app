@@ -137,9 +137,15 @@ export function NotificationsSection() {
         />
         <Toggle
           label="Screens-off reminder"
-          sub="From the wind-down timeline: phone on the charger, face down"
+          sub={settings.rundown.enabled ? "At phone-down (your bedtime rundown): charger across the room, and what's next" : 'From the wind-down timeline: phone on the charger, face down'}
           value={settings.notifications.screensOff}
           onChange={(v) => setNotif('screensOff', v)}
+        />
+        <Toggle
+          label="Phone down in 10 min"
+          sub="A heads-up for last messages and the alarm check"
+          value={settings.notifications.phoneDownSoon}
+          onChange={(v) => setNotif('phoneDownSoon', v)}
         />
         <Toggle
           label="Forgot your coffee?"
