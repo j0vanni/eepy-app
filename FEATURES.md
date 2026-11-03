@@ -490,6 +490,19 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 35. New in 0.12.1 — skip the routine (or fix it afterwards)
+
+*"Add a routine skip for when I wake up and want to skip, as well as an adjustment for when I wake up and didn't click on it."*
+
+| | Feature |
+| --- | --- |
+| ✅ | **Skip it at the time**: Today's routine card now shows from an hour before the routine alarm — *"Routine alarm at 5:00 AM — up at 6:00 AM. Not doing it today?"* **Skip the routine — sleep until 6:00 AM** — and during the routine **Skip it — back to sleep until 6:00 AM** (next to "Staying up? Skip the 6:00 alarm"). The routine alarm stops (watch buzzes, phone backup, the native alarm — also when it's ringing or snoozed), the final alarm still rings, and the card says so with **Undo** (the routine alarm comes back if it's still ahead) |
+| ✅ | **From the watch**: the routine alarm's buzzes (and the planner routine alarm on builds without the native alarm) have **I'm up** and **Skip routine**; Skip works in the background and doesn't count as "I'm up" |
+| ✅ | **Fix it afterwards**: the morning check-in and the night screen ask *"Your 5:00 AM routine this morning? Did it / Skipped it"* with eepy's guess from the night (*"eepy didn't see you up for it, so it counted the morning as skipped. Not right? Tap 'Did it'."*). Your answer is saved to that morning (`wakePlan[date].twoStep`) and the night is re-read: skipped, an early wake-up counts as waking, not as the routine; did it, the time up counts as the routine, not as waking in the night |
+| ✅ | A skip at the time records the same answer, so wake-up detection, the planner and the routine toggle all agree (`state/routineSkip.ts`, mark `wake.skipRoutine` for the alarm itself) |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

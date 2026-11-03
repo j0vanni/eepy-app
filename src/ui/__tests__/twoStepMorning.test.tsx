@@ -42,10 +42,11 @@ import { computeSessionMetrics } from '../../engine/sessions';
 import { atMinutes, MINUTE } from '../../engine/time';
 import type { TwoStepMorning } from '../../engine/types';
 import type { NightTimeline } from '../../engine/wakeDetect';
-import { resetWakeAlarmMemo, WAKE_AT_MARK, WAKE_FINAL_SKIP_MARK, WAKE_ROUTINE_AT_MARK } from '../../notifications/fullScreenAlarm';
+import { resetWakeAlarmMemo, WAKE_AT_MARK, WAKE_FINAL_SKIP_MARK, WAKE_ROUTINE_AT_MARK, WAKE_ROUTINE_SKIP_MARK } from '../../notifications/fullScreenAlarm';
 import { selectDataset, useStore } from '../../state/store';
 import { RoutineMorningNow } from '../cards/RoutineMorningNow';
 import { TwoStepMorningCard } from '../cards/TwoStepMorningCard';
+import { RoutineCheck } from '../RoutineCheck';
 import { NightTimelineCard } from '../WakeCheck';
 
 const THU_EVE = atMinutes('2026-10-22', 21 * 60);
@@ -158,6 +159,60 @@ describe('RoutineMorningNow', () => {
     expect(text()).toContain('Staying up');
     await press('Undo');
     expect(useStore.getState().settings.marks[WAKE_FINAL_SKIP_MARK]).toBeUndefined();
+  });
+});
+
+describe('skipping the routine', () => {
+  function morning(hour: number) {
+    useStore.getState().setProfile({ twoStepMorning: TWO, wakePlan: {} });
+    const before = analyze(selectDataset(useStore.getState()), atMinutes(FRI, 3 * 60));
+    useStore.getState().setSettings({ marks: { [WAKE_AT_MARK]: before.tonight.wake, [WAKE_ROUTINE_AT_MARK]: before.alarm.alarm } });
+    (Date.now as jest.Mock).mockReturnValue(atMinutes(FRI, hour * 60));
+    return { routineAt: before.alarm.alarm };
+  }
+
+  it('awake before the routine alarm: skip it and sleep through to 06:05 (and undo)', async () => {
+    const { routineAt } = morning(4.25);
+    expect(Date.now()).toBeLessThan(routineAt);
+    await render(<RoutineMorningNow />);
+    expect(text()).toContain('Not doing it today?');
+    await press('Skip the routine — sleep until 06:05');
+    expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBe(FRI);
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
+    expect(mockNative.cancelAlarm).toHaveBeenCalledWith('eepy-wake-routine');
+    expect(mockNative.cancelAlarm).not.toHaveBeenCalledWith('eepy-wake');
+    expect(text()).toContain('ROUTINE SKIPPED');
+    expect(text()).toContain('"Sleep until ","06:05"');
+    expect(text()).toContain('the 06:05 alarm still rings');
+    await press('Undo');
+    expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBeUndefined();
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toBeUndefined();
+  });
+
+  it('during the routine: "Skip it — back to sleep" keeps the final alarm', async () => {
+    morning(5.1);
+    await render(<RoutineMorningNow />);
+    await press('Skip it — back to sleep until 06:05');
+    expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBe(FRI);
+    expect(useStore.getState().settings.marks[WAKE_FINAL_SKIP_MARK]).toBeUndefined();
+    expect(text()).toContain('Undo — I did my routine');
+  });
+
+  it('afterwards: "Did it / Skipped it" on the morning, with eepy\'s guess', async () => {
+    useStore.getState().setProfile({ twoStepMorning: { ...TWO, since: '2026-10-01' }, wakePlan: {} });
+    (Date.now as jest.Mock).mockReturnValue(atMinutes(FRI, 8 * 60));
+    const m = { wakeDate: FRI, isNap: false } as Parameters<typeof RoutineCheck>[0]['m'];
+    await render(<RoutineCheck m={m} compact />);
+    expect(text()).toContain('this morning?');
+    expect(text()).toContain("eepy didn't see you up for it");
+    await press('Did it');
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: true });
+    expect(text()).toContain('Saved');
+    await press('Skipped it');
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
+    // Not a routine morning (Saturday) and nothing said: no question.
+    await render(<RoutineCheck m={{ ...m, wakeDate: '2026-10-24' }} compact />);
+    expect(root.container.children).toHaveLength(0);
   });
 });
 

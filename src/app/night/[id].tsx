@@ -15,6 +15,7 @@ import { Button, Card, CardTitle, Chip, Empty, Meter, Note, Ring, Row, Screen, S
 import { confirm } from '@/ui/confirm';
 import { nightLabel } from '@/ui/format';
 import { colors, font, scoreColor, space } from '@/ui/theme';
+import { RoutineCheck } from '@/ui/RoutineCheck';
 import { NightTimelineCard } from '@/ui/WakeCheck';
 
 export default function NightScreen() {
@@ -76,6 +77,7 @@ export default function NightScreen() {
       {story ? <NightStoryCard story={story} /> : null}
 
       {!m.isNap ? <NightTimelineCard m={m} t={a.timelines[m.id]} /> : null}
+      {!m.isNap ? <RoutineCheck m={m} t={a.timelines[m.id]} /> : null}
 
       <Card>
         <CardTitle icon="chart-gantt" title="Hypnogram" />

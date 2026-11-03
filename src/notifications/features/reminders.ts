@@ -18,6 +18,7 @@ import type { Analysis } from '../../engine/analysis';
 import { inBedTonight } from '../../engine/inBed';
 import { logUp } from '../../engine/wakeDetect';
 import { dateKey, formatDuration, formatTime, HOUR, MINUTE, weekdayOfKey } from '../../engine/time';
+import { skipRoutine } from '../../state/routineSkip';
 import type { AppState } from '../../state/store';
 import {
   cancelFullScreenAlarm,
@@ -40,6 +41,9 @@ export const DAILY_REMINDER_CAP = 5;
 /** Nap need (0–100) above which a "nap window open" nudge is worth sending. */
 export const NAP_NUDGE_MIN_NEED = 55;
 export const WRIST_WAKE_CATEGORY = 'wrist-wake';
+/** The routine alarm's buzzes: "I'm up" or "Skip routine" (back to sleep until the final alarm). */
+export const WRIST_ROUTINE_CATEGORY = 'wrist-routine';
+export const ROUTINE_SKIP_ACTION = 'routine-skip';
 export const WRIST_WAKE_KIND = 'wrist-wake';
 const wristWakeId = (i: number) => `wrist-wake-${i}`;
 const wristRoutineId = (i: number) => `wrist-routine-${i}`;
@@ -184,14 +188,27 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
           channel: 'wrist',
           alarm: true,
           silent: true,
-          categoryId: WRIST_WAKE_CATEGORY,
+          categoryId: WRIST_ROUTINE_CATEGORY,
           title: i === 0 ? `${routine.title} ⌚` : 'Routine time — still in bed?',
-          body: i === 0 ? `${routine.body} Tap "I'm up", or the phone alarm rings at ${backup}.` : `Phone alarm at ${backup} unless you tap "I'm up".`,
+          body:
+            i === 0
+              ? `${routine.body} Tap "I'm up" — or "Skip routine" to sleep on — else the phone alarm rings at ${backup}.`
+              : `Phone alarm at ${backup} unless you tap "I'm up" or "Skip routine".`,
           data: { kind: WRIST_WAKE_KIND, base: routine.base, routine: true },
         }),
       );
       if (!hasFullScreenAlarm()) {
-        planned.push({ id: ROUTINE_PLAN_ID, at: routine.at, channel: 'wake', sound: 'wake.wav', alarm: true, title: routine.title, body: routine.body });
+        planned.push({
+          id: ROUTINE_PLAN_ID,
+          at: routine.at,
+          channel: 'wake',
+          sound: 'wake.wav',
+          alarm: true,
+          title: routine.title,
+          body: routine.body,
+          categoryId: WRIST_ROUTINE_CATEGORY,
+          data: { kind: WRIST_WAKE_KIND, base: routine.base, routine: true },
+        });
       }
     }
     if (!wake.done) {
@@ -217,6 +234,16 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
     }
   }
   return planned;
+}
+
+/** Cancels the routine alarm's watch buzzes, its planner phone alarm and the native routine alarm (scheduled or showing). */
+export async function cancelRoutineAlarms(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  for (const id of [...WRIST_BUZZ_OFFSETS_MIN.map((_, i) => plannedId('reminders', wristRoutineId(i))), plannedId('reminders', ROUTINE_PLAN_ID)]) {
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
+    await Notifications.dismissNotificationAsync(id).catch(() => undefined);
+  }
+  await cancelFullScreenAlarm(WAKE_ROUTINE_ALARM_ID);
 }
 
 /**
@@ -259,6 +286,13 @@ export const reminders: NotificationFeature = {
     { id: NAP_ALARM_CATEGORY, actions: [{ id: 'nap-done', title: "I'm up — log nap" }] },
     { id: WRIST_WAKE_CATEGORY, actions: [{ id: 'wrist-up', title: "I'm up" }] },
     {
+      id: WRIST_ROUTINE_CATEGORY,
+      actions: [
+        { id: 'wrist-up', title: "I'm up" },
+        { id: ROUTINE_SKIP_ACTION, title: 'Skip routine', opensApp: false },
+      ],
+    },
+    {
       id: RUNNING_LATE_CATEGORY,
       actions: [
         { id: IN_BED_ACTION, title: "I'm in bed" },
@@ -284,6 +318,12 @@ export const reminders: NotificationFeature = {
     if (r.data.kind === WRIST_WAKE_KIND) {
       const base = typeof r.data.base === 'number' ? r.data.base : undefined;
       const routine = r.data.routine === true;
+      // "Skip routine": back to sleep — the routine alarm stops, the final one still rings, and the
+      // morning counts as a one-alarm morning. Stays in the background (no app to look at in bed).
+      if (routine && r.actionId === ROUTINE_SKIP_ACTION) {
+        if (base !== undefined && Date.now() - base < 3 * HOUR) await skipRoutine(dateKey(base));
+        return;
+      }
       // A replayed response for an old alarm must not cancel a newer one.
       if (base !== undefined && Date.now() - base < 3 * HOUR && state.settings.marks[routine ? WAKE_ROUTINE_DONE_MARK : WAKE_DONE_MARK] !== base) {
         await stopWristWake(state, base, { routine });

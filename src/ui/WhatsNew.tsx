@@ -26,6 +26,11 @@ const TABS: { icon: string; title: string; text: string }[] = [
 /** Smaller additions since this sheet was written. */
 const NEW: { icon: string; title: string; text: string }[] = [
   {
+    icon: 'sleep',
+    title: 'Skip the routine',
+    text: 'Not doing your face routine? Today shows "Skip the routine — sleep until 6:00" from an hour before the routine alarm (the watch buzz has "Skip routine" too). Forgot to tap? The morning check-in asks "Did it / Skipped it".',
+  },
+  {
     icon: 'format-list-checks',
     title: 'Bedtime rundown',
     text: 'Your evening step by step, from the caffeine cut-off to "I\'m in bed": phone down, teeth, reading time (on your e-reader if you use one) and more — each with what to do and why. Tap "Start my rundown" on Today in the evening for one step at a time, and make it yours in Settings → Wind-down & phone light.',

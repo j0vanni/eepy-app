@@ -49,6 +49,7 @@ import {
   WAKE_ROUTINE_AT_MARK,
   WAKE_FINAL_SKIP_MARK,
   WAKE_ROUTINE_DONE_MARK,
+  WAKE_ROUTINE_SKIP_MARK,
   WAKE_SKIP_MARK,
 } from '../fullScreenAlarm';
 import { naturalWake } from '../features/naturalWake';
@@ -201,7 +202,7 @@ describe('watch-first two-step morning', () => {
     expect(wrist.map((p) => p.id)).toEqual(['wrist-routine-0', 'wrist-routine-1', 'wrist-routine-2', 'wrist-wake-0', 'wrist-wake-1', 'wrist-wake-2']);
     expect(wrist.slice(0, 3).map((p) => p.at)).toEqual([r, r + MINUTE, r + 2 * MINUTE]);
     expect(wrist.slice(3).map((p) => p.at)).toEqual([final, final + MINUTE, final + 2 * MINUTE]);
-    expect(wrist[0]).toMatchObject({ silent: true, alarm: true, categoryId: 'wrist-wake', data: { kind: 'wrist-wake', base: r, routine: true } });
+    expect(wrist[0]).toMatchObject({ silent: true, alarm: true, categoryId: 'wrist-routine', data: { kind: 'wrist-wake', base: r, routine: true } });
     expect(wrist[3].data).toEqual({ kind: 'wrist-wake', base: final });
     expect(planned.find((p) => p.id === ROUTINE_PLAN_ID)?.at).toBe(r + 5 * MINUTE);
     expect(planned.find((p) => p.id === 'wake')?.at).toBe(final + 5 * MINUTE);
@@ -288,6 +289,7 @@ describe('the routine card window', () => {
       finalPhoneAt: final,
       date: FRI,
       skipped: false,
+      routineSkipped: false,
       eepyAlarm: true,
     });
     expect(routineNow(c.analysis, c.state.settings, c.state.profile, routineAt - 10 * MINUTE)).toBeUndefined();
@@ -315,6 +317,7 @@ describe('the routine card window', () => {
       finalPhoneAt: final,
       date: FRI,
       skipped: false,
+      routineSkipped: false,
       eepyAlarm: false,
     });
     expect(routineNow(c.analysis, c.state.settings, c.state.profile, atMinutes(FRI, 6 * 60 + 5))).toBeUndefined();
@@ -373,3 +376,59 @@ describe('with the setting off', () => {
     expect(c.state.setMark).toHaveBeenCalledWith(WAKE_ROUTINE_AT_MARK, undefined);
   });
 });
+
+describe('skipping the routine at the time', () => {
+  const before = ctx(FRI, 3);
+  const routineAt = before.analysis.alarm.alarm;
+  const marks: Marks = { [WAKE_AT_MARK]: final, [WAKE_ROUTINE_AT_MARK]: routineAt };
+
+  it('stops only the routine alarm — the final one still rings', () => {
+    const c = ctx(FRI, 5.1, { marks: { ...marks, [WAKE_ROUTINE_SKIP_MARK]: FRI } });
+    const w = nextWakeAlarm(c.analysis, c.state.settings, c.now);
+    expect(w.routine?.done).toBe(true);
+    expect(w.done).toBe(false);
+    expect(planNativeRoutineAlarm(c.analysis, true, c.now, c.state.settings)).toEqual({ action: 'cancel' });
+    expect(planNativeWakeAlarm(c.analysis, true, c.now, c.state.settings).action).not.toBe('cancel');
+    const ids = planReminders(c).map((p) => p.id);
+    expect(ids).not.toContain(ROUTINE_PLAN_ID);
+    // Yesterday's skip doesn't touch today's routine.
+    const other = ctx(FRI, 5.1, { marks: { ...marks, [WAKE_ROUTINE_SKIP_MARK]: THU } });
+    expect(nextWakeAlarm(other.analysis, other.state.settings, other.now).routine?.done).toBe(false);
+  });
+
+  it('opens the routine card up to an hour before the routine alarm, and keeps it after a skip', () => {
+    const early = ctx(FRI, 4.5, { marks });
+    expect(routineNow(early.analysis, early.state.settings, early.state.profile, early.now)).toBeUndefined();
+    expect(routineNow(early.analysis, early.state.settings, early.state.profile, early.now, { leadMin: 60 })).toMatchObject({ routineAt, routineSkipped: false });
+    const skipped = ctx(FRI, 5.1, { marks: { ...marks, [WAKE_ROUTINE_SKIP_MARK]: FRI } });
+    expect(routineNow(skipped.analysis, skipped.state.settings, skipped.state.profile, skipped.now, { leadMin: 60 })).toMatchObject({ routineSkipped: true, finalAt: final });
+  });
+
+  it('keeps the card (for Undo) when skipped before 4am, after the plan has dropped the routine', () => {
+    // Skipped at 3 AM: tonight is still Friday morning and its record now says no routine.
+    const data = withTwoStep(TWO, { [FRI]: { twoStep: false } });
+    const c = ctx(FRI, 3, { data, marks: { [WAKE_ROUTINE_SKIP_MARK]: FRI } });
+    expect(c.analysis.tonight.twoStep).toBeUndefined();
+    const r = routineNow(c.analysis, c.state.settings, c.state.profile, c.now + 90 * MINUTE, { leadMin: 60 });
+    expect(r).toMatchObject({ routineSkipped: true, date: FRI });
+    expect(r!.routineAt).toBe(nextWakeAlarm(c.analysis, c.state.settings, c.now).base - 65 * MINUTE);
+  });
+
+  it('"Skip routine" on the watch buzz stops it without counting as "I\'m up"', async () => {
+    const { useStore } = jest.requireActual('../../state/store') as typeof import('../../state/store');
+    await useStore.persist.rehydrate();
+    useStore.getState().setSettings({ marks: {} });
+    useStore.getState().setProfile({ wakePlan: {} });
+    const upsBefore = useStore.getState().wakeLog.ups.length;
+    jest.spyOn(Date, 'now').mockReturnValue(routineAt + MINUTE);
+    await reminders.onResponse!({ actionId: 'routine-skip', data: { kind: 'wrist-wake', base: routineAt, routine: true } }, useStore.getState());
+    expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBe(FRI);
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
+    expect(useStore.getState().wakeLog.ups.length).toBe(upsBefore);
+    expect(mockNative.cancelAlarm).toHaveBeenCalledWith(WAKE_ROUTINE_ALARM_ID);
+    expect(mockNative.cancelAlarm).not.toHaveBeenCalledWith(WAKE_ALARM_ID);
+    expect(router.push).not.toHaveBeenCalled();
+    (Date.now as jest.Mock).mockRestore?.();
+  });
+});
+

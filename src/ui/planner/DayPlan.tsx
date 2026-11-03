@@ -11,6 +11,7 @@ import { addDays, dateKey, formatClock, formatDuration, formatTime, normalizeMin
 import { checkTwoStep, twoStepByWeek, twoStepSetting } from '@/engine/twoStep';
 import type { DayWakePlan } from '@/engine/types';
 import type { UpcomingNight } from '@/engine/weekPlan';
+import { setWakePlanFor } from '@/state/routineSkip';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { Button, Note, Row, Segmented, Stat, Stepper } from '@/ui/components';
@@ -22,17 +23,9 @@ import { DAY_NAMES, wakeChoiceHint } from './planText';
 /** How far ahead mornings can be planned. */
 export const PLAN_AHEAD_DAYS = 90;
 
-/** Saves (or clears) one morning's wake plan; mornings older than a month are dropped to keep the store small. */
+/** Saves (or clears) one morning's wake plan (state/routineSkip.setWakePlanFor). */
 export function useSetWakePlan(): (date: string, plan: DayWakePlan | undefined) => void {
-  const setProfile = useStore((s) => s.setProfile);
-  return (date, plan) => {
-    const today = dateKey(Date.now());
-    const next: Record<string, DayWakePlan> = { ...(useStore.getState().profile.wakePlan ?? {}) };
-    if (plan) next[date] = plan;
-    else delete next[date];
-    for (const k of Object.keys(next)) if (k < addDays(today, -30)) delete next[k];
-    setProfile({ wakePlan: next });
-  };
+  return (date, plan) => setWakePlanFor(date, plan);
 }
 
 /** The weekly-pattern wake-up for a date, ignoring anything set for that day. */

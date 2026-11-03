@@ -13,7 +13,7 @@ import EepyAlarm from '../../modules/eepy-alarm';
 import type { Analysis } from '../engine/analysis';
 import { wakeTargetFor } from '../engine/schedule';
 import { atMinutes, dateKey, formatTime, HOUR, MINUTE, minutesOfDay } from '../engine/time';
-import { TWO_STEP, twoStepFor, twoStepSetting } from '../engine/twoStep';
+import { TWO_STEP, twoStepConfig, twoStepFor, twoStepSetting } from '../engine/twoStep';
 import type { Profile } from '../engine/types';
 import type { AppState, Settings } from '../state/store';
 
@@ -134,6 +134,12 @@ export const WAKE_ROUTINE_DONE_MARK = 'wake.routineDone';
  * WAKE_SKIP_MARK for the alarms, but that morning isn't a free one (no "did you wake up on your own?").
  */
 export const WAKE_FINAL_SKIP_MARK = 'wake.skipFinal';
+/**
+ * marks key: wake date whose *routine* alarm was skipped that morning ("Skip it — back to sleep").
+ * Only the routine alarm; the final alarm still rings. The morning's record (profile.wakePlan[date]
+ * .twoStep = false) is set alongside, so planning and wake-up detection treat it as a one-alarm morning.
+ */
+export const WAKE_ROUTINE_SKIP_MARK = 'wake.skipRoutine';
 /** Watch-first alarms buzz the wrist at these offsets (min) before the phone alarm takes over. */
 export const WRIST_BUZZ_OFFSETS_MIN = [0, 1, 2];
 /** A wake alarm that has rung stays current this long (it may be ringing or snoozed). */
@@ -214,7 +220,7 @@ export function nextWakeAlarm(a: Analysis, settings: WakeSettings, now: number):
           at: routineBase + backupMs,
           wrist: buzzes(routineBase),
           held: holding,
-          done: routineBase === settings.marks[WAKE_ROUTINE_DONE_MARK] || skippedByUser || calendarFree,
+          done: routineBase === settings.marks[WAKE_ROUTINE_DONE_MARK] || settings.marks[WAKE_ROUTINE_SKIP_MARK] === dateKey(base) || skippedByUser || calendarFree,
         };
   return {
     title: planned.title,
@@ -243,33 +249,54 @@ export interface RoutineNow {
   date: string;
   /** The final alarm is skipped ("I'm staying up"). */
   skipped: boolean;
+  /** The routine is skipped this morning ("Skip it — back to sleep", WAKE_ROUTINE_SKIP_MARK). */
+  routineSkipped: boolean;
   /** eepy rings these alarms (otherwise the times come from the plan, with nothing to skip). */
   eepyAlarm: boolean;
 }
 
 /**
- * During a two-step morning's routine — from (5 min before) the routine alarm until the final alarm
- * rings — the times that matter; undefined at any other time. With eepy's alarm on these are the
- * alarms actually scheduled (this morning's, held after 4am); otherwise this morning's plan.
+ * During a two-step morning's routine — from `leadMin` (default 5) before the routine alarm until the
+ * final alarm rings — the times that matter; undefined at any other time. With eepy's alarm on these
+ * are the alarms actually scheduled (this morning's, held after 4am); otherwise this morning's plan.
+ * A routine skipped this morning still counts (so it can be undone), even once the plan has dropped it.
  */
-export function routineNow(a: Analysis, settings: WakeSettings & Pick<Settings, 'notifications'>, profile: Profile, now: number): RoutineNow | undefined {
+export function routineNow(
+  a: Analysis,
+  settings: WakeSettings & Pick<Settings, 'notifications'>,
+  profile: Profile,
+  now: number,
+  opts: { leadMin?: number } = {},
+): RoutineNow | undefined {
+  const leadMin = opts.leadMin ?? 5;
   const routineMin = twoStepSetting(profile).routineMin;
+  const skipMark = settings.marks[WAKE_ROUTINE_SKIP_MARK];
   if (settings.notifications.smartAlarm) {
     const w = nextWakeAlarm(a, settings, now);
-    const r = w.routine;
-    if (!r || w.calendarFree || now < r.base - 5 * MINUTE || now >= w.base) return undefined;
-    return { routineAt: r.base, backToBedBy: r.base + routineMin * MINUTE, finalAt: w.base, finalPhoneAt: w.at, date: dateKey(w.base), skipped: w.skipped, eepyAlarm: true };
+    const date = dateKey(w.base);
+    const routineSkipped = skipMark === date;
+    let routineAt = w.routine?.base;
+    // Skipped before 4am: tonight's plan no longer has the routine — place it from the setting's gap.
+    if (routineAt === undefined && routineSkipped) {
+      const c = twoStepConfig({ ...profile, twoStepMorning: { ...twoStepSetting(profile), enabled: true } });
+      if (c) routineAt = w.base - c.gapMin * MINUTE;
+    }
+    if (routineAt === undefined || w.calendarFree || now < routineAt - leadMin * MINUTE || now >= w.base) return undefined;
+    return { routineAt, backToBedBy: routineAt + routineMin * MINUTE, finalAt: w.base, finalPhoneAt: w.at, date, skipped: w.skipped, routineSkipped, eepyAlarm: true };
   }
   // Your own alarms: this morning's planned times (mornings only).
   if (minutesOfDay(now) >= 12 * 60) return undefined;
   const date = dateKey(now);
-  const target = wakeTargetFor(profile, date);
-  const c = twoStepFor(profile, date, target);
+  const routineSkipped = skipMark === date;
+  // A skip also set this morning's routine off in the calendar: read the plan without it.
+  const asPlanned = routineSkipped && profile.wakePlan?.[date] ? { ...profile, wakePlan: { ...profile.wakePlan, [date]: { ...profile.wakePlan[date], twoStep: undefined } } } : profile;
+  const target = wakeTargetFor(asPlanned, date);
+  const c = twoStepFor(asPlanned, date, target);
   if (!c) return undefined;
   const finalAt = atMinutes(date, target.wakeMin);
   const first = finalAt - c.gapMin * MINUTE;
-  if (now < first - 30 * MINUTE || now >= finalAt) return undefined;
-  return { routineAt: first, backToBedBy: first + c.routineMin * MINUTE, finalAt, finalPhoneAt: finalAt, date, skipped: false, eepyAlarm: false };
+  if (now < first - Math.max(30, leadMin) * MINUTE || now >= finalAt) return undefined;
+  return { routineAt: first, backToBedBy: first + c.routineMin * MINUTE, finalAt, finalPhoneAt: finalAt, date, skipped: false, routineSkipped, eepyAlarm: false };
 }
 
 /**
