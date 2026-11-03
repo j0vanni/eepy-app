@@ -12,6 +12,7 @@ import { refreshAppShortcuts } from '@/shortcuts/appShortcuts';
 import { applyClockSetting } from '@/state/clockFormat';
 import { useInBedAutoClose } from '@/state/inBed';
 import { configureNotifications, handleNotificationResponse, replanNotifications } from '@/state/notifications';
+import { recordPlannedNight } from '@/state/planOptions';
 import { useLearning } from '@/state/learning';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
@@ -69,6 +70,11 @@ function Background() {
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
   }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, session, goals, experiments, checkins]);
+
+  // What eepy planned tonight, for "how late you go to bed vs the plan" (frozen once lights-out has passed).
+  useEffect(() => {
+    if (analysis) recordPlannedNight(analysis);
+  }, [analysis, session]);
 
   // Bedtime autopilot: after the wake alarm (its off time is the morning alarm). Cheap when nothing changed.
   // `session`: after Undo of "I'm in bed" the night's own plan is sent again (state/inBed.ts).

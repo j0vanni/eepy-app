@@ -7,6 +7,7 @@ import { DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/e
 import { isOpen, justNow, tapsNightOffer } from '@/engine/inBed';
 import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
 import { sessionFor } from '@/state/inBed';
+import { usePlanOptions } from '@/state/planOptions';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
@@ -21,6 +22,7 @@ import { colors, font, radius, space } from '@/ui/theme';
 import { CantSleepTip } from './CantSleepTip';
 import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, until, UsualCoffeeCard } from './cards';
 import { InBedButton, SessionHeader, TapsNightCard } from './InBed';
+import { StillUpCard } from './StillUp';
 
 type HeroProps = { a: Analysis; now: number };
 
@@ -69,6 +71,8 @@ function CountdownCard({ a }: { a: Analysis }) {
   const winding = now >= windDownStart;
   // From wind-down: the one tap that starts the night (unless you already did).
   const inBed = useStore((s) => isOpen(sessionFor(s.settings.session, a)));
+  // An option from "Options for tonight" in use.
+  const choice = useStore((s) => (s.settings.tonight?.wakeDate === a.tonight.wakeDate ? s.settings.tonight.choice : undefined));
   const eveningStart = windDownStart - PHASE.eveningLeadH * HOUR;
   const progress = Math.max(0, Math.min(1, (now - eveningStart) / (bedtime - eveningStart)));
   return (
@@ -79,9 +83,18 @@ function CountdownCard({ a }: { a: Analysis }) {
         at {formatTime(bedtime)}
         {a.alarm.onBoundary ? ` · ${a.alarm.cycles} sleep cycles to your alarm` : ''}
       </Text>
-      <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: 4 }}>
+      <Pressable
+        onPress={() => (choice ? router.navigate({ pathname: '/planner', params: { show: 'tonight' } }) : router.push('/tonight'))}
+        hitSlop={8}
+        accessibilityRole="button"
+        style={{ marginTop: 4 }}
+      >
         <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>
-          {a.tonight.adjusted ? `Adjusted for tonight (plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}) · change` : `Can't make ${formatTime(bedtime)}? Adjust tonight`}
+          {choice
+            ? `Using “${choice.title}” tonight · options`
+            : a.tonight.adjusted
+              ? `Adjusted for tonight (plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}) · change`
+              : `Can't make ${formatTime(bedtime)}? Adjust tonight`}
         </Text>
       </Pressable>
       {winding && !inBed ? <InBedButton a={a} /> : null}
@@ -159,6 +172,9 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
   const fitting = options.filter((o) => o.fitsBeforeWake);
   const late = options.find((o) => !o.fitsBeforeWake);
   const shown = [...fitting.slice(-3), ...(late && fitting.length ? [late] : [])];
+  // Past lights-out and not in bed: "Still up?" re-plans the rest of the night (engine/planOptions.ts).
+  const replan = usePlanOptions(a, now);
+  const stillUp = afterBedtime && !showSession && !!replan?.options.some((o) => o.bedtime >= now);
   return (
     <EnterView>
       {showSession ? (
@@ -171,13 +187,14 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
             It's {formatTime(now)}
             {afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm {formatTime(alarm)}
           </Text>
-          {afterBedtime ? (
+          {afterBedtime && !stillUp ? (
             <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
               <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Still up? Re-plan the rest of the night</Text>
             </Pressable>
           ) : null}
         </View>
       )}
+      {stillUp ? <StillUpCard a={a} now={now} /> : null}
       {showSession ? null : (
         <View style={{ marginBottom: space.lg }}>
           <InBedButton a={a} night />

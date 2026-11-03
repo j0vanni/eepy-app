@@ -6,7 +6,7 @@
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
-import { wakeTargetFor } from '@/engine/schedule';
+import { BODY_CLOCK, wakeTargetFor } from '@/engine/schedule';
 import { addDays, dateKey, formatClock, formatDuration, formatTime, normalizeMinutes, weekdayOfKey } from '@/engine/time';
 import { checkTwoStep, twoStepByWeek, twoStepSetting } from '@/engine/twoStep';
 import type { DayWakePlan } from '@/engine/types';
@@ -121,11 +121,13 @@ export function RoutineChoice({ date }: { date: string }) {
 /** Why a night is earlier, shorter or longer than usual (held back by the body clock, easing into an early start, paying back debt). */
 export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: number }) {
   const heldShort = night.heldBack && night.sleepMin < needMin - 30;
+  // The pace coming nights are planned at: what your sleep onset has actually kept up lately.
+  const ramp = useAnalysis()?.advance?.rampMinPerNight ?? BODY_CLOCK.rampMinPerNight;
   return (
     <>
       {heldShort ? (
         <Note tone="warn" icon="clock-alert-outline">
-          {`Your body clock isn't ready for a much earlier lights-out yet, so this night runs ${formatDuration(needMin - night.sleepMin)} short. eepy moves lights-out about 30 min earlier each night as you catch up — bright light soon after waking speeds it up, and a 20-min nap before 2 PM takes the edge off.`}
+          {`Your body clock isn't ready for a much earlier lights-out yet, so this night runs ${formatDuration(needMin - night.sleepMin)} short. eepy moves lights-out about ${ramp} min earlier each night as you catch up — bright light soon after waking speeds it up, and a 20-min nap before 2 PM takes the edge off.`}
         </Note>
       ) : null}
       {heldShort && night.twoStep ? <SkipRoutineForShortNight night={night} /> : null}

@@ -111,3 +111,15 @@ function planPayoff(map: NightLookup, needMin: number, asOfDate: string, debtMin
 export function debtOnDate(nights: Night[], needMin: number, asOfDate: string): number {
   return debtFromLookup(lookup(nights), needMin, asOfDate).debtMin;
 }
+
+/**
+ * Debt each morning if the coming nights go as given (oldest first; sleep = main sleep + naps that
+ * day): the same 14-night weighted model, with each night added in turn. Used to project a plan.
+ */
+export function projectDebt(nights: Night[], needMin: number, coming: { wakeDate: string; sleepMin: number }[]): number[] {
+  const map = lookup(nights);
+  return coming.map((c) => {
+    map.set(c.wakeDate, { totalSleepMin: Math.max(0, c.sleepMin), hasMain: true });
+    return debtFromLookup(map, needMin, c.wakeDate).debtMin;
+  });
+}

@@ -2,13 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import type { PlanLog } from '../engine/adherence';
 import { pruneSpo2Curves } from '../engine/breathing';
 import type { DrinkPreset } from '../engine/caffeine';
 import type { InBedSession } from '../engine/inBed';
 import type { TonightOverride } from '../engine/schedule';
 import type { CalibrationResult } from '../engine/calibration';
 import type { CbtiProgram } from '../engine/cbti';
-import { generateDemoData } from '../engine/demo';
+import { demoPlanLog, generateDemoData } from '../engine/demo';
 import type { Experiment } from '../engine/experiments';
 import type { GoalSetting } from '../engine/goals';
 import type { UpcomingDemand } from '../engine/nap';
@@ -175,6 +176,8 @@ export interface AppState extends SleepDataset {
   workouts: Workout[];
   /** App use / "I'm up" taps / your corrections for the accurate wake-up (engine/wakeDetect.ts). */
   wakeLog: WakeLog;
+  /** What eepy planned each night, kept ~30 nights — how late you go to bed vs the plan (engine/adherence.ts). */
+  planLog: PlanLog;
   /** Learned personal circadian timing (energy forecast calibration). */
   calibration?: CalibrationResult;
   experiments: Experiment[];
@@ -217,6 +220,7 @@ export interface AppState extends SleepDataset {
   setMark(key: string, value: string | number | undefined): void;
   /** Applies a wakeDetect.ts reducer (logAppUse, logUp, withFix…); a reducer returning the same log changes nothing. */
   updateWakeLog(fn: (log: WakeLog) => WakeLog): void;
+  setPlanLog(log: PlanLog): void;
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -269,6 +273,7 @@ const EMPTY: Omit<AppState, keyof Actions | 'settings' | 'hydrated'> = {
   checkins: [],
   workouts: [],
   wakeLog: EMPTY_WAKE_LOG,
+  planLog: {},
   calibration: undefined,
   experiments: [],
   goals: [],
@@ -349,6 +354,7 @@ export const useStore = create<AppState>()(
           const demo = generateDemoData(now);
           return {
             ...demo,
+            planLog: demoPlanLog(demo),
             profile: s.profile.onboarded ? s.profile : demo.profile,
             settings: { ...s.settings, dataMode: 'demo', preferredOrigins: [], lastSync: undefined, lastSyncError: undefined },
           };
@@ -391,6 +397,7 @@ export const useStore = create<AppState>()(
           const wakeLog = fn(s.wakeLog);
           return wakeLog === s.wakeLog ? s : { wakeLog };
         }),
+      setPlanLog: (planLog) => set((s) => (planLog === s.planLog ? s : { planLog })),
     }),
     {
       name: 'eepy-store-v1',
@@ -406,6 +413,7 @@ export const useStore = create<AppState>()(
         checkins: s.checkins,
         workouts: s.workouts,
         wakeLog: s.wakeLog,
+        planLog: s.planLog,
         calibration: s.calibration,
         experiments: s.experiments,
         goals: s.goals,
@@ -425,6 +433,7 @@ export const useStore = create<AppState>()(
           checkins: p.checkins ?? [],
           workouts: p.workouts ?? [],
           wakeLog: { ...EMPTY_WAKE_LOG, ...p.wakeLog },
+          planLog: p.planLog ?? {},
           experiments: p.experiments ?? [],
           goals: p.goals ?? [],
           settings: {

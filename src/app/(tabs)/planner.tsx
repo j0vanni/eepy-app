@@ -18,6 +18,7 @@ import { Button, Card, Empty, Icon, ListRow, Row, Screen, Section } from '@/ui/c
 import { Disclosure } from '@/ui/Disclosure';
 import { RecoveryCard } from '@/ui/planner/calendar';
 import { DayCard } from '@/ui/planner/DayCard';
+import { PlanOptionsCard } from '@/ui/planner/PlanOptions';
 import { TonightPanel } from '@/ui/planner/TonightPanel';
 import { BedtimeCalculator, BodyClockNote, CaffeineCurve, ScheduleShift } from '@/ui/planner/tools';
 import { UsualWeekCard } from '@/ui/planner/UsualWeek';
@@ -105,6 +106,7 @@ export default function PlannerScreen() {
       <View onLayout={at('tonight')}>
         <Section title="Tonight">
           <TonightPanel a={a} />
+          <PlanOptionsCard a={a} />
           <WindDownTimelineCard a={a} compact />
           <RecoveryCard nights={a.upcoming} debtMin={a.debt.debtMin} />
         </Section>

@@ -1,3 +1,4 @@
+import { AdvanceRate, estimateAdvanceRate } from './adherence';
 import { CircadianParams, EnergyForecast, forecastEnergy, Interval, sleepPressureAt } from './alertness';
 import { assessBreathing, breathingSummaryFor, breathingTrend, BreathingTrend } from './breathing';
 import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
@@ -8,7 +9,7 @@ import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
 import { buildNightStory, NightStory } from './nightStory';
 import { analyzeRegularity, RegularityResult } from './regularity';
-import { applyTonightOverride, planTonight, SmartAlarm, timeTonight, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
+import { applyTonightOverride, PlanInput, planTonight, SmartAlarm, timeTonight, TonightOverride, TonightPlan, wakeTargetFor } from './schedule';
 import { planUpcomingNights, preShiftTonight, UpcomingNight } from './weekPlan';
 import {
   buildNights,
@@ -48,6 +49,10 @@ export interface Analysis {
   chronotype: ChronotypeResult;
   /** When you've fallen asleep over the last three nights (minutes after midnight); planning holds lights-out against the earlier of this and the habit. */
   recentOnsetMin?: number;
+  /** How fast your sleep onset has really been moving earlier, and the ramp coming nights assume (adherence.ts). */
+  advance?: AdvanceRate;
+  /** What tonight was planned from (schedule.planTonight), for re-planning variants of tonight (planOptions.ts). */
+  planInput: PlanInput;
   regularity: RegularityResult;
   latencyMin: number;
   cycleMin: number;
@@ -141,7 +146,9 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   const regularity = analyzeRegularity(metrics, nights, day, chronotype.habitual?.midSleepSdMin);
 
   const recentOnsetMin = habitualTiming(nights.filter((n) => n.main).slice(-3))?.onsetMin;
-  const planInput = {
+  // Coming nights step earlier at the pace your sleep onset has actually kept (15–45 min a night).
+  const advance = estimateAdvanceRate(nights, day);
+  const planInput: PlanInput = {
     profile,
     today: day,
     needMin: need.needMin,
@@ -152,6 +159,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     habitualOnsetMin: chronotype.habitual?.onsetMin,
     // The last three nights: following an earlier plan shows up here long before the four-week habit.
     recentOnsetMin,
+    rampMinPerNight: advance?.rampMinPerNight,
     firstEventStart: opts.firstEventTomorrow,
     firstEventTitle: opts.firstEventTitle,
     firstEventPrepMin: opts.firstEventPrepMin,
@@ -319,6 +327,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     debt,
     chronotype,
     ...(recentOnsetMin !== undefined ? { recentOnsetMin } : {}),
+    ...(advance ? { advance } : {}),
+    planInput,
     regularity,
     latencyMin,
     cycleMin,

@@ -36,6 +36,14 @@ const SCREENS: Feature[] = [
   // Planner
   { id: 'tonight-plan', title: "Tonight's plan", where: 'Planner › Tonight', icon: 'moon-waning-crescent', href: planner('tonight'), keywords: ['tonight', 'bedtime', 'lights out', 'wind down', 'why these times'] },
   { id: 'in-bed', title: "I'm in bed (start the sleep session)", where: 'Today › evening & night', icon: 'bed', href: '/', keywords: ['in bed', 'going to bed', 'sleep session', 'sleep sesh', 'start sleep', 'lights out now', 'bedtime now', "i'm up", 'end session', 'good night', 'save last night'] },
+  {
+    id: 'plan-options',
+    title: 'Options for tonight (and "Still up?")',
+    where: 'Planner › Tonight',
+    icon: 'source-branch',
+    href: planner('tonight'),
+    keywords: ['options', 'possibilities', 'alternatives', 'best plan', 'how eepy decided', 'thinking', 'reasoning', 'still up', 're-plan', 'replan', 'skip routine tonight', 'catch up tonight', 'nap tomorrow', 'sleep in a little', 'going to bed late', 'bedtime slipping'],
+  },
   { id: 'adjust-tonight', title: 'Adjust tonight', where: 'Planner › Tonight', icon: 'clock-edit-outline', href: '/tonight', keywords: ["can't make it", 'running late', 'later bedtime', 'stay up', 'change tonight', 'late night'] },
   { id: 'plan-morning', title: 'Plan a single morning', where: 'Planner › tap a day', icon: 'calendar-edit', href: '/planner', keywords: ['set a time', 'free day', 'day off', 'no alarm', 'holiday', 'flight', 'appointment', 'early start', 'sleep in'] },
   { id: 'skip-alarm', title: "Skip tomorrow's alarm", where: 'Planner › Tonight', icon: 'alarm-off', href: planner('tonight'), keywords: ['skip alarm', 'day off', 'sleep in', 'turn off alarm', 'no alarm'] },
