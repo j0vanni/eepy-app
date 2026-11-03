@@ -42,9 +42,9 @@ import { analyzeOptionsFor } from '../analysisOptions';
 import { cancelInBedSession, closeStaleInBed, endInBedSession, saveTapsNight, sessionAlarm, startInBedSession, undoEndInBedSession } from '../inBed';
 import { selectDataset, useStore } from '../store';
 
-// Monday evening, wind-down under way: the demo plan's lights-out is ~23:08, wake-up Tuesday 07:00.
+// Monday evening, wind-down under way: the demo plan's lights-out is ~22:01, wake-up Tuesday 07:00.
 const DAY = '2026-11-02';
-const NOW = atMinutes(DAY, 22 * 60 + 45);
+const NOW = atMinutes(DAY, 21 * 60 + 30);
 const prevOS = Platform.OS;
 
 const analysisAt = (now: number): Analysis => {

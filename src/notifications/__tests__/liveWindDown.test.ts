@@ -40,7 +40,8 @@ describe('live wind-down card', () => {
   });
 
   it('during wind-down, schedules its replacement for lights-out instead of the bedtime reminder', () => {
-    const ctx = scenario(at(WORKDAY, 8.5), { now: at(WORKDAY, 22.6) });
+    const planned = scenario(at(WORKDAY, 8.5)).analysis.tonight;
+    const ctx = scenario(at(WORKDAY, 8.5), { now: planned.windDownStart + 30 * MINUTE });
     const t = ctx.analysis.tonight;
     expect(ctx.now).toBeGreaterThan(t.windDownStart);
     expect(liveWindDownPhase(ctx.analysis, ctx.state, ctx.now)).toBe('during');
@@ -77,8 +78,9 @@ describe('live wind-down card', () => {
   });
 
   it('skips the card when a nap timer runs through the start of wind-down', () => {
-    const napTimer = { start: at(WORKDAY, 21.5), alarmAt: at(WORKDAY, 23), label: 'Recovery nap' };
-    const ctx = scenario(at(WORKDAY, 8.5), { now: at(WORKDAY, 21.6), settings: { napTimer } });
+    const wd = scenario(at(WORKDAY, 8.5)).analysis.tonight.windDownStart;
+    const napTimer = { start: wd - 30 * MINUTE, alarmAt: wd + 60 * MINUTE, label: 'Recovery nap' };
+    const ctx = scenario(at(WORKDAY, 8.5), { now: napTimer.start + 6 * MINUTE, settings: { napTimer } });
     expect(liveWindDownPhase(ctx.analysis, ctx.state, ctx.now)).toBe('off');
     expect(planLiveWindDown(ctx)).toEqual([]);
   });

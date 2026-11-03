@@ -435,6 +435,21 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 32. New in 0.10.1 — catching up with a late body clock
+
+*"Does this make sense? How am I supposed to beat sleep debt?"* — a plan that held lights-out at 1:27 AM before a 5:00 routine alarm (about 3½ h of sleep) because the body clock was used to ~2:12 AM.
+
+| | Feature |
+| --- | --- |
+| ✅ | **Sleep debt lets lights-out move further ahead of the body clock**: 1 h ahead of when you usually fall asleep with no debt, plus 1 min per 3 min of debt, up to 2 h (`schedule.bodyClockAdvanceMin`) — sleep pressure makes you sleepy sooner. Was a fixed 45 min |
+| ✅ | **Never under 5 h on a morning with an alarm**: lights-out is planned for at least 5 h of sleep (routine and time to fall asleep included), but never more than 3 h before your usual sleep onset; the old rule could plan 4 h in bed. Days off with no alarm keep the body-clock hold |
+| ✅ | **Actually steps earlier each night**: the hold uses the earlier of your four-week habit and the last three nights, so keeping last night's earlier lights-out moves tonight's; coming nights in the week strip and calendar assume ~30 min earlier per night instead of repeating the same late time. Holds shorter than 15 min are dropped |
+| ✅ | **Honest plan text**: *"Your need puts lights out at 10:03 PM, but you've been falling asleep around 2:12 AM — too big a jump for one night. With 2h 59m of sleep debt you'll get sleepy sooner than usual, so aim for 12:06 AM tonight, then about 30 min earlier each night until you're there. Not sleepy at lights-out? Keep the lights low and read until you are."* plus what moves the body clock earlier (bright light soon after waking, dim evenings, not sleeping in > 1 h on days off). The "+20m to pay down debt" and "lights out 30 min earlier for the routine" lines are dropped on held nights, where they weren't true |
+| ✅ | **Skip the routine on a short night**: a held two-step night says the routine costs 30 min of sleep, and the Planner offers **Skip the routine that morning · +30 min sleep** (sets that date's routine alarm off) |
+| ✅ | The what-if simulator uses the same rule for "lying awake from going to bed too early" |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

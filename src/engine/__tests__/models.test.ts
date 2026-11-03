@@ -161,7 +161,8 @@ describe('scheduling', () => {
     const p = profile({ workWakeMin: 7 * 60 });
     const plan = planTonight({ profile: p, today: '2026-10-20', needMin: 480, debtMin: 0, efficiency: 0.92, latencyMin: 15, habitualOnsetMin: 30 });
     expect(plan.gradual).toBe(true);
-    expect(formatTime(plan.bedtime)).toBe('23:45');
+    // Usually asleep at 00:30: lights out an hour before it (no sleep debt), not at the need-based 22:03.
+    expect(formatTime(plan.bedtime)).toBe('23:30');
     expect(plan.bedtime).toBeGreaterThan(atMinutes('2026-10-20', 20 * 60));
   });
 

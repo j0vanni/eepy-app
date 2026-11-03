@@ -120,6 +120,16 @@ export interface PlanInput {
   efficiency: number;
   latencyMin: number;
   habitualOnsetMin?: number;
+  /**
+   * When you've fallen asleep over the last few nights (minutes after midnight). Following the plan
+   * moves this earlier faster than the four-week habit, so lights-out keeps stepping earlier.
+   */
+  recentOnsetMin?: number;
+  /**
+   * Nights from tonight to the night planned (0 = tonight). Coming nights assume the earlier
+   * lights-out is kept, so each one steps BODY_CLOCK.rampMinPerNight earlier.
+   */
+  rampNights?: number;
   /** Start of tomorrow's first calendar event (epoch ms), if calendar access is on. */
   firstEventStart?: number;
   /** Title of that event, for the rationale. */
@@ -169,12 +179,43 @@ export function wakeForEvent(eventStart: number, prepMin: number, wakeDate: stri
   return Math.floor((eventStart - prepMin * MINUTE) / step) * step;
 }
 
+function debtLine(extra: number, debtMin: number): string {
+  return `+${formatDuration(extra)} to pay down ${formatDuration(debtMin)} of sleep debt.`;
+}
+
 /** "an hour", "2 hours", "45 min", "1h 30m". */
 function prepPhrase(min: number): string {
   if (min === 60) return 'an hour';
   if (min > 0 && min % 60 === 0) return `${min / 60} hours`;
   if (min < 60) return `${min} min`;
   return formatDuration(min);
+}
+
+/**
+ * How far ahead of the body clock lights-out may be planned. Lying down deep in the evening
+ * wake-maintenance zone mostly means lying awake — but sleep debt builds sleep pressure that lets
+ * you fall asleep sooner, and a fixed early alarm makes a 4-hour night the worse outcome.
+ */
+export const BODY_CLOCK = {
+  /** Lights-out at most this long before when you usually fall asleep, with no sleep debt … */
+  baseAdvanceMin: 60,
+  /** … plus one minute per this many minutes of sleep debt … */
+  debtMinPerMin: 3,
+  /** … up to this much. */
+  maxAdvanceMin: 120,
+  /** Each coming night is assumed this much earlier than the one before (if you keep the plan). */
+  rampMinPerNight: 30,
+  /** On a morning with an alarm, never plan less sleep than this … */
+  minSleepMin: 300,
+  /** … unless that means lights-out more than this long before you usually fall asleep. */
+  maxBeforeOnsetMin: 180,
+  /** Holding lights-out later by less than this isn't worth it. */
+  minHoldMin: 15,
+} as const;
+
+/** How far before your usual sleep onset lights-out may be planned, given the sleep debt. */
+export function bodyClockAdvanceMin(debtMin: number): number {
+  return Math.round(clamp(BODY_CLOCK.baseAdvanceMin + Math.max(0, debtMin) / BODY_CLOCK.debtMinPerMin, BODY_CLOCK.baseAdvanceMin, BODY_CLOCK.maxAdvanceMin));
 }
 
 export function planTonight(input: PlanInput): TonightPlan {
@@ -199,7 +240,7 @@ export function planTonight(input: PlanInput): TonightPlan {
   let extra = 0;
   if (!profile.insomniaMode && debtMin >= 60) {
     extra = Math.min(60, input.payoffExtraMin ?? Math.round(debtMin / 6 / 5) * 5);
-    rationale.push(`+${formatDuration(extra)} to pay down ${formatDuration(debtMin)} of sleep debt.`);
+    rationale.push(debtLine(extra, debtMin));
   }
   const inBedMin = Math.round(needMin / eff + latencyMin + extra + awakeMin);
   let bedtime = wake - inBedMin * MINUTE;
@@ -209,20 +250,44 @@ export function planTonight(input: PlanInput): TonightPlan {
   if (profile.insomniaMode) rationale.push('Insomnia mode: no extra time in bed — a consolidated, consistent window works better.');
 
   let gradual = false;
-  if (input.habitualOnsetMin !== undefined) {
-    const earlierBy = -clockDiff(input.habitualOnsetMin, minutesOfDay(bedtime));
-    if (earlierBy > 75) {
-      // Lying down deep in the evening wake-maintenance zone mostly means lying awake.
-      // The habitual onset nearest the planned bedtime (it may fall after midnight).
-      const habitualOnset = bedtime + earlierBy * MINUTE;
-      const held = habitualOnset - 45 * MINUTE;
-      if (held < wake - 4 * HOUR) {
+  // When you usually fall asleep: the earlier of the four-week habit and the last few nights.
+  const minutesBefore = (onsetMin: number | undefined) => (onsetMin === undefined ? undefined : -clockDiff(onsetMin, minutesOfDay(bedtime)));
+  const behind = [minutesBefore(input.habitualOnsetMin), minutesBefore(input.recentOnsetMin)].filter((m): m is number => m !== undefined);
+  if (behind.length) {
+    // How much later than the need-based bedtime you usually fall asleep — less on coming nights,
+    // which assume the earlier lights-out is kept.
+    const earlierBy = Math.min(...behind);
+    const projectedBy = earlierBy - Math.max(0, input.rampNights ?? 0) * BODY_CLOCK.rampMinPerNight;
+    const advance = bodyClockAdvanceMin(debtMin);
+    if (projectedBy > advance) {
+      const onset = bedtime + projectedBy * MINUTE;
+      let held = onset - advance * MINUTE;
+      let floored = false;
+      if (!noAlarm) {
+        // An alarm morning: a 4-hour night does more harm than lying awake a while — plan at least
+        // BODY_CLOCK.minSleepMin, but not hours before the body clock could possibly sleep.
+        const minSleepBed = wake - Math.round(BODY_CLOCK.minSleepMin / eff + latencyMin + awakeMin) * MINUTE;
+        const floor = Math.max(minSleepBed, onset - BODY_CLOCK.maxBeforeOnsetMin * MINUTE);
+        if (floor < held) {
+          held = floor;
+          floored = true;
+        }
+      }
+      // A few minutes either way isn't worth a "too big a jump" — keep the need-based bedtime.
+      if (held - bedtime >= BODY_CLOCK.minHoldMin * MINUTE) {
+        const needBed = bedtime;
         bedtime = held;
         gradual = true;
+        // The debt line promised extra time in bed that the body clock won't allow tonight.
+        if (extra > 0) rationale.splice(rationale.indexOf(debtLine(extra, debtMin)), 1);
         // A one-off early event isn't a schedule change, so the calendar lines below explain this instead.
         if (!calendarDrove) {
+          const pressure = debtMin >= 60 ? ` With ${formatDuration(debtMin)} of sleep debt you'll get sleepy sooner than usual, so` : ' So';
           rationale.push(
-            `That's ${formatDuration(earlierBy)} earlier than your body clock is used to, so aim for ${formatTime(bedtime)} tonight and move earlier by 15–30 min each night.`,
+            `Your need puts lights out at ${formatTime(needBed)}, but you've been falling asleep around ${formatTime(onset)} — too big a jump for one night.${pressure} aim for ${formatTime(bedtime)} tonight, then about ${BODY_CLOCK.rampMinPerNight} min earlier each night until you're there.` +
+              (floored ? ` (eepy doesn't plan a night with an alarm under ${formatDuration(BODY_CLOCK.minSleepMin)} of sleep.)` : '') +
+              ' Not sleepy at lights-out? Keep the lights low and read until you are.',
+            `What moves your body clock earlier: bright light soon after your ${formatTime(wake)} wake-up (outside, or by a window for 15–30 min), dim light in the evening, and not sleeping in more than an hour on days off.`,
           );
         }
       }
@@ -295,7 +360,7 @@ export function planTonight(input: PlanInput): TonightPlan {
     // Too little sleep before the routine alarm to be worth splitting the morning: one alarm at the wake-up.
     if (plan.firstWake - bedtime >= TWO_STEP.minMainSleepMin * MINUTE) {
       twoStep = plan;
-      rationale.splice(rationale.indexOf(needLine) + 1, 0, twoStepRationale(plan, finalWake));
+      rationale.splice(rationale.indexOf(needLine) + 1, 0, twoStepRationale(plan, finalWake, gradual));
     }
   }
 

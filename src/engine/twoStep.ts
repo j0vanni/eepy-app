@@ -194,13 +194,15 @@ export function twoStepSleep(bedtime: number, p: TwoStepPlan, latencyMin: number
   return { mainMin, backMin: p.backToSleepMin, totalMin: mainMin + p.backToSleepMin };
 }
 
-/** The plan's rationale line. */
-export function twoStepRationale(p: TwoStepPlan, finalWake: number): string {
-  return (
-    `Two-step morning: routine alarm by ${formatTime(p.firstWake)} (cycle-timed), back in bed ~${formatTime(p.routineEnd)} ` +
-    `and asleep again ~${formatTime(p.backToSleep)} until ${formatTime(finalWake)}. Lights out ${p.awakeMin} min earlier so the two stretches ` +
-    `still add up to your need — the ${p.routineMin}-min routine and falling back asleep are time awake.`
-  );
+/**
+ * The plan's rationale line. `held`: lights-out was held later for the body clock, so it didn't
+ * move earlier for the routine — the routine comes out of a night that's already short.
+ */
+export function twoStepRationale(p: TwoStepPlan, finalWake: number, held = false): string {
+  const start = `Two-step morning: routine alarm by ${formatTime(p.firstWake)} (cycle-timed), back in bed ~${formatTime(p.routineEnd)} and asleep again ~${formatTime(p.backToSleep)} until ${formatTime(finalWake)}.`;
+  return held
+    ? `${start} On a short night like this the routine costs ${p.awakeMin} min of sleep — skipping it that morning (tap the day in the Planner) gives them back.`
+    : `${start} Lights out ${p.awakeMin} min earlier so the two stretches still add up to your need — the ${p.routineMin}-min routine and falling back asleep are time awake.`;
 }
 
 /** "Lights out 23:05 → 04:47 routine alarm → back to sleep ~05:17 → up 06:05 · 7h 10m sleep" */

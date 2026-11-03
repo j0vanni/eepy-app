@@ -125,9 +125,10 @@ export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: 
     <>
       {heldShort ? (
         <Note tone="warn" icon="clock-alert-outline">
-          {`Lights-out can't move much earlier than your body clock allows — you'd mostly lie awake — so this night runs ${formatDuration(needMin - night.sleepMin)} short. A short nap that afternoon helps; eepy eases the nights before where it can.`}
+          {`Your body clock isn't ready for a much earlier lights-out yet, so this night runs ${formatDuration(needMin - night.sleepMin)} short. eepy moves lights-out about 30 min earlier each night as you catch up — bright light soon after waking speeds it up, and a 20-min nap before 2 PM takes the edge off.`}
         </Note>
       ) : null}
+      {heldShort && night.twoStep ? <SkipRoutineForShortNight night={night} /> : null}
       {night.preShiftMin > 0 && night.preShiftFor ? (
         <Note icon="arrow-collapse-left">
           {`${formatDuration(night.preShiftMin)} earlier than usual to ease into ${DAY_NAMES[weekdayOfKey(night.preShiftFor)]}'s early start — the body clock only moves earlier gradually.`}
@@ -139,6 +140,24 @@ export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: 
         </Note>
       ) : null}
     </>
+  );
+}
+
+/** On a short two-step night, the routine comes out of sleep you don't have: offer to skip it that morning. */
+function SkipRoutineForShortNight({ night }: { night: UpcomingNight }) {
+  const plan = useStore((s) => s.profile.wakePlan?.[night.wakeDate]);
+  const setPlan = useSetWakePlan();
+  if (!night.twoStep || plan?.twoStep === false) return null;
+  return (
+    <View style={{ marginTop: space.sm, alignItems: 'flex-start' }}>
+      <Button
+        small
+        kind="secondary"
+        icon="alarm-off"
+        label={`Skip the routine that morning · +${night.twoStep.awakeMin} min sleep`}
+        onPress={() => setPlan(night.wakeDate, { ...plan, twoStep: false })}
+      />
+    </View>
   );
 }
 

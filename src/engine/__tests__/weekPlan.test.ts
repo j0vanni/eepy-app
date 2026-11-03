@@ -112,3 +112,18 @@ describe('different wake-up times on different days', () => {
     expect(a.upcoming.find((n) => n.wakeDate === '2026-11-03')?.wake).toBe(a.tonight.wake);
   });
 });
+
+describe('catching up with a late body clock', () => {
+  it('steps the coming workday nights earlier instead of holding every night at the same late time', () => {
+    const now = atMinutes('2026-11-02', 19 * 60); // Monday evening
+    const data = generateDemoData(now);
+    // A much earlier alarm than the demo's habit: lights-out is held for the body clock.
+    const a = analyze({ ...data, profile: { ...data.profile, workWakeMin: 5 * 60, workdays: [1, 2, 3, 4, 5] } }, now);
+    expect(a.tonight.gradual).toBe(true);
+    const clock = (n: { bedtime: number; wakeDate: string }) => (n.bedtime - startOfDateKey(n.wakeDate)) / MINUTE;
+    const workNights = a.upcoming.filter((n) => [2, 3, 4, 5].includes(new Date(startOfDateKey(n.wakeDate)).getDay())).slice(0, 4);
+    for (let i = 1; i < workNights.length; i++) expect(clock(workNights[i])).toBeLessThanOrEqual(clock(workNights[i - 1]));
+    expect(clock(workNights[workNights.length - 1])).toBeLessThan(clock(workNights[0]));
+  });
+});
+

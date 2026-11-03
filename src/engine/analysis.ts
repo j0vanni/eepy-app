@@ -2,7 +2,7 @@ import { CircadianParams, EnergyForecast, forecastEnergy, Interval, sleepPressur
 import { assessBreathing, breathingSummaryFor, breathingTrend, BreathingTrend } from './breathing';
 import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
 import { CbtiProgram, currentCbtiWindow } from './cbti';
-import { analyzeChronotype, ChronotypeResult } from './chronotype';
+import { analyzeChronotype, ChronotypeResult, habitualTiming } from './chronotype';
 import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
 import { generateInsights, Insight, NightRow } from './insights';
 import { NapRecommendation, recommendNap, UpcomingDemand } from './nap';
@@ -21,7 +21,7 @@ import {
 import { computeSleepDebt, debtOnDate, SleepDebtResult } from './sleepDebt';
 import { ageFromBirthYear, estimateSleepNeed, SleepNeedEstimate } from './sleepNeed';
 import { scoreSleep, SleepScore } from './sleepScore';
-import { addDays, atMinutes, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
+import { addDays, atMinutes, dateKey, daysBetween, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
 import { isSleepStage, SleepDataset } from './types';
 import { detectRecoveryAlert, RecoveryAlert } from './recovery';
 import { computeReadiness, Readiness } from './vitals';
@@ -46,6 +46,8 @@ export interface Analysis {
   upcoming: UpcomingNight[];
   debt: SleepDebtResult;
   chronotype: ChronotypeResult;
+  /** When you've fallen asleep over the last three nights (minutes after midnight); planning holds lights-out against the earlier of this and the habit. */
+  recentOnsetMin?: number;
   regularity: RegularityResult;
   latencyMin: number;
   cycleMin: number;
@@ -138,6 +140,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
   }
   const regularity = analyzeRegularity(metrics, nights, day, chronotype.habitual?.midSleepSdMin);
 
+  const recentOnsetMin = habitualTiming(nights.filter((n) => n.main).slice(-3))?.onsetMin;
   const planInput = {
     profile,
     today: day,
@@ -147,6 +150,8 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     efficiency,
     latencyMin,
     habitualOnsetMin: chronotype.habitual?.onsetMin,
+    // The last three nights: following an earlier plan shows up here long before the four-week habit.
+    recentOnsetMin,
     firstEventStart: opts.firstEventTomorrow,
     firstEventTitle: opts.firstEventTitle,
     firstEventPrepMin: opts.firstEventPrepMin,
@@ -168,6 +173,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
       planTonight({
         ...planInput,
         today: addDays(wakeDate, -1),
+        rampNights: daysBetween(day, addDays(wakeDate, -1)),
         debtMin,
         payoffExtraMin,
         firstEventStart: undefined,
@@ -312,6 +318,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     need,
     debt,
     chronotype,
+    ...(recentOnsetMin !== undefined ? { recentOnsetMin } : {}),
     regularity,
     latencyMin,
     cycleMin,

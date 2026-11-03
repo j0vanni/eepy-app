@@ -129,6 +129,19 @@ describe('Planner day card', () => {
     expect(text()).not.toContain('Routine alarm this morning');
   });
 
+  it('offers to skip the routine on a short night', async () => {
+    const a = analysis();
+    const n = a.upcoming[2];
+    const t = n.wake - 60 * 60_000;
+    const twoStep = { firstWake: t, firstAlarm: t, routineEnd: t + 20 * 60_000, backToSleep: t + 30 * 60_000, routineMin: 20, fallBackAsleepMin: 10, awakeMin: 30, backToSleepMin: 27 };
+    const short = { ...n, heldBack: true, sleepMin: a.need.needMin - 120, twoStep };
+    await render(<DayCard night={short} needMin={a.need.needMin} isTonight={false} />);
+    expect(text()).toContain("Your body clock isn't ready");
+    await press('Skip the routine that morning');
+    expect(useStore.getState().profile.wakePlan?.[n.wakeDate]).toEqual({ twoStep: false });
+    expect(text()).not.toContain('Skip the routine that morning');
+  });
+
   it("offers Adjust tonight on tonight's card", async () => {
     const a = analysis();
     await render(<DayCard night={a.upcoming[0]} needMin={a.need.needMin} isTonight />);

@@ -81,12 +81,15 @@ describe('adaptive reminders', () => {
   });
 
   it('stays quiet while a nap timer runs past wind-down and bedtime', () => {
-    const napTimer = { start: at(WORKDAY, 22), alarmAt: at(WORKDAY, 23.5), label: 'Recovery nap' };
+    // A nap that starts just before wind-down and runs past lights-out.
+    const t = scenario(at(WORKDAY, 8.5)).analysis.tonight;
+    const napTimer = { start: t.windDownStart - 15 * MINUTE, alarmAt: t.bedtime + 15 * MINUTE, label: 'Recovery nap' };
+    const now = t.windDownStart - 20 * MINUTE;
     const prefs = { liveWindDown: false };
-    const napping = planReminders(scenario(at(WORKDAY, 8.5), { now: at(WORKDAY, 21.9), prefs, settings: { napTimer } }));
+    const napping = planReminders(scenario(at(WORKDAY, 8.5), { now, prefs, settings: { napTimer } }));
     expect(byId(napping, 'winddown')).toBeUndefined();
     expect(byId(napping, 'bedtime')).toBeUndefined();
-    const awake = planReminders(scenario(at(WORKDAY, 8.5), { now: at(WORKDAY, 21.9), prefs }));
+    const awake = planReminders(scenario(at(WORKDAY, 8.5), { now, prefs }));
     expect(byId(awake, 'winddown')).toBeDefined();
     expect(byId(awake, 'bedtime')).toBeDefined();
   });

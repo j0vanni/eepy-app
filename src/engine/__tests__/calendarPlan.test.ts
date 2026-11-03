@@ -89,11 +89,11 @@ describe('planTonight with a calendar event', () => {
     expect(usual.gradual).toBe(false);
     const plan = planTonight(base({ habitualOnsetMin: 22 * 60 + 30, firstEventStart: at(WORK_MORNING, 6) }));
     expect(formatTime(plan.wake)).toBe('05:00');
-    expect(formatTime(plan.bedtime)).toBe('21:45');
+    expect(formatTime(plan.bedtime)).toBe('21:30');
     expect(plan.gradual).toBe(true);
     expect(plan.calendar!.shortByMin).toBeGreaterThan(60);
     const last = plan.rationale[plan.rationale.length - 1];
-    expect(last).toMatch(/lights out at 20:03, too early for your body clock to fall asleep, so aim for 21:45 \(18m earlier than usual\)/);
+    expect(last).toMatch(/lights out at 20:03, too early for your body clock to fall asleep, so aim for 21:30 \(33m earlier than usual\)/);
     expect(last).toMatch(/short of your need/);
     // The "move earlier each night" advice is for permanent shifts, not a one-off event.
     expect(plan.rationale.join(' ')).not.toMatch(/each night/);
@@ -101,10 +101,10 @@ describe('planTonight with a calendar event', () => {
 
   it('keeps lights-out where it is when the usual bedtime is already as early as the body clock allows', () => {
     const usual = planTonight(base({ habitualOnsetMin: 23 * 60 + 30 }));
-    expect(formatTime(usual.bedtime)).toBe('22:45');
+    expect(formatTime(usual.bedtime)).toBe('22:30');
     const plan = planTonight(base({ habitualOnsetMin: 23 * 60 + 30, firstEventStart: at(WORK_MORNING, 6) }));
     expect(plan.bedtime).toBe(usual.bedtime);
-    expect(plan.rationale[plan.rationale.length - 1]).toMatch(/^Lights out stays at 22:45 — .*short of your need/);
+    expect(plan.rationale[plan.rationale.length - 1]).toMatch(/^Lights out stays at 22:30 — .*short of your need/);
   });
 
   it('without body-clock data, keeps lights-out within 90 min of the usual bedtime', () => {

@@ -14,6 +14,7 @@ import type { Analysis } from './analysis';
 import { caffeineDuringEarlySleep } from './caffeine';
 import { computeSessionMetrics, Night, SessionMetrics } from './sessions';
 import { computeSleepDebt, DebtCategory } from './sleepDebt';
+import { BODY_CLOCK, bodyClockAdvanceMin } from './schedule';
 import { scoreSleep, SleepScore } from './sleepScore';
 import { mean, median } from './stats';
 import { clamp, clockDiff, dateKey, HOUR, MINUTE, minutesOfDay } from './time';
@@ -46,9 +47,7 @@ export const SIM = {
   maxCaffeineWasoMin: 45,
   maxDeepLoss: 0.35,
   maxNapLatencyMin: 90,
-  /** Lights out more than this long before your usual sleep onset lands in the wake-maintenance zone… */
-  earlyBedZoneMin: 60,
-  /** …and this share of the time beyond it is spent lying awake. */
+  /** Lights out further ahead of your usual sleep onset than schedule.bodyClockAdvanceMin lands in the wake-maintenance zone, and this share of the time beyond it is spent lying awake. */
   earlyBedLatencyShare: 0.5,
   maxEarlyBedLatencyMin: 120,
   /** Grid of the energy simulation (minutes). */
@@ -136,6 +135,9 @@ interface Ctx {
   efficiency: number;
   napLatencyMin: number;
   habitualOnsetMin?: number;
+  recentOnsetMin?: number;
+  /** Sleep debt going into tonight: it lets you fall asleep further ahead of your body clock (schedule.bodyClockAdvanceMin). */
+  debtMin: number;
   /** A rested schedule (need met, today's wake time) — the nap delay counts only pressure removed below it. */
   reference: Interval[];
   tomorrowBed: number;
@@ -260,6 +262,8 @@ function contextFor(a: Analysis, data: SleepDataset): Ctx {
     efficiency,
     napLatencyMin: clamp(Math.round(a.latencyMin / 2), 5, 10),
     habitualOnsetMin: a.chronotype.habitual?.onsetMin,
+    recentOnsetMin: a.recentOnsetMin,
+    debtMin: a.debt.debtMin,
     reference,
     tomorrowBed: a.tonight.bedtime + 24 * HOUR,
     stage: stageProfile(a, needMin, cycleMin, efficiency),
@@ -343,10 +347,12 @@ function simulateOutcome(ctx: Omit<Ctx, 'baseline'>, input: Scenario): ScenarioO
   // Time to fall asleep: your usual, plus what the nap, caffeine and an early lights-out add.
   const napMin = Math.min(SIM.maxNapLatencyMin, napDelayMin);
   const caffeineMin = Math.min(SIM.maxCaffeineLatencyMin, excessMg * SIM.caffeineLatencyPerMg);
+  // The same rule the planner holds lights-out to: sleep debt lets you fall asleep further ahead of your body clock.
   let earlyBedMin = 0;
-  if (ctx.habitualOnsetMin !== undefined) {
-    const usualOnsetLaterBy = clockDiff(minutesOfDay(bedtime + a.latencyMin * MINUTE), ctx.habitualOnsetMin);
-    earlyBedMin = Math.min(SIM.maxEarlyBedLatencyMin, Math.max(0, usualOnsetLaterBy - SIM.earlyBedZoneMin) * SIM.earlyBedLatencyShare);
+  const ahead = [ctx.habitualOnsetMin, ctx.recentOnsetMin].filter((m): m is number => m !== undefined).map((onset) => clockDiff(minutesOfDay(bedtime), onset));
+  if (ahead.length) {
+    const allowed = bodyClockAdvanceMin(ctx.debtMin) + BODY_CLOCK.minHoldMin;
+    earlyBedMin = Math.min(SIM.maxEarlyBedLatencyMin, Math.max(0, Math.min(...ahead) - allowed) * SIM.earlyBedLatencyShare);
   }
   const latencyMin = Math.min(tibMin - 30, a.latencyMin + napMin + caffeineMin + earlyBedMin);
   const onset = bedtime + latencyMin * MINUTE;

@@ -35,10 +35,15 @@ describe('what-if simulator', () => {
 
   it('an earlier bedtime means less debt and more energy tomorrow', () => {
     const r = run({ bedtime: base.bedtime - 30 * MINUTE });
-    expect(r.delta.sleepMin).toBeGreaterThan(20);
-    expect(r.delta.debtMin).toBeLessThan(-15);
+    // Tonight's plan is already about as far ahead of the body clock as the sleep debt allows, so
+    // part of an extra half hour is spent lying awake.
+    expect(r.scenario.sleep.latencyParts.earlyBedMin).toBeGreaterThan(0);
+    expect(r.scenario.sleep.latencyParts.earlyBedMin).toBeLessThan(15);
+    expect(r.delta.sleepMin).toBeGreaterThan(10);
+    expect(r.delta.debtMin).toBeLessThan(-10);
     expect(r.delta.avgEnergy).toBeGreaterThan(0);
-    expect(r.delta.score).toBeGreaterThanOrEqual(0);
+    // The longer time to fall asleep costs the score a little.
+    expect(r.delta.score).toBeGreaterThan(-5);
   });
 
   it('lights-out deep in the wake-maintenance zone mostly buys time lying awake', () => {
