@@ -90,6 +90,22 @@ export interface TonightOverride {
   wakeDate: string;
   bedtime?: number;
   wake?: number;
+  /** Set when one of "Options for tonight" was used (engine/planOptions.ts); the planner ignores it. */
+  choice?: TonightChoice;
+}
+
+/** Which option from "Options for tonight" / "Still up?" is in use, so it can be shown and undone. */
+export interface TonightChoice {
+  /** PlanOption id. */
+  id: string;
+  title: string;
+  /**
+   * The morning's routine choice before the option switched the routine (`wakePlan[date].twoStep`;
+   * null = what your week says). Only set when the option switched it.
+   */
+  routineBefore?: boolean | null;
+  /** A nap planned for tomorrow: when to lie down. */
+  napAt?: number;
 }
 
 export interface CalendarAdjustment {
@@ -127,9 +143,14 @@ export interface PlanInput {
   recentOnsetMin?: number;
   /**
    * Nights from tonight to the night planned (0 = tonight). Coming nights assume the earlier
-   * lights-out is kept, so each one steps BODY_CLOCK.rampMinPerNight earlier.
+   * lights-out is kept, so each one steps `rampMinPerNight` earlier.
    */
   rampNights?: number;
+  /**
+   * How much earlier each coming night is assumed to be (default BODY_CLOCK.rampMinPerNight). The
+   * analysis passes what your sleep onset has actually done lately (adherence.estimateAdvanceRate).
+   */
+  rampMinPerNight?: number;
   /** Start of tomorrow's first calendar event (epoch ms), if calendar access is on. */
   firstEventStart?: number;
   /** Title of that event, for the rationale. */
@@ -257,7 +278,8 @@ export function planTonight(input: PlanInput): TonightPlan {
     // How much later than the need-based bedtime you usually fall asleep — less on coming nights,
     // which assume the earlier lights-out is kept.
     const earlierBy = Math.min(...behind);
-    const projectedBy = earlierBy - Math.max(0, input.rampNights ?? 0) * BODY_CLOCK.rampMinPerNight;
+    const ramp = input.rampMinPerNight ?? BODY_CLOCK.rampMinPerNight;
+    const projectedBy = earlierBy - Math.max(0, input.rampNights ?? 0) * ramp;
     const advance = bodyClockAdvanceMin(debtMin);
     if (projectedBy > advance) {
       const onset = bedtime + projectedBy * MINUTE;
@@ -284,7 +306,7 @@ export function planTonight(input: PlanInput): TonightPlan {
         if (!calendarDrove) {
           const pressure = debtMin >= 60 ? ` With ${formatDuration(debtMin)} of sleep debt you'll get sleepy sooner than usual, so` : ' So';
           rationale.push(
-            `Your need puts lights out at ${formatTime(needBed)}, but you've been falling asleep around ${formatTime(onset)} — too big a jump for one night.${pressure} aim for ${formatTime(bedtime)} tonight, then about ${BODY_CLOCK.rampMinPerNight} min earlier each night until you're there.` +
+            `Your need puts lights out at ${formatTime(needBed)}, but you've been falling asleep around ${formatTime(onset)} — too big a jump for one night.${pressure} aim for ${formatTime(bedtime)} tonight, then about ${ramp} min earlier each night until you're there.` +
               (floored ? ` (eepy doesn't plan a night with an alarm under ${formatDuration(BODY_CLOCK.minSleepMin)} of sleep.)` : '') +
               ' Not sleepy at lights-out? Keep the lights low and read until you are.',
             `What moves your body clock earlier: bright light soon after your ${formatTime(wake)} wake-up (outside, or by a window for 15–30 min), dim light in the evening, and not sleeping in more than an hour on days off.`,

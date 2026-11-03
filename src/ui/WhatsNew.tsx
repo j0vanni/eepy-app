@@ -31,6 +31,11 @@ const NEW: { icon: string; title: string; text: string }[] = [
     text: 'Read on a Kindle, Kobo or Boox? Turn on "I read on an e-ink reader" in Settings → Wind-down & phone light: your wind-down gets reading time after screens-off, with frontlight tips.',
   },
   {
+    icon: 'source-branch',
+    title: 'Options for tonight',
+    text: 'Planner → Tonight weighs several ways to spend the night — eepy\'s plan, skipping the routine, the earliest you\'ll fall asleep, a nap tomorrow and more — highlights its pick and shows how it decided. Up past lights-out? Today shows "Still up?" with the best plan from now, one tap to use it.',
+  },
+  {
     icon: 'weather-sunset-up',
     title: 'Routine alarm, one morning at a time',
     text: 'Tap a day in the Planner → "Routine alarm this morning" to skip your two-step routine that morning, or add it to a morning that usually doesn\'t have it.',

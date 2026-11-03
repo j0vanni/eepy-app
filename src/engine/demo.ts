@@ -3,6 +3,7 @@
  * staged sleep cycles, heart rate / HRV / SpO2, journal tags whose effects are baked in (so the
  * insight engine has something real to find), naps and caffeine logs.
  */
+import type { PlannedNight } from './adherence';
 import type { CircadianParams } from './alertness';
 import { calibrationContext, createKssPredictor, livingDay } from './calibration';
 import { gaussian, rng } from './stats';
@@ -355,4 +356,21 @@ function demoCheckins(data: SleepDataset, now: number, rand: () => number): Aler
     });
   }
   return out;
+}
+
+/**
+ * What eepy "planned" on the demo's last nights (the store's `planLog`, engine/adherence.ts): the
+ * demo person tends to get into bed 15–50 min after the plan, so the plan's reasoning and the
+ * wind-down nudge have something to show.
+ */
+export function demoPlanLog(data: Pick<SleepDataset, 'sessions'>, nights = 7): Record<string, PlannedNight> {
+  const rand = rng(7919);
+  const mains = data.sessions.filter((s) => s.id.startsWith('demo-') && !s.id.startsWith('demo-nap-')).slice(-nights);
+  const log: Record<string, PlannedNight> = {};
+  for (const s of mains) {
+    const wakeDate = dateKey(s.end);
+    const target = Math.round((s.start - (15 + rand() * 35) * MINUTE) / (5 * MINUTE)) * 5 * MINUTE;
+    log[wakeDate] = { wakeDate, planned: target, target, wake: s.end, held: false };
+  }
+  return log;
 }

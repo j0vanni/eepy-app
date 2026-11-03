@@ -25,6 +25,7 @@ import { applyClockSetting } from '../state/clockFormat';
 import { getFirstEventTomorrowDetails } from '../state/calendar';
 import { closeStaleInBed } from '../state/inBed';
 import { refitCalibration } from '../state/learning';
+import { recordPlannedNight } from '../state/planOptions';
 import { selectDataset, useStore } from '../state/store';
 import { runSync } from '../state/sync';
 import { checkForUpdates } from '../updates/check';
@@ -138,6 +139,7 @@ export async function runBackgroundSync(now = Date.now()): Promise<BackgroundRun
           now,
           analyzeOptionsFor(state, { now, firstEventTomorrow: firstEvent?.start, firstEventTitle: firstEvent?.title }),
         );
+        recordPlannedNight(analysis, now);
         await replanNotifications(analysis, useStore.getState(), { background: true, now });
         await syncWakeAlarm(analysis, useStore.getState(), now);
         await syncSleepMode(analysis, useStore.getState(), now);

@@ -27,6 +27,13 @@ export interface Scenario {
   nap?: { start: number; minutes: number };
   /** Drinks on top of what's already logged. */
   caffeine?: { time: number; mg: number }[];
+  /**
+   * A two-step morning's routine inside the night: awake from `start` (the routine alarm) for
+   * `minutes` (the routine + falling back asleep), then back to sleep until `wake`.
+   */
+  routine?: { start: number; minutes: number };
+  /** A nap tomorrow (after `wake`): when you lie down and how long until the alarm (minutes). */
+  tomorrowNap?: { start: number; minutes: number };
 }
 
 /** Model constants. Caffeine/early-bedtime effects are deliberately modest approximations. */
@@ -83,6 +90,8 @@ export interface ScenarioOutcome {
   };
   /** Minutes asleep during the nap. */
   napSleepMin: number;
+  /** Minutes asleep during tomorrow's nap (counts toward tomorrow's sleep, not tonight's). */
+  tomorrowNapSleepMin: number;
   /** How much later you'd get sleepy tonight because of the nap (two-process model). */
   napDelayMin: number;
   /** Peak caffeine (mg) in the first 3 hours after bedtime. */
@@ -360,7 +369,11 @@ function simulateOutcome(ctx: Omit<Ctx, 'baseline'>, input: Scenario): ScenarioO
 
   const wasoMin = Math.min(periodMin * 0.5, periodMin * (1 - ctx.efficiency) + Math.min(SIM.maxCaffeineWasoMin, excessMg * SIM.caffeineWasoPerMg));
   const deepFactor = 1 - Math.min(SIM.maxDeepLoss, excessMg * SIM.caffeineDeepLossPerMg);
-  const night = computeSessionMetrics(syntheticNight(ctx, bedtime, onset, wake, wasoMin, deepFactor))!;
+  const session = syntheticNight(ctx, bedtime, onset, wake, wasoMin, deepFactor);
+  // A two-step routine is time awake in the middle of the night (it only counts once you're asleep).
+  const routine = input.routine && input.routine.minutes > 0 ? { start: Math.max(onset, input.routine.start), end: Math.min(wake, input.routine.start + input.routine.minutes * MINUTE) } : undefined;
+  if (routine && routine.end > routine.start) session.stages = overlayAwake(session.stages, routine.start, routine.end - routine.start);
+  const night = computeSessionMetrics(session)!;
 
   const cycles = periodMin / ctx.cycleMin;
   const nearest = Math.round(cycles);
@@ -373,6 +386,16 @@ function simulateOutcome(ctx: Omit<Ctx, 'baseline'>, input: Scenario): ScenarioO
   const sleeps = [...a.sleeps];
   if (nap) sleeps.push(nap);
   for (const s of night.segments) if (isSleepStage(s.stage)) sleeps.push({ start: s.start, end: s.end });
+  // Tomorrow's nap: asleep a few minutes after lying down, until its alarm (before tomorrow night).
+  let tomorrowNapSleepMin = 0;
+  if (input.tomorrowNap && input.tomorrowNap.minutes > 0) {
+    const start = Math.max(wake, input.tomorrowNap.start) + ctx.napLatencyMin * MINUTE;
+    const end = Math.min(input.tomorrowNap.start + input.tomorrowNap.minutes * MINUTE, ctx.tomorrowBed);
+    if (end - start >= MINUTE) {
+      sleeps.push({ start, end });
+      tomorrowNapSleepMin = (end - start) / MINUTE;
+    }
+  }
 
   return {
     scenario: { ...input, bedtime, wake },
@@ -388,6 +411,7 @@ function simulateOutcome(ctx: Omit<Ctx, 'baseline'>, input: Scenario): ScenarioO
       boundaryWakes: { earlier: onset + lower * ctx.cycleMin * MINUTE, later: onset + upper * ctx.cycleMin * MINUTE },
     },
     napSleepMin,
+    tomorrowNapSleepMin,
     napDelayMin,
     caffeineMg,
     debtMin: debt.debtMin,
