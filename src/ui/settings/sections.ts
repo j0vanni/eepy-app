@@ -66,9 +66,9 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo[] = [
     id: 'winddown',
     title: 'Wind-down & phone light',
     icon: 'weather-night',
-    sub: 'Wind-down length, sleep sounds, screens off, e-reader, bedtime sleep mode',
+    sub: 'Wind-down length, your bedtime rundown, sleep sounds, e-reader, bedtime sleep mode',
     group: 'Your nights',
-    keywords: ['wind-down', 'routine', 'length', 'sleep sounds', 'white noise', 'brown noise', 'rain', 'volume', 'sleep timer', 'screens off', 'dim', 'warm', 'bedtime autopilot', 'sleep mode', 'do not disturb', 'dnd', 'modes', 'phone light', 'e-reader', 'e-ink', 'kindle'],
+    keywords: ['wind-down', 'routine', 'length', 'sleep sounds', 'white noise', 'brown noise', 'rain', 'volume', 'sleep timer', 'screens off', 'dim', 'warm', 'bedtime autopilot', 'sleep mode', 'do not disturb', 'dnd', 'modes', 'phone light', 'e-reader', 'e-ink', 'kindle', 'bedtime rundown', 'phone down', 'reading time'],
   },
   {
     id: 'caffeine',

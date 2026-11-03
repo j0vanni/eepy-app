@@ -33,7 +33,7 @@ import { IN_BED_ACTION, IN_BED_LINK, plannedId, RUNNING_LATE_ACTION, RUNNING_LAT
 import { markResponseHandled, openFromNotification } from '../navigate';
 import { NAP_ALARM_CATEGORY, NAP_TIMER_CATEGORY, NAP_TIMER_KIND, stopNapTimer } from '../napTimer';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
-import { DayContext, dayContext, duringNap } from './dayContext';
+import { DayContext, dayContext, duringNap, READING_UP_TITLE, readingDown } from './dayContext';
 import { liveWindDownCoversBedtime } from './liveWindDown';
 
 export const DAILY_REMINDER_CAP = 5;
@@ -51,7 +51,10 @@ const PRIORITY = ['bedtime', 'winddown', 'nap', 'checkin', 'caffeine'];
 const hours = (min: number) => Math.round((min / 60) * 10) / 10;
 
 function windDownBody(day: DayContext): string {
-  const base = `Dim the lights and put screens away — lights out at ${formatTime(day.lightsOut)}.`;
+  // With the bedtime rundown: its first steps now, the phone later.
+  const base = day.rundown
+    ? `Your bedtime rundown starts — phone down at ${formatTime(day.phoneDown)}, lights out at ${formatTime(day.lightsOut)}.`
+    : `Dim the lights and put screens away — lights out at ${formatTime(day.lightsOut)}.`;
   if (!day.adaptive) return base;
   if (day.lateCaffeine) return `${base} Caffeine is still in your system, so keep this hour extra calm.`;
   if (day.napShiftMin > 0) return `${base} That's ${day.napShiftMin} min later than usual after your nap.`;
@@ -114,14 +117,15 @@ export function planReminders({ analysis: a, state, now }: PlannerContext): Plan
     });
   }
   // During wind-down the live card is already scheduled to turn into "Lights out" at bedtime.
+  // With reading time in the bedtime rundown, this is also "reading time's up" (one notification, not two).
   if (prefs.bedtime && !inBed && !liveWindDownCoversBedtime(a, state, now, day) && !napping(day.lightsOut)) {
     out.push({
       id: 'bedtime',
       at: day.lightsOut,
       channel: 'reminders',
       categoryId: RUNNING_LATE_CATEGORY,
-      title: 'Lights out',
-      body: bedtimeBody(a, day),
+      title: day.readingMin > 0 ? READING_UP_TITLE : 'Lights out',
+      body: day.readingMin > 0 ? `${readingDown(day)} ${bedtimeBody(a, day)}` : bedtimeBody(a, day),
     });
   }
   // Adaptive: a last call only matters if you're actually drinking caffeine today.

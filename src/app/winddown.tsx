@@ -6,6 +6,7 @@ import { SoundsCard } from '@/audio/ui/SoundControls';
 import { Checklist, CountdownHero } from '@/audio/ui/WindDownParts';
 import { lightContextAt } from '@/audio/light';
 import { dateKey } from '@/engine/time';
+import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { WindDownTimelineCard } from '@/ui/cards/WindDownTimeline';
@@ -13,9 +14,13 @@ import { Screen } from '@/ui/components';
 import { WindDownInBed } from '@/ui/today/InBed';
 import { font, space } from '@/ui/theme';
 
-/** Wind-down routine: countdown to lights-out, "I'm in bed", checklist, breathing, sleep sounds and a light check. */
+/**
+ * Wind-down routine: countdown to lights-out, "I'm in bed", tonight's bedtime rundown (or, with it
+ * off, the plain timeline and checklist), breathing, sleep sounds and a light check.
+ */
 export default function WindDownScreen() {
   const analysis = useAnalysis();
+  const rundown = useStore((s) => s.settings.rundown.enabled);
   const now = useNow(30_000);
   const nightKey = analysis?.tonight.wakeDate ?? dateKey(now);
   const lightContext = lightContextAt(now, {
@@ -29,7 +34,8 @@ export default function WindDownScreen() {
       <CountdownHero analysis={analysis} now={now} />
       {analysis ? <WindDownInBed a={analysis} /> : null}
       {analysis ? <WindDownTimelineCard a={analysis} /> : null}
-      <Checklist key={nightKey} nightKey={nightKey} />
+      {/* The rundown has these steps (and more); the checklist is for the plain wind-down. */}
+      {rundown ? null : <Checklist key={nightKey} nightKey={nightKey} />}
       <BreathingCard />
       <SoundsCard />
       <LightCheckCard context={lightContext} />

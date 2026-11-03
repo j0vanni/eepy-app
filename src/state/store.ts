@@ -6,6 +6,7 @@ import type { PlanLog } from '../engine/adherence';
 import { pruneSpo2Curves } from '../engine/breathing';
 import type { DrinkPreset } from '../engine/caffeine';
 import type { InBedSession } from '../engine/inBed';
+import { DEFAULT_RUNDOWN, RundownProgress, RundownSettings, rundownSettingsFrom } from '../engine/rundown';
 import type { TonightOverride } from '../engine/schedule';
 import type { CalibrationResult } from '../engine/calibration';
 import type { CbtiProgram } from '../engine/cbti';
@@ -55,8 +56,10 @@ export interface NotificationPrefs {
   caffeineNudge: boolean;
   /** Evening "Night Light on, dim your screen" reminder (phone light). */
   screenLight: boolean;
-  /** "Screens off" reminder from the wind-down timeline. */
+  /** "Screens off" reminder from the wind-down timeline — at phone-down, with the bedtime rundown on. */
   screensOff: boolean;
+  /** "Phone down in 10 min" heads-up before phone-down (engine/rundown.ts). */
+  phoneDownSoon: boolean;
 }
 
 export interface BackgroundSettings {
@@ -145,8 +148,12 @@ export interface Settings {
   inBedSounds?: boolean;
   /** Dim and warm eepy itself in the evening (its own window only). */
   screenDim: boolean;
-  /** Wind-down timeline: screens off this many minutes before lights-out. */
+  /** Wind-down timeline: screens off this many minutes before lights-out (with the bedtime rundown off; on, phone-down comes from its steps). */
   screensOffMin: number;
+  /** Bedtime rundown: your steps from the caffeine cut-off to lights-out, their order and minutes (engine/rundown.ts). */
+  rundown: RundownSettings;
+  /** The guided rundown player's progress (for tonight's wakeDate only; another night's is ignored). */
+  rundownProgress?: RundownProgress;
   dataMode: 'live' | 'demo';
   /** Health Connect data origins (apps) to trust for sleep, most preferred first. */
   preferredOrigins: string[];
@@ -241,6 +248,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   caffeineNudge: true,
   screenLight: true,
   screensOff: true,
+  phoneDownSoon: true,
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -248,6 +256,7 @@ const DEFAULT_SETTINGS: Settings = {
   customDrinks: [],
   screenDim: true,
   screensOffMin: 45,
+  rundown: DEFAULT_RUNDOWN,
   dataMode: 'live',
   preferredOrigins: [],
   historyDays: 60,
@@ -447,6 +456,8 @@ export const useStore = create<AppState>()(
             updates: { ...DEFAULT_SETTINGS.updates, ...ps?.updates },
             sleepMode: { ...DEFAULT_SETTINGS.sleepMode, ...ps?.sleepMode },
             eReader: { ...DEFAULT_SETTINGS.eReader, ...ps?.eReader },
+            // Saved before the rundown existed: reading time from the old screens-off choice, so phone-down stays put.
+            rundown: rundownSettingsFrom(ps?.rundown, ps?.screensOffMin),
             marks: { ...ps?.marks },
           },
         };

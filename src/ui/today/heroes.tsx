@@ -5,9 +5,11 @@ import { Pressable, Text, View } from 'react-native';
 import type { Analysis } from '@/engine/analysis';
 import { DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/engine/dayPhase';
 import { isOpen, justNow, tapsNightOffer } from '@/engine/inBed';
+import { rundownGlance } from '@/engine/rundown';
 import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
 import { sessionFor } from '@/state/inBed';
 import { usePlanOptions } from '@/state/planOptions';
+import { useRundown } from '@/state/rundown';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
@@ -73,6 +75,8 @@ function CountdownCard({ a }: { a: Analysis }) {
   const inBed = useStore((s) => isOpen(sessionFor(s.settings.session, a)));
   // An option from "Options for tonight" in use.
   const choice = useStore((s) => (s.settings.tonight?.wakeDate === a.tonight.wakeDate ? s.settings.tonight.choice : undefined));
+  // Tonight's bedtime rundown at a glance (per minute is plenty).
+  const rundown = useRundown(a, Math.floor(now / MINUTE) * MINUTE);
   const eveningStart = windDownStart - PHASE.eveningLeadH * HOUR;
   const progress = Math.max(0, Math.min(1, (now - eveningStart) / (bedtime - eveningStart)));
   return (
@@ -109,12 +113,14 @@ function CountdownCard({ a }: { a: Analysis }) {
           {winding ? (
             <>
               <Text style={font.h3}>Wind-down started {formatDuration(Math.max(1, Math.round((now - windDownStart) / MINUTE)))} ago</Text>
-              <Text style={font.small}>Dim the lights, screens away, keep the room cool.</Text>
+              <Text style={font.small}>{rundown ? rundownGlance(rundown) : 'Dim the lights, screens away, keep the room cool.'}</Text>
             </>
           ) : (
             <>
               <Text style={[font.h3, { fontVariant: ['tabular-nums'] }]}>Wind-down in {until(windDownStart - now)}</Text>
-              <Text style={font.small}>From {formatTime(windDownStart)}: dim lights and put screens away as melatonin rises.</Text>
+              <Text style={font.small}>
+                {rundown ? `From ${formatTime(windDownStart)}: your bedtime rundown — ${rundownGlance(rundown)}.` : `From ${formatTime(windDownStart)}: dim lights and put screens away as melatonin rises.`}
+              </Text>
             </>
           )}
         </View>

@@ -1,10 +1,12 @@
 /**
  * Today's context for adaptive notifications: naps taken, a running nap timer, caffeine logged,
  * and the lights-out time after accounting for naps. Pure — shared by reminders and the live
- * wind-down so both agree on when "lights out" is.
+ * wind-down so both agree on when "lights out" is. Also tonight's phone-down and reading time from
+ * the bedtime rundown (engine/rundown.ts), so their copy matches it.
  */
 import { bedtimeDelayMin, Interval } from '../../engine/alertness';
 import type { Analysis } from '../../engine/analysis';
+import { phoneDownAt, rundownFor } from '../../engine/rundown';
 import { HOUR, MINUTE, startOfDateKey } from '../../engine/time';
 import type { AppState } from '../../state/store';
 
@@ -32,6 +34,14 @@ export interface DayContext {
   /** When reminders say "lights out": the bedtime, moved later after a long nap (adaptive only). */
   lightsOut: number;
   highDebt: boolean;
+  /** The bedtime rundown is on. */
+  rundown: boolean;
+  /** When the phone goes down tonight (the rundown's phone-down, or screens-off). */
+  phoneDown: number;
+  /** Reading before lights-out tonight, from the rundown (0 = none, or skipped in the player). */
+  readingMin: number;
+  /** Reads on an e-ink reader. */
+  eReader: boolean;
 }
 
 function todaysNaps(a: Analysis, now: number) {
@@ -69,6 +79,7 @@ export function dayContext(a: Analysis, state: AppState, now: number): DayContex
   const rawShift = adaptive ? napBedtimeShiftMin(a, now) : 0;
   const napShiftMin = rawShift < 10 ? 0 : Math.min(MAX_NAP_SHIFT_MIN, Math.round(rawShift / 5) * 5);
   const bedtime = a.tonight.bedtime;
+  const rundown = rundownFor(a, state);
   return {
     adaptive,
     napsTodayMin: Math.round(todaysNaps(a, now).reduce((s, m) => s + m.totalSleepMin, 0)),
@@ -80,7 +91,19 @@ export function dayContext(a: Analysis, state: AppState, now: number): DayContex
     bedtime,
     lightsOut: bedtime + napShiftMin * MINUTE,
     highDebt: a.debt.category === 'high' || a.debt.category === 'severe',
+    rundown: !!rundown,
+    phoneDown: phoneDownAt(a.tonight, state.settings),
+    readingMin: rundown?.readingMin ?? 0,
+    eReader: !!state.settings.eReader?.enabled,
   };
+}
+
+/** Lights-out after the bedtime rundown's reading time (the bedtime reminder's title then). */
+export const READING_UP_TITLE = "Reading time's up — lights out";
+
+/** "E-reader down, light off." / "Book down, light off." */
+export function readingDown(day: Pick<DayContext, 'eReader'>): string {
+  return `${day.eReader ? 'E-reader' : 'Book'} down, light off.`;
 }
 
 /** True when a running nap timer covers time `t` (adaptive mode suppresses reminders then). */

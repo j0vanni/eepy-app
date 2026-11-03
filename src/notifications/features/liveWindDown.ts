@@ -25,7 +25,7 @@ import type { AppState } from '../../state/store';
 import { IN_BED_ACTION, IN_BED_LINK, RUNNING_LATE_ACTION, RUNNING_LATE_CATEGORY } from '../ids';
 import { markResponseHandled, openFromNotification } from '../navigate';
 import type { NotificationFeature, PlannedNotification, PlannerContext } from '../types';
-import { DayContext, dayContext, duringNap } from './dayContext';
+import { DayContext, dayContext, duringNap, readingDown } from './dayContext';
 
 export const LIVE_WIND_DOWN_FEATURE = 'liveWindDown';
 export const LIVE_ID = 'live';
@@ -51,7 +51,9 @@ export function liveWindDownPhase(a: Analysis, state: AppState, now: number, day
 }
 
 function checklist(a: Analysis, state: AppState, day: DayContext): string {
-  const lines = ['☐ Dim the lights', '☐ Screens away (or night mode)', '☐ Cool, dark, quiet room'];
+  // With the bedtime rundown: when the phone goes down, and the reading after it.
+  const phone = day.rundown ? `☐ Phone down at ${formatTime(day.phoneDown)}${day.readingMin > 0 ? `, then read ${day.readingMin} min` : ''}` : '☐ Screens away (or night mode)';
+  const lines = ['☐ Dim the lights', phone, '☐ Cool, dark, quiet room'];
   if (day.adaptive && day.lateCaffeine) lines.push('Caffeine is still around tonight — keep this hour extra calm.');
   else if (day.adaptive && day.napShiftMin > 0) lines.push(`Lights out is ${day.napShiftMin} min later tonight after your nap.`);
   const two = a.tonight.twoStep;
@@ -67,7 +69,11 @@ function checklist(a: Analysis, state: AppState, day: DayContext): string {
 
 function lightsOutBody(a: Analysis, day: DayContext): string {
   const inBed = formatDuration((a.tonight.wake - day.lightsOut) / MINUTE);
-  const base = `Wind-down done — lights out now gives you ${inBed} in bed before ${formatTime(a.tonight.wake)}.`;
+  // With reading time in the bedtime rundown: "Reading time's up" (this replaces the bedtime reminder).
+  const base =
+    day.readingMin > 0
+      ? `Reading time's up. ${readingDown(day)} Lights out now gives you ${inBed} in bed before ${formatTime(a.tonight.wake)}.`
+      : `Wind-down done — lights out now gives you ${inBed} in bed before ${formatTime(a.tonight.wake)}.`;
   if (day.adaptive && day.lateCaffeine) return `${base} Not sleepy yet? Read in dim light until you are.`;
   return base;
 }
@@ -101,7 +107,7 @@ export function planLiveWindDown({ analysis: a, state, now }: PlannerContext): P
         // Same identifier: replaces the pinned card in place. Carries the bedtime reminder too.
         channel: prefs.bedtime ? 'reminders' : 'live',
         categoryId: RUNNING_LATE_CATEGORY,
-        title: `Lights out · ${formatTime(day.lightsOut)}`,
+        title: day.readingMin > 0 ? `Reading time's up · lights out ${formatTime(day.lightsOut)}` : `Lights out · ${formatTime(day.lightsOut)}`,
         body: lightsOutBody(a, day),
       },
     ];

@@ -8,6 +8,7 @@ import { LearningSection } from './LearningSection';
 import { BackgroundSection, NotificationsSection, WakeAlarmSection } from './NotificationsSection';
 import { AboutYouSection, SleepNeedSection } from './ProfileSection';
 import { ProgramsSection } from './ProgramsSection';
+import { RundownSection } from './RundownSection';
 import type { SettingsSectionId } from './sections';
 import { SelfChecksCard } from './SelfChecks';
 import { ShortcutsSection } from './ShortcutsSection';
@@ -51,6 +52,7 @@ export function SettingsPage({ id }: { id: SettingsSectionId }) {
       return (
         <>
           <WindDownLengthSection />
+          <RundownSection />
           <WindDownSection />
           <EReaderSection />
           <SleepModeSection />

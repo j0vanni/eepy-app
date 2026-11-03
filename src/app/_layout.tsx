@@ -19,6 +19,7 @@ import { useAnalysis } from '@/state/useAnalysis';
 import { useAutoSync } from '@/state/sync';
 import { useAppUseLog } from '@/state/wakeLog';
 import { useUpdateChecks } from '@/updates/useUpdates';
+import { NIGHT_BG } from '@/ui/components';
 import { EveningScreen } from '@/ui/EveningScreen';
 import { colors } from '@/ui/theme';
 
@@ -69,7 +70,8 @@ function Background() {
     replanNotifications(analysis, useStore.getState()).catch(() => undefined);
     // On builds with the native alarm module the wake alarm is scheduled natively, not by the planner.
     syncWakeAlarm(analysis, useStore.getState()).catch(() => undefined);
-  }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, session, goals, experiments, checkins]);
+    // rundown / screens-off / e-reader: phone-down time and the evening copy; rundownProgress: steps the player has done.
+  }, [analysis, settings.notifications, settings.napTimer, settings.watch, skippedAlarm, session, goals, experiments, checkins, settings.rundown, settings.rundownProgress, settings.screensOffMin, settings.eReader]);
 
   // What eepy planned tonight, for "how late you go to bed vs the plan" (frozen once lights-out has passed).
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function RootLayout() {
         <Stack.Screen name="goals" options={{ title: 'Goals' }} />
         <Stack.Screen name="review" options={{ title: 'Weekly review' }} />
         <Stack.Screen name="winddown" options={{ title: 'Wind down' }} />
+        <Stack.Screen name="rundown" options={{ title: 'Bedtime rundown', contentStyle: { backgroundColor: NIGHT_BG }, headerStyle: { backgroundColor: NIGHT_BG } }} />
         <Stack.Screen name="cbti" options={{ title: 'Insomnia programme' }} />
         <Stack.Screen name="export" options={{ title: 'Reports & export' }} />
         <Stack.Screen name="updates" options={{ title: 'App updates' }} />

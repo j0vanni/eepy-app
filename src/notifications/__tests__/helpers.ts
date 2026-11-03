@@ -3,6 +3,7 @@ jest.mock('@react-native-async-storage/async-storage', () => require('@react-nat
 
 import { analyze, Analysis } from '../../engine/analysis';
 import { generateDemoData } from '../../engine/demo';
+import { DEFAULT_RUNDOWN } from '../../engine/rundown';
 import { atMinutes } from '../../engine/time';
 import type { SleepDataset } from '../../engine/types';
 import { AppState, DEFAULT_NOTIFICATION_PREFS, NotificationPrefs, Settings } from '../../state/store';
@@ -15,6 +16,9 @@ export const SATURDAY = '2026-10-24';
 
 export const at = (day: string, h: number) => atMinutes(day, h * 60);
 
+/** The bedtime rundown with its default steps (engine/rundown.ts). */
+export const RUNDOWN_ON = { ...DEFAULT_RUNDOWN, enabled: true };
+
 /** A plain AppState around a dataset, with jest.fn() actions. */
 export function makeState(data: SleepDataset, over: { settings?: Partial<Settings>; prefs?: Partial<NotificationPrefs> } = {}): AppState {
   const settings: Settings = {
@@ -22,6 +26,8 @@ export function makeState(data: SleepDataset, over: { settings?: Partial<Setting
     customDrinks: [],
     screenDim: false,
     screensOffMin: 45,
+    // Off here, so these tests keep covering the plain wind-down; rundown tests switch it on (RUNDOWN_ON).
+    rundown: { ...DEFAULT_RUNDOWN, enabled: false },
     dataMode: 'live',
     preferredOrigins: [],
     historyDays: 60,

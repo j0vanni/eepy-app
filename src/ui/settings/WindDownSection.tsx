@@ -5,7 +5,10 @@ import { Text, View } from 'react-native';
 import { soundPlayer } from '@/audio/player';
 import { PlayButton, SoundPicker, TimerPicker, VolumeSlider } from '@/audio/ui/SoundControls';
 import { useSoundPlayer } from '@/audio/useSoundPlayer';
+import { formatTime } from '@/engine/time';
+import { usePhoneDown } from '@/state/rundown';
 import { useStore } from '@/state/store';
+import { useAnalysis } from '@/state/useAnalysis';
 import { SCREENS_OFF_OPTIONS } from '@/engine/windDownPlan';
 import { Card, CardTitle, ListRow, Section, Segmented, Stepper } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
@@ -16,7 +19,9 @@ export function WindDownSection() {
   const { settings } = sound;
   const screenDim = useStore((s) => s.settings.screenDim);
   const screensOffMin = useStore((s) => s.settings.screensOffMin);
+  const rundownOn = useStore((s) => s.settings.rundown.enabled);
   const setSettings = useStore((s) => s.setSettings);
+  const phoneDown = usePhoneDown(useAnalysis());
   return (
     <Section title="Sounds & screens">
       <Card>
@@ -29,12 +34,19 @@ export function WindDownSection() {
         <VolumeSlider value={settings.volume} onChange={(v) => soundPlayer.setVolume(v)} onCommit={sound.setVolume} />
         <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>SLEEP TIMER</Text>
         <TimerPicker value={settings.timerMin} onChange={sound.setTimer} />
-        <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>SCREENS OFF BEFORE LIGHTS-OUT</Text>
-        <Segmented
-          value={screensOffMin}
-          onChange={(v) => setSettings({ screensOffMin: v })}
-          options={SCREENS_OFF_OPTIONS.map((m) => ({ label: `${m} min`, value: m as number }))}
-        />
+        <Text style={[font.label, { marginTop: space.lg, marginBottom: space.sm }]}>{rundownOn ? 'PHONE DOWN' : 'SCREENS OFF BEFORE LIGHTS-OUT'}</Text>
+        {rundownOn ? (
+          // With the bedtime rundown, phone-down comes from its screen-free steps (teeth, reading…).
+          <Text style={font.small}>
+            {phoneDown !== undefined ? `Tonight at ${formatTime(phoneDown)} — ` : ''}when your bedtime rundown's screen-free steps start. Change them (and reading time) under Your bedtime rundown above.
+          </Text>
+        ) : (
+          <Segmented
+            value={screensOffMin}
+            onChange={(v) => setSettings({ screensOffMin: v })}
+            options={SCREENS_OFF_OPTIONS.map((m) => ({ label: `${m} min`, value: m as number }))}
+          />
+        )}
         <Toggle
           label="Dim & warm eepy in the evening"
           sub="A warm tint from the evening, and eepy's own screen dimmed from wind-down (your phone's settings stay as they are)"
@@ -42,7 +54,7 @@ export function WindDownSection() {
           onChange={(v) => setSettings({ screenDim: v })}
         />
         <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <ListRow icon="weather-night" title="Open wind-down routine" sub="Countdown, checklist, breathing and a light check" onPress={() => router.push('/winddown')} />
+          <ListRow icon="weather-night" title="Open wind-down routine" sub="Countdown, your rundown, breathing and a light check" onPress={() => router.push('/winddown')} />
         </View>
       </Card>
     </Section>
