@@ -103,6 +103,12 @@ describe('phaseInputFor', () => {
     expect(input.wakeRecorded).toBe(false);
     expect(input.wakeTime).toBeGreaterThan(now);
     expect(dayPhase(now, input)).toBe('night');
+    // "I'm up" tapped before the alarm: that's this morning's wake-up until the night syncs.
+    const up = phaseInputFor(a, p, now - 5 * 60_000);
+    expect(up).toMatchObject({ wakeTime: now - 5 * 60_000, wakeRecorded: true });
+    expect(dayPhase(now, up)).toBe('morning');
+    // Yesterday's tap doesn't count.
+    expect(phaseInputFor(a, p, now - 24 * 3600_000).wakeTime).toBe(input.wakeTime);
   });
 });
 

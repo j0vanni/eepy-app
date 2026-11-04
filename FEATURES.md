@@ -503,6 +503,18 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 36. New in 0.12.2 — "I'm up" before the alarm
+
+*"I woke up earlier but could not mark it, allow me to click the I'm up button early."*
+
+| | Feature |
+| --- | --- |
+| ✅ | **"Up before your alarm? I'm up"** on Today from 3 AM until this morning's alarm — on the night view (which used to offer only "I'm in bed" until the wake-up) and in the morning, with or without a sleep session, on two-step mornings too |
+| ✅ | One tap ends the night: closes an open sleep session (sounds and sleep mode off) or logs when you got up (the strongest sign for wake-up detection), turns off this morning's alarms still to ring — the final one and, before it rings, the routine alarm (not a free morning) — and switches Today to the morning (`dayPhase.phaseInputFor` uses the tap until the night syncs; no more "I'm in bed" offered) |
+| ✅ | Then **"Up at 4:42 AM — this morning's alarms are off. Good morning"** with **Undo — I'm going back to sleep** for 3 hours: the alarms still ahead ring again, the session reopens, sleep mode comes back on (`state/earlyUp.ts`, mark `wake.upEarly`) |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

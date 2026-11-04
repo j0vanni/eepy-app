@@ -53,12 +53,16 @@ export function nightWakeTarget(now: number, i: DayPhaseInput): number {
   return now >= i.bedtime ? i.nextWake : i.wakeTime;
 }
 
-/** Phase inputs from the engine output. Before last night syncs, this morning's wake is today's wake target. */
-export function phaseInputFor(a: Pick<Analysis, 'day' | 'wakeTime' | 'lastNightIsCurrent' | 'tonight' | 'alarm'>, profile: Profile): DayPhaseInput {
+/**
+ * Phase inputs from the engine output. Before last night syncs, this morning's wake is today's wake
+ * target — or `upAt`, when you tapped "I'm up" earlier than that this morning.
+ */
+export function phaseInputFor(a: Pick<Analysis, 'day' | 'wakeTime' | 'lastNightIsCurrent' | 'tonight' | 'alarm'>, profile: Profile, upAt?: number): DayPhaseInput {
   const plannedWake = atMinutes(a.day, wakeTargetFor(profile, a.day).wakeMin);
+  const upEarly = !a.lastNightIsCurrent && upAt !== undefined && upAt < plannedWake && upAt >= atMinutes(a.day, 0);
   return {
-    wakeTime: a.lastNightIsCurrent ? a.wakeTime : plannedWake,
-    wakeRecorded: a.lastNightIsCurrent,
+    wakeTime: a.lastNightIsCurrent ? a.wakeTime : upEarly ? upAt : plannedWake,
+    wakeRecorded: a.lastNightIsCurrent || upEarly,
     windDownStart: a.tonight.windDownStart,
     bedtime: a.tonight.bedtime,
     nextWake: a.alarm.alarm,

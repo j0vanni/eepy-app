@@ -16,8 +16,8 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
-import { formatTime } from '@/engine/time';
-import { routineNow, syncWakeAlarm, WAKE_FINAL_SKIP_MARK } from '@/notifications/fullScreenAlarm';
+import { dateKey, formatTime } from '@/engine/time';
+import { routineNow, syncWakeAlarm, WAKE_FINAL_SKIP_MARK, WAKE_UP_EARLY_MARK } from '@/notifications/fullScreenAlarm';
 import { replanNotifications } from '@/notifications/scheduler';
 import { hasSleepMode, startSleepModeNow, stopSleepModeNow } from '@/notifications/sleepMode';
 import { endInBedSession, undoEndInBedSession } from '@/state/inBed';
@@ -45,7 +45,9 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
   const [skipUndo, setSkipUndo] = useState<RoutineSkipUndo>();
   // From an hour before the routine alarm: up early (or awake anyway) and not doing it today.
   const r = analysis ? routineNow(analysis, settings, profile, now, { leadMin: ROUTINE_CARD_LEAD_MIN }) : undefined;
-  if (!analysis || !r) return null;
+  // Up for the day already ("I'm up" before the alarm): its own card says so, with Undo.
+  const upEarly = settings.marks[WAKE_UP_EARLY_MARK];
+  if (!analysis || !r || (typeof upEarly === 'number' && dateKey(upEarly) === r.date)) return null;
 
   const final = formatTime(r.finalAt);
   const watchFirst = r.finalPhoneAt !== r.finalAt;

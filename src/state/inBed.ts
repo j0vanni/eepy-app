@@ -20,7 +20,7 @@ import { dayPhase, phaseInputFor } from '../engine/dayPhase';
 import { closeInBed, IN_BED, InBedSession, isOpen, planInBed, reopenInBed, SessionAlarm, staleInBed, tapsNightOffer } from '../engine/inBed';
 import { dateKey, MINUTE } from '../engine/time';
 import { logInBed, logOutOfBed, logUp, unlogInBed, unlogOutOfBed } from '../engine/wakeDetect';
-import { nextWakeAlarm } from '../notifications/fullScreenAlarm';
+import { nextWakeAlarm, WAKE_UP_EARLY_MARK } from '../notifications/fullScreenAlarm';
 import { eveningNotificationIds } from '../notifications/ids';
 import { getSleepModeStatus, hasSleepMode, sleepModeWindow, sleepSoundsLabel, startSleepModeNow, stopSleepModeNow, undoSleepModeStart } from '../notifications/sleepMode';
 import { Settings, useStore } from './store';
@@ -35,7 +35,9 @@ export function sessionFor(s: InBedSession | undefined, a: Pick<Analysis, 'day' 
 
 /** Whether "I'm in bed" makes sense now: the evening or the night (not the middle of the day). */
 export function inBedAvailable(a: Analysis, profile: Parameters<typeof phaseInputFor>[1], now: number): boolean {
-  const phase = dayPhase(now, phaseInputFor(a, profile));
+  // Up early this morning ("I'm up" before the alarm): it's morning now, not the night.
+  const upAt = useStore.getState().settings.marks[WAKE_UP_EARLY_MARK];
+  const phase = dayPhase(now, phaseInputFor(a, profile, typeof upAt === 'number' ? upAt : undefined));
   return phase === 'evening' || phase === 'night';
 }
 

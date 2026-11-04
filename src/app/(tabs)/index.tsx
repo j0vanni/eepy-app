@@ -30,7 +30,9 @@ import {
   TonightCard,
 } from '@/ui/today/cards';
 import { DayHero, EveningHero, MorningHero, NightMoreToggle, NightView } from '@/ui/today/heroes';
+import { EarlyUpCard, earlyUpShows } from '@/ui/today/EarlyUp';
 import { UpCard } from '@/ui/today/InBed';
+import { nowAfterUp, upEarlyAt } from '@/state/earlyUp';
 import { QuickActions } from '@/ui/today/QuickActions';
 import { RoutineMorningNow } from '@/ui/cards/RoutineMorningNow';
 import { NightChromeContext } from '@/ui/QuickCheckInButton';
@@ -39,8 +41,10 @@ const PHASE_LABEL: Record<DayPhase, string> = { morning: 'morning', day: 'daytim
 
 export default function Today() {
   const a = useAnalysis();
-  const now = useNow(30_000);
+  const clock = useNow(30_000);
   const settings = useStore((s) => s.settings);
+  // Never before an "I'm up" just tapped, so Today switches to the morning right away.
+  const now = nowAfterUp(settings, clock);
   const profile = useStore((s) => s.profile);
   const loadDemo = useStore((s) => s.loadDemo);
   const [syncing, setSyncing] = useState(false);
@@ -50,7 +54,7 @@ export default function Today() {
   const session = useStore((s) => s.settings.session);
   // In bed ("I'm in bed") a little before lights-out is night too: the calm view, the + and tab bar dimmed.
   const inBed = !!a && isOpen(sessionFor(session, a));
-  const phaseNow = a ? dayPhase(now, phaseInputFor(a, profile)) : undefined;
+  const phaseNow = a ? dayPhase(now, phaseInputFor(a, profile, upEarlyAt(settings, now))) : undefined;
   // Known before the early return below, so the hook order never changes.
   const nightNow = phaseNow === 'night' || (inBed && phaseNow === 'evening');
   // While the night view is on screen, the floating button and tab bar dim too.
@@ -96,7 +100,9 @@ export default function Today() {
     );
   }
 
-  const input = phaseInputFor(a, profile);
+  const input = phaseInputFor(a, profile, upEarlyAt(settings, now));
+  // Woke before the alarm: "I'm up" (that also turns this morning's alarms off), then "Up at …" with Undo.
+  const earlyUp = earlyUpShows(a, settings, profile, now);
   const phase = dayPhase(now, input);
   const night = phase === 'night' || (inBed && phase === 'evening');
   const preDawn = night && now < input.bedtime && phase === 'night';
@@ -147,7 +153,7 @@ export default function Today() {
 
   return (
     <Screen
-      title={night ? (inBed ? 'Good night' : preDawn ? 'Still night' : 'Up late') : greeting(now)}
+      title={night ? (inBed ? 'Good night' : preDawn ? 'Still night' : 'Up late') : phase === 'morning' ? 'Good morning' : greeting(now)}
       subtitle={`${night ? (inBed ? 'Sleep session' : preDawn ? 'Early morning' : 'Tonight') : `${dayLabel(a.day)} · ${PHASE_LABEL[phase]}`}${settings.lastSync ? ` · synced ${relativeTime(settings.lastSync, now)}` : ''}`}
       right={header}
       tone={night ? 'night' : 'default'}
@@ -157,6 +163,7 @@ export default function Today() {
       {night ? (
         <>
           <RoutineMorningNow a={a} />
+          {earlyUp ? <EarlyUpCard a={a} now={now} night /> : null}
           <NightView a={a} now={now} input={input} />
           <RecoveryAlertCard analysis={a} />
           <NightMoreToggle open={nightMore} onToggle={() => setNightMore(!nightMore)} />
@@ -165,8 +172,8 @@ export default function Today() {
       ) : (
         <>
           <RoutineMorningNow a={a} />
-          {/* Still in bed from last night: "I'm up" first. */}
-          <UpCard a={a} />
+          {/* Still in bed from last night: "I'm up" first — before the alarm, the one that also turns it off. */}
+          {earlyUp ? <EarlyUpCard a={a} now={now} /> : <UpCard a={a} />}
           <QuickActions phase={phase} a={a} now={now} />
           <RecoveryAlertCard analysis={a} />
           {/* Keyed by phase so the hero re-enters when the day moves on. */}

@@ -35,7 +35,7 @@ const SCREENS: Feature[] = [
 
   // Planner
   { id: 'tonight-plan', title: "Tonight's plan", where: 'Planner › Tonight', icon: 'moon-waning-crescent', href: planner('tonight'), keywords: ['tonight', 'bedtime', 'lights out', 'wind down', 'why these times'] },
-  { id: 'in-bed', title: "I'm in bed (start the sleep session)", where: 'Today › evening & night', icon: 'bed', href: '/', keywords: ['in bed', 'going to bed', 'sleep session', 'sleep sesh', 'start sleep', 'lights out now', 'bedtime now', "i'm up", 'end session', 'good night', 'save last night'] },
+  { id: 'in-bed', title: "I'm in bed (start the sleep session)", where: 'Today › evening & night', icon: 'bed', href: '/', keywords: ['in bed', 'going to bed', 'sleep session', 'sleep sesh', 'start sleep', 'lights out now', 'bedtime now', "i'm up", 'end session', 'good night', 'save last night', 'up early', 'woke up early', 'awake before alarm', 'up before alarm'] },
   {
     id: 'plan-options',
     title: 'Options for tonight (and "Still up?")',

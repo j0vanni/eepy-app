@@ -140,6 +140,12 @@ export const WAKE_FINAL_SKIP_MARK = 'wake.skipFinal';
  * .twoStep = false) is set alongside, so planning and wake-up detection treat it as a one-alarm morning.
  */
 export const WAKE_ROUTINE_SKIP_MARK = 'wake.skipRoutine';
+/**
+ * marks key: when you tapped "I'm up" before this morning's alarm (epoch ms; state/earlyUp.ts). That
+ * morning's remaining alarms are skipped with WAKE_FINAL_SKIP_MARK / WAKE_ROUTINE_SKIP_MARK, and Today
+ * treats it as your wake-up until the night syncs.
+ */
+export const WAKE_UP_EARLY_MARK = 'wake.upEarly';
 /** Watch-first alarms buzz the wrist at these offsets (min) before the phone alarm takes over. */
 export const WRIST_BUZZ_OFFSETS_MIN = [0, 1, 2];
 /** A wake alarm that has rung stays current this long (it may be ringing or snoozed). */

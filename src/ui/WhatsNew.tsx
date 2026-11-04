@@ -26,6 +26,11 @@ const TABS: { icon: string; title: string; text: string }[] = [
 /** Smaller additions since this sheet was written. */
 const NEW: { icon: string; title: string; text: string }[] = [
   {
+    icon: 'weather-sunny',
+    title: "I'm up — before the alarm",
+    text: 'Woke up early? From 3 AM Today has "I\'m up": it ends the night, turns off this morning\'s alarms and switches to the morning (Undo if you go back to sleep).',
+  },
+  {
     icon: 'sleep',
     title: 'Skip the routine',
     text: 'Not doing your face routine? Today shows "Skip the routine — sleep until 6:00" from an hour before the routine alarm (the watch buzz has "Skip routine" too). Forgot to tap? The morning check-in asks "Did it / Skipped it".',
