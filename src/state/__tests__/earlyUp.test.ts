@@ -45,7 +45,7 @@ import { dayPhase, phaseInputFor } from '../../engine/dayPhase';
 import { atMinutes, MINUTE } from '../../engine/time';
 import { nextWakeAlarm, WAKE_AT_MARK, WAKE_FINAL_SKIP_MARK, WAKE_ROUTINE_AT_MARK, WAKE_ROUTINE_SKIP_MARK, WAKE_UP_EARLY_MARK } from '../../notifications/fullScreenAlarm';
 import { analyzeOptionsFor } from '../analysisOptions';
-import { earlyUpOffer, imUpEarly, undoEarlyUp, upEarlyAt } from '../earlyUp';
+import { earlyUpOffer, imUpEarly, setMorningWakeTime, undoEarlyUp, upEarlyAt, wakeTimeRange } from '../earlyUp';
 import { inBedAvailable, startInBedSession } from '../inBed';
 import { selectDataset, useStore } from '../store';
 
@@ -161,3 +161,41 @@ describe('"I\'m up" before the alarm', () => {
     expect(useStore.getState().profile.wakePlan?.[TUE]).toBeUndefined();
   });
 });
+
+describe('"Woke up at …" — correcting this morning\'s wake-up', () => {
+  it('moves the tap (and the ended session) to when you really woke up; Undo still clears it', async () => {
+    holdMorning();
+    const bed = at(MON, 23);
+    (Date.now as jest.Mock).mockReturnValue(bed);
+    await startInBedSession(analysisAt(bed), bed);
+    const now = at(TUE, 5.5);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    const undo = await imUpEarly(analysisAt(now), now);
+    const woke = at(TUE, 4.75);
+    expect(setMorningWakeTime(woke, now)).toBe(woke);
+    const st = useStore.getState();
+    expect(upEarlyAt(st.settings, now)).toBe(woke);
+    expect(st.settings.session?.upAt).toBe(woke);
+    expect(st.wakeLog.outOfBed).toContain(woke);
+    expect(st.wakeLog.outOfBed).not.toContain(undo.upAt);
+    await undoEarlyUp(undo, analysisAt(now));
+    const back = useStore.getState();
+    expect(back.settings.marks[WAKE_UP_EARLY_MARK]).toBeUndefined();
+    expect(back.wakeLog.outOfBed ?? []).not.toContain(woke);
+    expect(back.settings.session?.closed).toBeUndefined();
+  });
+
+  it('works with no "I\'m up" tapped, and stays between 3am (an hour after bed) and now', () => {
+    const now = at(TUE, 8);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    expect(wakeTimeRange(useStore.getState().settings, now)).toEqual({ min: at(TUE, 3), max: now });
+    expect(setMorningWakeTime(at(TUE, 5.25), now)).toBe(at(TUE, 5.25));
+    expect(upEarlyAt(useStore.getState().settings, now)).toBe(at(TUE, 5.25));
+    expect(useStore.getState().wakeLog.outOfBed).toContain(at(TUE, 5.25));
+    // Out of range: clamped.
+    expect(setMorningWakeTime(at(TUE, 1), now)).toBe(at(TUE, 3));
+    expect(setMorningWakeTime(at(TUE, 9), now)).toBe(now);
+    expect(useStore.getState().wakeLog.outOfBed).not.toContain(at(TUE, 5.25));
+  });
+});
+

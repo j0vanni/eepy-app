@@ -28,7 +28,7 @@ const NEW: { icon: string; title: string; text: string }[] = [
   {
     icon: 'weather-sunny',
     title: "I'm up — before the alarm",
-    text: 'Woke up early? From 3 AM Today has "I\'m up": it ends the night, turns off this morning\'s alarms and switches to the morning (Undo if you go back to sleep).',
+    text: 'Woke up early? From 3 AM Today has "I\'m up": it ends the night, turns off this morning\'s alarms and switches to the morning (Undo if you go back to sleep). Woke up before you tapped? "Change time" sets when you really woke up.',
   },
   {
     icon: 'sleep',

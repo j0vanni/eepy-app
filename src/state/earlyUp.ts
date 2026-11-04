@@ -99,9 +99,10 @@ export async function imUpEarly(a: Analysis, now = Date.now()): Promise<EarlyUpU
   const offer = earlyUpOffer(a, st.settings, st.profile, now);
   const date = offer?.date ?? dateKey(now);
   const marks = { final: st.settings.marks[WAKE_FINAL_SKIP_MARK], routine: st.settings.marks[WAKE_ROUTINE_SKIP_MARK] };
-  // The session (if any) ends with its own "I'm up" — that also logs when you got up.
+  // The session (if any) ends with its own "I'm up" — that also logs when you got up (to the minute).
   const sessionEnded = isOpen(st.settings.session) ? await endInBedSession('today', a, now).catch(() => false) : false;
-  if (!sessionEnded) st.updateWakeLog((log) => logOutOfBed(log, now));
+  const upAt = sessionEnded ? (useStore.getState().settings.session?.upAt ?? toMinute(now)) : toMinute(now);
+  if (!sessionEnded) st.updateWakeLog((log) => logOutOfBed(log, upAt));
   if (offer?.eepyAlarm) {
     st.setMark(WAKE_FINAL_SKIP_MARK, date);
     if (offer.routineAt !== undefined) {
@@ -110,7 +111,7 @@ export async function imUpEarly(a: Analysis, now = Date.now()): Promise<EarlyUpU
       await cancelRoutineAlarms().catch(() => undefined);
     }
   }
-  st.setMark(WAKE_UP_EARLY_MARK, now);
+  st.setMark(WAKE_UP_EARLY_MARK, upAt);
   // Lights on: sleep mode off (a session's "I'm up" already did that).
   let sleepModeUntil: number | undefined;
   if (!sessionEnded && st.settings.sleepMode.enabled && hasSleepMode()) {
@@ -118,7 +119,36 @@ export async function imUpEarly(a: Analysis, now = Date.now()): Promise<EarlyUpU
     if (status?.active && (await stopSleepModeNow(date).catch(() => false))) sleepModeUntil = offer?.wakeAt;
   }
   await resync(a);
-  return { upAt: now, date, marks, sessionEnded, ...(sleepModeUntil !== undefined ? { sleepModeUntil } : {}) };
+  return { upAt, date, marks, sessionEnded, ...(sleepModeUntil !== undefined ? { sleepModeUntil } : {}) };
+}
+
+const toMinute = (t: number) => Math.floor(t / MINUTE) * MINUTE;
+
+/** The range a corrected wake-up time can take this morning: from 3am (or an hour after "I'm in bed") until now. */
+export function wakeTimeRange(settings: Pick<Settings, 'session'>, now: number): { min: number; max: number } {
+  const s = settings.session;
+  const from = atMinutes(dateKey(now), EARLY_UP_FROM_MIN);
+  const afterBed = s && dateKey(s.inBedAt + 12 * HOUR) === dateKey(now) ? s.inBedAt + 60 * MINUTE : from;
+  return { min: Math.max(from, afterBed), max: toMinute(now) };
+}
+
+/**
+ * "Woke up at …": sets (or corrects) this morning's wake-up — woke earlier than you tapped "I'm up",
+ * or never tapped at all. The time is what Today, the morning and wake-up detection go by until the
+ * night syncs (then the night screen's own corrections take over): the logged "I'm up" moves, and a
+ * sleep session that ended this morning gets the same time.
+ */
+export function setMorningWakeTime(t: number, now = Date.now()): number {
+  const st = useStore.getState();
+  const { min, max } = wakeTimeRange(st.settings, now);
+  const at = Math.min(max, Math.max(min, toMinute(t)));
+  const prev = upEarlyAt(st.settings, now);
+  const s = st.settings.session;
+  const sessionUp = s?.closed === 'up' && s.upAt !== undefined && dateKey(s.upAt) === dateKey(now) ? s.upAt : undefined;
+  st.updateWakeLog((log) => logOutOfBed(unlogOutOfBed(unlogOutOfBed(log, prev), sessionUp), at));
+  if (sessionUp !== undefined && s) st.setSettings({ session: { ...s, upAt: at } });
+  st.setMark(WAKE_UP_EARLY_MARK, at);
+  return at;
 }
 
 /** Undo: back in bed — the alarms still ahead ring again, the session (if any) is open again. */
@@ -126,9 +156,12 @@ export async function undoEarlyUp(u: EarlyUpUndo, a: Analysis): Promise<void> {
   const st = useStore.getState();
   st.setMark(WAKE_FINAL_SKIP_MARK, u.marks.final);
   st.setMark(WAKE_ROUTINE_SKIP_MARK, u.marks.routine);
-  if (st.settings.marks[WAKE_UP_EARLY_MARK] === u.upAt) st.setMark(WAKE_UP_EARLY_MARK, undefined);
+  // The time may have been corrected since ("Woke up at …"): forget whichever is recorded now.
+  const current = st.settings.marks[WAKE_UP_EARLY_MARK];
+  const recorded = typeof current === 'number' && dateKey(current) === u.date ? current : u.upAt;
+  if (typeof current === 'number' && dateKey(current) === u.date) st.setMark(WAKE_UP_EARLY_MARK, undefined);
   if (u.sessionEnded) await undoEndInBedSession().catch(() => undefined);
-  else st.updateWakeLog((log) => unlogOutOfBed(log, u.upAt));
+  st.updateWakeLog((log) => unlogOutOfBed(unlogOutOfBed(log, u.upAt), recorded));
   if (u.sleepModeUntil !== undefined && u.sleepModeUntil > Date.now() && hasSleepMode()) await startSleepModeNow(u.date, u.sleepModeUntil).catch(() => false);
   await resync(a);
 }

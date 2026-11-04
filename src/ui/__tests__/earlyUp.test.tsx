@@ -37,7 +37,7 @@ import { analyze } from '../../engine/analysis';
 import { atMinutes } from '../../engine/time';
 import { resetWakeAlarmMemo, WAKE_AT_MARK, WAKE_FINAL_SKIP_MARK } from '../../notifications/fullScreenAlarm';
 import { selectDataset, useStore } from '../../state/store';
-import { EarlyUpCard } from '../today/EarlyUp';
+import { EarlyUpCard, MorningWakeRow } from '../today/EarlyUp';
 
 /**
  * "I'm up" before the alarm on Today (state/earlyUp.ts): the offer, the "Up at …" confirmation and Undo.
@@ -111,3 +111,47 @@ describe('EarlyUpCard', () => {
     expect(root.container.children).toHaveLength(0);
   });
 });
+
+describe('changing the wake-up time', () => {
+  it('"Woke up earlier? Change time" on the "Up at …" card', async () => {
+    const before = analyze(selectDataset(useStore.getState()), atMinutes(TUE, 3 * 60));
+    useStore.getState().setSettings({ marks: { [WAKE_AT_MARK]: before.tonight.wake } });
+    const now = atMinutes(TUE, 5 * 60);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    const a = analyze(selectDataset(useStore.getState()), now);
+    await render(<EarlyUpCard a={a} now={now} night />);
+    await press("I'm up");
+    expect(text()).toContain('05:00');
+    await press('Woke up earlier? Change time');
+    expect(text()).toContain('Woke up at');
+    await press('30 min earlier');
+    await press('Save');
+    expect(text()).toContain('04:30');
+    expect(useStore.getState().wakeLog.outOfBed).toContain(atMinutes(TUE, 4 * 60 + 30));
+  });
+
+  it('on the morning check-in when nothing was tapped (until the night syncs)', async () => {
+    const now = atMinutes(TUE, 8 * 60);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    const a = { ...analyze(selectDataset(useStore.getState()), now), lastNightIsCurrent: false };
+    await render(<MorningWakeRow a={a} now={now} />);
+    expect(text()).toContain('Woke up before ');
+    await press('Set the time');
+    await press('1 h earlier');
+    await press('Save');
+    expect(useStore.getState().wakeLog.outOfBed).toContain(atMinutes(TUE, 6 * 60));
+    // Today's "Up at 6:00 AM" card (with Change and Undo) takes over for a few hours …
+    expect(root.container.children).toHaveLength(0);
+    await render(<EarlyUpCard a={a} now={now} />);
+    expect(text()).toContain('06:00');
+    expect(text()).toContain('"Undo"');
+    // … then the check-in row says it.
+    const later = atMinutes(TUE, 9 * 60 + 30);
+    await render(<MorningWakeRow a={a} now={later} />);
+    expect(text()).toContain('You were up at ');
+    // Once the night has synced, the night's own corrections take over.
+    await render(<MorningWakeRow a={{ ...a, lastNightIsCurrent: true }} now={now} />);
+    expect(root.container.children).toHaveLength(0);
+  });
+});
+

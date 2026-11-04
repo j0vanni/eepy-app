@@ -19,6 +19,7 @@ import { nightLabel } from '@/ui/format';
 import { InsightCard } from '@/ui/InsightCard';
 import { colors, debtColor, font, scoreColor, space } from '@/ui/theme';
 import { RoutineCheck } from '@/ui/RoutineCheck';
+import { MorningWakeRow } from '@/ui/today/EarlyUp';
 import { WakeCheck } from '@/ui/WakeCheck';
 
 type A = { a: Analysis };
@@ -105,7 +106,7 @@ export function MorningCheckInCard({ a }: A) {
         }
       />
       {last && timeline ? <WakeCheck m={last} t={timeline} /> : null}
-      {last ? <RoutineCheck m={last} t={timeline} compact /> : null}
+      {last ? <RoutineCheck m={last} t={timeline} compact /> : <MorningWakeRow a={a} now={Date.now()} />}
       <Text style={font.small}>How did you sleep?</Text>
       <Row gap={space.xs} style={{ marginTop: 6, justifyContent: 'space-between' }}>
         {RATINGS.map((r, i) => {
