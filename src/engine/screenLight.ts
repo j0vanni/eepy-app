@@ -142,6 +142,16 @@ export function linearToSlider(linear: number): number {
 }
 
 /** Slider position (0–1) → linear panel brightness (0–1). */
+/**
+ * eepy's own window never auto-dims below this slider position: you're using it, so it has to stay
+ * readable (the phone-light advice for everything else goes lower).
+ */
+export const EEPY_MIN_SLIDER = 0.35;
+/** …and with eepy's brightness control you can go down to this. */
+export const EEPY_MANUAL_MIN_SLIDER = 0.1;
+/** How far eepy dims its own window in the evening (slider positions). */
+export const EEPY_DIM = { winddown: 0.5, night: 0.4 } as const;
+
 export function sliderToLinear(slider: number): number {
   const g = Math.max(0, Math.min(1, slider));
   const v = g <= HLG.r ? (g / HLG.r) ** 2 : Math.exp((g - HLG.c) / HLG.a) + HLG.b;

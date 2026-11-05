@@ -10,7 +10,7 @@ import { usePhoneDown } from '@/state/rundown';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { SCREENS_OFF_OPTIONS } from '@/engine/windDownPlan';
-import { Card, CardTitle, ListRow, Section, Segmented, Stepper } from '@/ui/components';
+import { Button, Card, CardTitle, ListRow, Row, Section, Segmented, Stepper } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
 import { colors, font, space } from '@/ui/theme';
 
@@ -18,6 +18,7 @@ export function WindDownSection() {
   const sound = useSoundPlayer();
   const { settings } = sound;
   const screenDim = useStore((s) => s.settings.screenDim);
+  const pausedUntil = useStore((s) => s.settings.screenDimPausedUntil);
   const screensOffMin = useStore((s) => s.settings.screensOffMin);
   const rundownOn = useStore((s) => s.settings.rundown.enabled);
   const setSettings = useStore((s) => s.setSettings);
@@ -49,10 +50,16 @@ export function WindDownSection() {
         )}
         <Toggle
           label="Dim & warm eepy in the evening"
-          sub="A warm tint from the evening, and eepy's own screen dimmed from wind-down (your phone's settings stay as they are)"
+          sub="A warm tint from the evening, and eepy's own screen dimmed from wind-down — never too dark to read. Too dark anyway? Tap Brighter (bottom left) for the rest of the night. Your phone's settings stay as they are."
           value={screenDim}
-          onChange={(v) => setSettings({ screenDim: v })}
+          onChange={(v) => setSettings({ screenDim: v, screenDimPausedUntil: undefined })}
         />
+        {screenDim && pausedUntil !== undefined && pausedUntil > Date.now() ? (
+          <Row gap={space.sm} style={{ flexWrap: 'wrap', marginBottom: space.sm }}>
+            <Text style={[font.small, { flex: 1, minWidth: 160 }]}>Brighter until {formatTime(pausedUntil)} — eepy isn't dimming itself.</Text>
+            <Button small kind="ghost" icon="brightness-4" label="Dim again" onPress={() => setSettings({ screenDimPausedUntil: undefined })} />
+          </Row>
+        ) : null}
         <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <ListRow icon="weather-night" title="Open wind-down routine" sub="Countdown, your rundown, breathing and a light check" onPress={() => router.push('/winddown')} />
         </View>

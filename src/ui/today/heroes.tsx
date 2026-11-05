@@ -201,6 +201,10 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
         </View>
       )}
       {stillUp ? <StillUpCard a={a} now={now} /> : null}
+      {/* Up late and want to log how you feel: in plain sight, not only behind the dimmed "+". */}
+      <View style={{ alignItems: 'center', marginBottom: space.md }}>
+        <Button small kind="ghost" icon="emoticon-happy-outline" label="Check in" onPress={() => router.push('/checkin')} />
+      </View>
       {showSession ? null : (
         <View style={{ marginBottom: space.lg }}>
           <InBedButton a={a} night />

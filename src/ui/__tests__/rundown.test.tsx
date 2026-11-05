@@ -110,8 +110,8 @@ describe('the guided player', () => {
     expect(text()).toContain('TIME LEFT');
     expect(text()).toContain('5:00');
     expect(progressValue()).toEqual({ min: 0, max: 9, now: 0 });
-    // eepy's own screen goes dim while the player is open.
-    expect(mockDim).toHaveBeenCalledWith(0.3);
+    // eepy's own screen goes dim while the player is open — but stays readable.
+    expect(mockDim).toHaveBeenCalledWith(0.5);
 
     clock += 3 * MINUTE;
     await press('Done');
@@ -142,7 +142,7 @@ describe('the guided player', () => {
     }
     expect(text()).toContain('PHONE DOWN');
     expect(text()).toContain('eepy keeps time from here');
-    expect(mockDim).toHaveBeenLastCalledWith(0.15);
+    expect(mockDim).toHaveBeenLastCalledWith(0.4);
     await press('Phone is down');
     expect(text()).toContain('Teeth & skin care');
 

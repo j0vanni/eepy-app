@@ -23,7 +23,9 @@ import {
   screenControlsSupported,
   setAutoBrightness,
   setPhoneBrightness,
+  undimEepy,
 } from '@/integrations/screen';
+import { eepyWindowMode, manualBrightness } from '@/state/screenDim';
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
 import { Settings, useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
@@ -75,11 +77,32 @@ function usePhoneScreen(): [PhoneScreen, (patch: Partial<PhoneScreen>) => void, 
 }
 
 /** Drag to set the phone's brightness, after the one-time "Modify system settings" permission. */
-function PhoneBrightness({ target, phone, patch, refresh }: { target?: number; phone: PhoneScreen; patch: (p: Partial<PhoneScreen>) => void; refresh: () => void }) {
+function PhoneBrightness({
+  target,
+  phone,
+  patch,
+  refresh,
+  dimming,
+}: {
+  target?: number;
+  phone: PhoneScreen;
+  patch: (p: Partial<PhoneScreen>) => void;
+  refresh: () => void;
+  /** eepy is (or may be) auto-dimming its own screen now (wind-down / night). */
+  dimming: boolean;
+}) {
   const lastSent = useRef(0);
   if (!screenControlsSupported() || phone.brightness === undefined) return null;
 
+  // While eepy dims (or sets) its own screen, the phone's brightness wouldn't show in eepy: hand it
+  // back to the phone's brightness until tomorrow noon, so what you drag is what you see.
+  const release = () => {
+    const st = useStore.getState();
+    if (eepyWindowMode(st.settings, Date.now(), dimming ? 1 : undefined).kind !== 'phone') st.setSettings(manualBrightness(Date.now(), undefined));
+    undimEepy();
+  };
   const live = (v: number) => {
+    if (lastSent.current === 0) release();
     // Apply while dragging, but not more than ~8 times a second.
     patch({ brightness: v });
     const now = Date.now();
@@ -88,6 +111,8 @@ function PhoneBrightness({ target, phone, patch, refresh }: { target?: number; p
     setPhoneBrightness(v);
   };
   const commit = async (v: number) => {
+    release();
+    lastSent.current = 0;
     patch({ brightness: v, auto: false });
     await setPhoneBrightness(v);
   };
@@ -199,7 +224,13 @@ export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boo
       <Text style={font.h3}>{target.title}</Text>
       <Text style={[font.small, { marginTop: 2 }]}>{target.advice}</Text>
       <BrightnessCheck target={target} brightness={phone.brightness} />
-      <PhoneBrightness target={target.maxBrightness < 1 ? target.maxBrightness : undefined} phone={phone} patch={patchPhone} refresh={refreshPhone} />
+      <PhoneBrightness
+        target={target.maxBrightness < 1 ? target.maxBrightness : undefined}
+        phone={phone}
+        patch={patchPhone}
+        refresh={refreshPhone}
+        dimming={target.phase === 'winddown' || target.phase === 'night'}
+      />
 
       {full || !evening ? (
         <View style={{ marginTop: space.sm, gap: 4 }}>

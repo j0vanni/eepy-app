@@ -26,6 +26,11 @@ const TABS: { icon: string; title: string; text: string }[] = [
 /** Smaller additions since this sheet was written. */
 const NEW: { icon: string; title: string; text: string }[] = [
   {
+    icon: 'brightness-6',
+    title: 'Brightness at night',
+    text: 'eepy still dims itself in the evening, but never too dark to read — and the Brightness button (bottom left) lets you set eepy\'s brightness or hand it back to your phone\'s.',
+  },
+  {
     icon: 'weather-sunny',
     title: "I'm up — before the alarm",
     text: 'Woke up early? From 3 AM Today has "I\'m up": it ends the night, turns off this morning\'s alarms and switches to the morning (Undo if you go back to sleep). Woke up before you tapped? "Change time" sets when you really woke up.',

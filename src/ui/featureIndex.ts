@@ -55,7 +55,7 @@ const SCREENS: Feature[] = [
   { id: 'calculator', title: 'Bedtime calculator', where: 'Planner › More planning tools', icon: 'calculator-variant-outline', href: planner('calculator'), keywords: ['when to sleep', 'sleep cycles', 'what time to go to bed', 'wake up at', 'sleep now'] },
   { id: 'shift', title: 'Move your schedule', where: 'Planner › More planning tools', icon: 'arrow-left-right', href: planner('shift'), keywords: ['shift schedule', 'wake earlier', 'wake later', 'new routine', 'light'] },
   { id: 'caffeine-curve', title: 'Caffeine in your system', where: 'Planner › More planning tools', icon: 'coffee-outline', href: planner('caffeine'), keywords: ['caffeine', 'coffee', 'cut-off', 'last coffee', 'mg', 'curve'] },
-  { id: 'phone-light', title: 'Phone light', where: 'Planner › More planning tools', icon: 'brightness-6', href: planner('light'), keywords: ['brightness', 'screen', 'night light', 'blue light', 'extra dim'] },
+  { id: 'phone-light', title: 'Phone light', where: 'Planner › More planning tools', icon: 'brightness-6', href: planner('light'), keywords: ['brightness', 'screen', 'night light', 'blue light', 'extra dim', 'too dark', 'cant see', 'dim', 'brighter'] },
   { id: 'simulate', title: 'What if?', where: 'More › Learn', icon: 'tune-variant', href: '/simulate', keywords: ['simulator', 'try', 'tomorrow', 'experiment with bedtime', 'forecast'] },
   { id: 'jetlag', title: 'Jet lag planner', where: 'More › Programmes', icon: 'airplane-clock', href: '/jetlag', keywords: ['travel', 'time zone', 'flight', 'jet lag'] },
 

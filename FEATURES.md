@@ -517,6 +517,19 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 37. New in 0.12.4 — eepy's screen stays readable, and you can always change its brightness
+
+*"I'm having a very late night but I can't check in nor see the damn screen because of the light controls … I don't mind that it dims auto, it's just I can't adjust the brightness in the app at all."*
+
+| | Feature |
+| --- | --- |
+| ✅ | **Never too dark to read**: eepy dimmed its own window to slider 15% at night (under 1% of full brightness) on top of its dark night look. Now wind-down 50% and night 40% (`engine/screenLight.EEPY_DIM`), and its own window never auto-dims below 35%, the rundown player included. The warm tint is lighter too |
+| ✅ | **A Brightness button** (bottom left, above the tab bar) whenever eepy sets its own brightness: opens *eepy's brightness* — a slider for eepy's screen that needs no permission — with **Auto-dim** and **Use phone brightness**. Setting it yourself turns the auto-dimming off until the next noon (`state/screenDim.ts`, `settings.screenDimPausedUntil` / `eepyBrightness`) |
+| ✅ | **The phone-brightness slider works in eepy again**: while eepy dimmed its own window, Android's brightness (and eepy's phone-brightness slider) couldn't change what you saw in eepy. Moving the slider now hands eepy's screen back to the phone's brightness for the night |
+| ✅ | **Check in at night**: the night view has a plain **Check in** button (the dimmed "+" was easy to miss). Settings → Wind-down & phone light says when auto-dim is paused, with **Dim again** |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

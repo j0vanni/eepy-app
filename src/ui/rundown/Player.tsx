@@ -17,7 +17,9 @@ import { isOpen } from '@/engine/inBed';
 import { canPickUp, playerPosition, Rundown, rundownGlance, RundownStep } from '@/engine/rundown';
 import { screenTargetAt } from '@/engine/screenLight';
 import { formatDuration, formatTime, MINUTE } from '@/engine/time';
-import { dimEepy, getScreenBrightness, undimEepy } from '@/integrations/screen';
+import { EEPY_DIM as DIM } from '@/engine/screenLight';
+import { dimEepy, getScreenBrightness, setEepyBrightness, undimEepy } from '@/integrations/screen';
+import { eepyDimOn, eepyWindowMode } from '@/state/screenDim';
 import { sleepSoundsLabel } from '@/notifications/sleepMode';
 import { sessionFor } from '@/state/inBed';
 import { backRundown, markRundown, resetRundownProgress, startRundown, useRundown } from '@/state/rundown';
@@ -31,7 +33,6 @@ import { InBedButton, SessionHeader } from '@/ui/today/InBed';
 
 const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
 /** eepy's own brightness while the player is open: wind-down level, then night level once the phone is down. */
-const DIM = { winddown: 0.3, night: 0.15 };
 
 const clock = (ms: number) => {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -44,6 +45,8 @@ function useDim(a: Analysis, night: boolean) {
   const dimTo = night ? DIM.night : DIM.winddown;
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    // "Brighter" (or the setting off) wins here too.
+    if (!eepyDimOn(useStore.getState().settings, Date.now())) return;
     getScreenBrightness().then((b) => {
       if (b === undefined || b > dimTo) dimEepy(dimTo);
     });
@@ -53,7 +56,10 @@ function useDim(a: Analysis, night: boolean) {
       if (Platform.OS === 'web') return;
       const { settings } = useStore.getState();
       const phase = screenTargetAt(screenPlanFor(a, settings), Date.now()).phase;
-      if (settings.screenDim && (phase === 'winddown' || phase === 'night')) dimEepy(phase === 'night' ? DIM.night : DIM.winddown);
+      // Back to what eepy's screen should be: auto-dimmed, the brightness you set, or the phone's.
+      const mode = eepyWindowMode(settings, Date.now(), phase === 'night' ? DIM.night : phase === 'winddown' ? DIM.winddown : undefined);
+      if (mode.kind === 'auto') dimEepy(mode.slider);
+      else if (mode.kind === 'manual') setEepyBrightness(mode.slider);
       else undimEepy();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

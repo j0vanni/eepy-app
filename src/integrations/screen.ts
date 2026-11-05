@@ -10,7 +10,7 @@ import * as Brightness from 'expo-brightness';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 
-import { linearToSlider, sliderToLinear } from '../engine/screenLight';
+import { EEPY_MANUAL_MIN_SLIDER, EEPY_MIN_SLIDER, linearToSlider, sliderToLinear } from '../engine/screenLight';
 
 /** The phone's brightness as a slider position (0–1), or undefined when unknown. */
 export async function getScreenBrightness(): Promise<number | undefined> {
@@ -73,10 +73,18 @@ export async function setAutoBrightness(on: boolean): Promise<boolean> {
   }
 }
 
-/** Dims only eepy's window (while it's in front) to a slider position; the phone's setting is untouched. */
+/** Dims only eepy's window (while it's in front) to a slider position — never below EEPY_MIN_SLIDER; the phone's setting is untouched. */
 export async function dimEepy(slider: number): Promise<void> {
   if (Platform.OS === 'web') return;
-  await Brightness.setBrightnessAsync(Math.max(0.005, sliderToLinear(Math.min(1, slider)))).catch(() => undefined);
+  const to = Math.max(EEPY_MIN_SLIDER, Math.min(1, slider));
+  await Brightness.setBrightnessAsync(sliderToLinear(to)).catch(() => undefined);
+}
+
+/** Sets eepy's own window to a slider position you chose (eepy's brightness control); at least EEPY_MANUAL_MIN_SLIDER. */
+export async function setEepyBrightness(slider: number): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const to = Math.max(EEPY_MANUAL_MIN_SLIDER, Math.min(1, slider));
+  await Brightness.setBrightnessAsync(sliderToLinear(to)).catch(() => undefined);
 }
 
 /** eepy follows the system brightness again. */

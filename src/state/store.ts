@@ -148,6 +148,10 @@ export interface Settings {
   inBedSounds?: boolean;
   /** Dim and warm eepy itself in the evening (its own window only). */
   screenDim: boolean;
+  /** eepy's own evening dimming and tint are off until then (epoch ms, the next noon) — you set the brightness yourself. */
+  screenDimPausedUntil?: number;
+  /** While paused: eepy's own window at this slider position (eepy's brightness control); missing = follow the phone's brightness. */
+  eepyBrightness?: number;
   /** Wind-down timeline: screens off this many minutes before lights-out (with the bedtime rundown off; on, phone-down comes from its steps). */
   screensOffMin: number;
   /** Bedtime rundown: your steps from the caffeine cut-off to lights-out, their order and minutes (engine/rundown.ts). */
