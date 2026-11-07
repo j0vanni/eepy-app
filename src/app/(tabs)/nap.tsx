@@ -6,6 +6,7 @@ import { dateKey, formatTime } from '@/engine/time';
 import { startNapTimer } from '@/notifications/alarms';
 import { stopNapTimer } from '@/notifications/napTimer';
 import { useStore } from '@/state/store';
+import { NapLogCard } from '@/ui/NapLog';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Card, CardTitle, Chip, Empty, Icon, Meter, Note, Ring, Row, Screen, Section } from '@/ui/components';
 import { Disclosure } from '@/ui/Disclosure';
@@ -97,6 +98,8 @@ export default function NapScreen() {
           </Text>
         ) : null}
       </Card>
+
+      <NapLogCard />
 
       {a.nap.reasons.length ? (
         <Section title="Why">

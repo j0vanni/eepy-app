@@ -26,6 +26,11 @@ const TABS: { icon: string; title: string; text: string }[] = [
 /** Smaller additions since this sheet was written. */
 const NEW: { icon: string; title: string; text: string }[] = [
   {
+    icon: 'clock-edit-outline',
+    title: 'Your times, your naps',
+    text: 'Adjust when you fell asleep and woke up right on the morning check-in, and log naps you took without the timer (Nap tab, or the + check-in).',
+  },
+  {
     icon: 'brightness-6',
     title: 'Brightness at night',
     text: 'eepy still dims itself in the evening, but never too dark to read — and the Brightness button (bottom left) lets you set eepy\'s brightness or hand it back to your phone\'s.',

@@ -136,24 +136,31 @@ function FixEditor({ t, full, onDone }: { t: NightTimeline; full?: boolean; onDo
  */
 export function WakeCheck({ m, t, full }: { m: SessionMetrics; t: NightTimeline; full?: boolean }) {
   const update = useStore((s) => s.updateWakeLog);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<false | 'wake' | 'all'>(false);
   const q = wakeQuestion(m, t);
-  if (editing) return <FixEditor t={t} full={full} onDone={() => setEditing(false)} />;
+  // "Change" on eepy's question edits the wake-up; "Adjust sleep & wake times" all three.
+  if (editing) return <FixEditor t={t} full={full || editing === 'all'} onDone={() => setEditing(false)} />;
+  // Today: always a way to set when you fell asleep and woke up, not only when eepy asks.
+  const adjust = (
+    <View style={{ marginBottom: space.md, alignItems: 'flex-start' }}>
+      <Button small kind="ghost" icon="clock-edit-outline" label={t.fixed ? 'Your times · Adjust' : 'Adjust sleep & wake times'} onPress={() => setEditing('all')} />
+    </View>
+  );
   if (t.fixed || t.confirmed) {
-    if (!full) return null;
+    if (!full) return adjust;
     return (
       <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap' }}>
         <Text style={[font.small, { flex: 1, minWidth: 160 }]}>{t.fixed ? 'Using the times you set.' : 'You confirmed these times.'}</Text>
-        <Button small kind="ghost" label="Change" onPress={() => setEditing(true)} />
+        <Button small kind="ghost" label="Change" onPress={() => setEditing('all')} />
         <Button small kind="ghost" label="Undo" onPress={() => update((log) => withFix(log, t.id, undefined))} />
       </Row>
     );
   }
   if (!q) {
-    if (!full) return null;
+    if (!full) return adjust;
     return (
       <View style={{ marginTop: space.sm, alignItems: 'flex-start' }}>
-        <Button small kind="ghost" icon="pencil-outline" label="Times look off? Change" onPress={() => setEditing(true)} />
+        <Button small kind="ghost" icon="pencil-outline" label="Times look off? Change" onPress={() => setEditing('all')} />
       </View>
     );
   }
@@ -171,7 +178,7 @@ export function WakeCheck({ m, t, full }: { m: SessionMetrics; t: NightTimeline;
             update((log) => withFix(log, t.id, { ok: true, at: Date.now() }));
           }}
         />
-        <Button small kind="ghost" icon="pencil-outline" label="Change" onPress={() => setEditing(true)} />
+        <Button small kind="ghost" icon="pencil-outline" label="Change" onPress={() => setEditing(full ? 'all' : 'wake')} />
       </Row>
     </View>
   );

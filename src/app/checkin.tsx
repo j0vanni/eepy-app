@@ -9,6 +9,7 @@ import { TAG_BY_ID } from '@/engine/tags';
 import { addDays, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import { endInBedSession } from '@/state/inBed';
 import { useStore } from '@/state/store';
+import { NapLogCard } from '@/ui/NapLog';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { Button, Chip, Icon, Row, Screen, Section } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
@@ -215,6 +216,10 @@ export default function CheckInSheet() {
             ))}
             <Chip label={moreDrinks ? 'Fewer' : 'More…'} onPress={() => setMoreDrinks(!moreDrinks)} />
           </View>
+        </Section>
+
+        <Section title="Naps today">
+          <NapLogCard bare />
         </Section>
 
         <Section title="Tag today">

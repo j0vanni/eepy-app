@@ -530,6 +530,17 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 38. New in 0.12.5 — adjust sleep & wake times, log naps you took
+
+*"An option where I can adjust my wake up time and sleep time, as well as add naps that I may have taken throughout the day if I don't do a planned one."*
+
+| | Feature |
+| --- | --- |
+| ✅ | **Adjust sleep & wake times on Today**: the morning check-in always has **Adjust sleep & wake times** (or *Your times · Adjust*) — *Fell asleep*, *Woke up* and *Got up* in 5-minute steps — not only when eepy asks a question. Saved as your correction for that night, which always wins (the night screen's *Times look off? Change* edits all three too). Before last night syncs: *Woke up before 6:00 AM? Set the time*, or *Log it manually* for the whole night |
+| ✅ | **"Took a nap? Log it"** on the Nap tab and in the **+** check-in (*Naps today*): when you lay down (5-min steps) and for how long (10 min … 1h 30m chips, or 5-min steps), never ending in the future. It's a manual nap session (`state/napLog.ts`), so sleep pressure, tonight's plan, the nap coach and trends count it. Today's naps are listed — logged ones with Undo / Remove, the watch's marked *from your watch* |
+
+---
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation

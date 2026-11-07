@@ -30,6 +30,7 @@ const SCREENS: Feature[] = [
   { id: 'today', title: 'Today', where: 'Tab', icon: 'home-variant-outline', href: '/', keywords: ['home', 'last night', 'score', 'energy', 'countdown', 'morning check-in', 'quick actions'] },
   { id: 'planner', title: 'Planner', where: 'Tab', icon: 'calendar-clock', href: '/planner', keywords: ['plan', 'week', 'bedtime', 'lights out', 'alarm', 'wake-up', 'schedule'] },
   { id: 'nap', title: 'Nap coach', where: 'Tab', icon: 'sleep', href: '/nap', keywords: ['nap', 'power nap', 'nap timer', 'sleepy', 'afternoon'] },
+  { id: 'log-nap', title: 'Log a nap you took', where: 'Nap tab, and the "+" check-in', icon: 'sleep', href: '/nap', keywords: ['log nap', 'took a nap', 'unplanned nap', 'add nap', 'napped', 'dozed off'] },
   { id: 'sleep', title: 'Sleep history', where: 'Tab', icon: 'chart-timeline-variant', href: '/sleep', keywords: ['history', 'trends', 'charts', 'nights', 'past'] },
   { id: 'more', title: 'More', where: 'Tab', icon: 'dots-horizontal-circle-outline', href: '/more', keywords: ['tools', 'all features', 'menu'] },
 
@@ -63,7 +64,7 @@ const SCREENS: Feature[] = [
   { id: 'trends', title: 'Trends', where: 'Sleep › Trends', icon: 'chart-line', href: sleep('trends'), keywords: ['charts', 'average', 'sleep debt', 'score', 'regularity', 'chronotype', 'hrv', 'heart rate', 'deep sleep', 'rem', 'breathing', 'oxygen', 'spo2'] },
   { id: 'sleep-calendar', title: 'Sleep calendar', where: 'Sleep › Calendar', icon: 'calendar-month', href: sleep('calendar'), keywords: ['month', 'past nights', 'calendar', 'history'] },
   { id: 'nights', title: 'All nights', where: 'Sleep › Nights', icon: 'format-list-bulleted', href: sleep('nights'), keywords: ['list', 'night details', 'report', 'hypnogram', 'stages'] },
-  { id: 'log-sleep', title: 'Log a night yourself', where: 'Sleep › Nights', icon: 'pencil-plus', href: '/log-sleep', keywords: ['manual', 'add sleep', 'forgot watch', 'missing night', 'nap log'] },
+  { id: 'log-sleep', title: 'Log a night yourself', where: 'Sleep › Nights', icon: 'pencil-plus', href: '/log-sleep', keywords: ['manual', 'add sleep', 'forgot watch', 'missing night', 'nap log', 'sleep time', 'adjust sleep time', 'adjust wake time', 'fell asleep'] },
 
   // More: coach & learn
   { id: 'coach', title: 'Coach', where: 'More › Coach', icon: 'account-heart-outline', href: '/coach', keywords: ['coach', 'advice', 'tips', 'suggestions'] },
