@@ -51,28 +51,52 @@ interface State {
   n: number;
 }
 
-function deriv(s: State, lux: number): State {
-  const alpha = F.alpha0 * Math.pow(Math.max(lux, 0) / F.I0, F.p);
-  const B = F.G * (1 - s.n) * alpha * (1 - 0.4 * s.x) * (1 - 0.4 * s.xc);
-  const w = Math.PI / 12;
-  return {
-    x: w * (s.xc + B),
-    xc: w * (F.mu * (s.xc - (4 / 3) * s.xc ** 3) - s.x * ((24 / (0.99669 * F.taux)) ** 2 + F.k * B)),
-    n: 60 * (alpha * (1 - s.n) - F.beta * s.n),
-  };
+const W = Math.PI / 12;
+const STIFFNESS = (24 / (0.99669 * F.taux)) ** 2;
+
+/** How strongly light at `lux` drives the clock (constant while the light is). */
+function lightDrive(lux: number): number {
+  return F.alpha0 * Math.pow(Math.max(lux, 0) / F.I0, F.p);
 }
 
-function rk4(s: State, lux: number, dt: number): State {
-  const add = (a: State, b: State, k: number): State => ({ x: a.x + k * b.x, xc: a.xc + k * b.xc, n: a.n + k * b.n });
-  const k1 = deriv(s, lux);
-  const k2 = deriv(add(s, k1, dt / 2), lux);
-  const k3 = deriv(add(s, k2, dt / 2), lux);
-  const k4 = deriv(add(s, k3, dt), lux);
-  return {
-    x: s.x + (dt / 6) * (k1.x + 2 * k2.x + 2 * k3.x + k4.x),
-    xc: s.xc + (dt / 6) * (k1.xc + 2 * k2.xc + 2 * k3.xc + k4.xc),
-    n: clamp(s.n + (dt / 6) * (k1.n + 2 * k2.n + 2 * k3.n + k4.n), 0, 1),
-  };
+/**
+ * One Runge–Kutta step of the oscillator under a light drive `alpha`, written into `s`. Plain
+ * numbers and no objects: this runs about 20,000 times per estimate, on a phone.
+ */
+function rk4(s: State, alpha: number, dt: number): void {
+  const { x, xc, n } = s;
+  let B = F.G * (1 - n) * alpha * (1 - 0.4 * x) * (1 - 0.4 * xc);
+  const k1x = W * (xc + B);
+  const k1c = W * (F.mu * (xc - (4 / 3) * xc ** 3) - x * (STIFFNESS + F.k * B));
+  const k1n = 60 * (alpha * (1 - n) - F.beta * n);
+
+  let ax = x + (dt / 2) * k1x;
+  let ac = xc + (dt / 2) * k1c;
+  let an = n + (dt / 2) * k1n;
+  B = F.G * (1 - an) * alpha * (1 - 0.4 * ax) * (1 - 0.4 * ac);
+  const k2x = W * (ac + B);
+  const k2c = W * (F.mu * (ac - (4 / 3) * ac ** 3) - ax * (STIFFNESS + F.k * B));
+  const k2n = 60 * (alpha * (1 - an) - F.beta * an);
+
+  ax = x + (dt / 2) * k2x;
+  ac = xc + (dt / 2) * k2c;
+  an = n + (dt / 2) * k2n;
+  B = F.G * (1 - an) * alpha * (1 - 0.4 * ax) * (1 - 0.4 * ac);
+  const k3x = W * (ac + B);
+  const k3c = W * (F.mu * (ac - (4 / 3) * ac ** 3) - ax * (STIFFNESS + F.k * B));
+  const k3n = 60 * (alpha * (1 - an) - F.beta * an);
+
+  ax = x + dt * k3x;
+  ac = xc + dt * k3c;
+  an = n + dt * k3n;
+  B = F.G * (1 - an) * alpha * (1 - 0.4 * ax) * (1 - 0.4 * ac);
+  const k4x = W * (ac + B);
+  const k4c = W * (F.mu * (ac - (4 / 3) * ac ** 3) - ax * (STIFFNESS + F.k * B));
+  const k4n = 60 * (alpha * (1 - an) - F.beta * an);
+
+  s.x = x + (dt / 6) * (k1x + 2 * k2x + 2 * k3x + k4x);
+  s.xc = xc + (dt / 6) * (k1c + 2 * k2c + 2 * k3c + k4c);
+  s.n = clamp(n + (dt / 6) * (k1n + 2 * k2n + 2 * k3n + k4n), 0, 1);
 }
 
 /**
@@ -86,10 +110,14 @@ export function lightGuess(hourOfDay: number, steps: number | undefined): number
   return day ? 150 + active * 1500 : 40 + active * 60;
 }
 
-/** Share of the hour starting at `t` spent asleep (`sleeps` sorted by start). */
-function asleepShare(sleeps: Interval[], t: number): number {
+/**
+ * Share of the hour starting at `t` spent asleep (`sleeps` sorted by start). `from` is the index to
+ * start looking at: the caller walks forward in time and skips the sleeps that are already over.
+ */
+function asleepShare(sleeps: Interval[], t: number, from = 0): number {
   let ms = 0;
-  for (const s of sleeps) {
+  for (let i = from; i < sleeps.length; i++) {
+    const s = sleeps[i];
     if (s.start >= t + HOUR) break;
     const o = Math.min(s.end, t + HOUR) - Math.max(s.start, t);
     if (o > 0) ms += o;
@@ -132,12 +160,14 @@ export function lightDrivenClock(input: BodyClockInput, historyDays = BODY_CLOCK
   const wakeH = input.habitualWakeMin / 60;
   const usualAsleep = (h: number) => (onsetH <= wakeH ? h >= onsetH && h < wakeH : h >= onsetH || h < wakeH);
 
-  let s: State = { x: -0.3, xc: -1.13, n: 0.1 };
+  const s: State = { x: -0.3, xc: -1.13, n: 0.1 };
   let prev2 = s.x;
   let prev1 = s.x;
   const out: number[] = [];
   const stepsPerHour = Math.round(1 / DT_H);
+  let firstOpen = 0; // sleeps before this index ended before the hour being simulated
   for (let t = start; t < end; t += HOUR) {
+    while (firstOpen < sleeps.length && sleeps[firstOpen].end <= t) firstOpen++;
     const d = new Date(t);
     const hour = d.getHours();
     let lux: number;
@@ -146,10 +176,11 @@ export function lightDrivenClock(input: BodyClockInput, historyDays = BODY_CLOCK
     } else {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const hours = input.daily[key]?.hours;
-      lux = (1 - asleepShare(sleeps, t)) * lightGuess(hour, hours ? hours.steps[hour] : undefined);
+      lux = (1 - asleepShare(sleeps, t, firstOpen)) * lightGuess(hour, hours ? hours.steps[hour] : undefined);
     }
+    const alpha = lightDrive(lux);
     for (let i = 0; i < stepsPerHour; i++) {
-      s = rk4(s, lux, DT_H);
+      rk4(s, alpha, DT_H);
       if (prev1 < prev2 && prev1 <= s.x && t >= dataStart - 24 * HOUR) {
         // prev1 (the state one step back, at t + i·dt) was a minimum of x.
         out.push(t + i * DT_H * HOUR + CBT_AFTER_XMIN_H * HOUR);

@@ -335,10 +335,20 @@ function watchRanOn(data: SleepDataset, id: string, now: number) {
 function demoHours(data: SleepDataset, now: number, rand: () => number) {
   const asleep: [number, number][] = [];
   for (const s of data.sessions) for (const seg of s.stages) if (seg.stage !== 'awake' && seg.stage !== 'outOfBed') asleep.push([seg.start, seg.end]);
+  // Sleep segments never overlap, so in start order they are in end order too: find the first one
+  // still running at `t` by bisection instead of scanning the whole history for every hour.
+  asleep.sort((p, q) => p[0] - q[0]);
   const share = (t: number) => {
+    let lo = 0;
+    let hi = asleep.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (asleep[mid][1] <= t) lo = mid + 1;
+      else hi = mid;
+    }
     let ms = 0;
-    for (const [a, b] of asleep) {
-      const o = Math.min(b, t + HOUR) - Math.max(a, t);
+    for (let i = lo; i < asleep.length && asleep[i][0] < t + HOUR; i++) {
+      const o = Math.min(asleep[i][1], t + HOUR) - Math.max(asleep[i][0], t);
       if (o > 0) ms += o;
     }
     return ms / HOUR;
