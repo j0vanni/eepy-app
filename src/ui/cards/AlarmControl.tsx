@@ -1,19 +1,18 @@
 /**
  * The next wake alarm as it will actually ring (held this-morning alarm, watch-first buzz + phone
  * backup), with a one-tap "Skip" for a day off and "Undo". Skipping only silences that one morning.
+ * A plain row with no panel of its own: it sits inside a Card (Today's evening, Plan → Tonight).
  */
-import { Text, View } from 'react-native';
-
 import type { Analysis } from '@/engine/analysis';
 import { dateKey, formatTime } from '@/engine/time';
 import { ensureNotificationPermission } from '@/notifications/channels';
 import { nextWakeAlarm, WAKE_SKIP_MARK } from '@/notifications/fullScreenAlarm';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
-import { Button, Icon, Row } from '@/ui/components';
+import { Button, ListRow } from '@/ui/components';
 import { notify } from '@/ui/confirm';
 import { dayLabel } from '@/ui/format';
-import { colors, font, space } from '@/ui/theme';
+import { colors } from '@/ui/theme';
 
 export function AlarmControl({ a }: { a: Analysis }) {
   const now = useNow(60_000);
@@ -27,11 +26,13 @@ export function AlarmControl({ a }: { a: Analysis }) {
       else notify('Notifications are off', 'Allow notifications for eepy in Android settings so the alarm can ring.');
     };
     return (
-      <Row gap={space.sm} style={{ marginTop: space.md }}>
-        <Icon name="alarm-off" size={18} color={colors.textFaint} />
-        <Text style={[font.small, { flex: 1 }]}>eepy's wake alarm is off — use your own, or let eepy ring at the cycle-timed time.</Text>
-        <Button small kind="secondary" label="Turn on" onPress={turnOn} />
-      </Row>
+      <ListRow
+        icon="alarm-off"
+        iconColor={colors.textFaint}
+        title="eepy's alarm is off"
+        sub="Use your own, or let eepy ring at the end of a sleep cycle."
+        right={<Button small kind="secondary" label="Turn on" onPress={turnOn} />}
+      />
     );
   }
 
@@ -40,27 +41,31 @@ export function AlarmControl({ a }: { a: Analysis }) {
   const when = dayLabel(day);
   // Two-step morning: the routine alarm first, then the final one (engine/twoStep.ts).
   const r = w.routine;
-  const text = r
+  const times = r
     ? w.wrist.length
-      ? `${when}: routine ⌚ ${formatTime(r.base)} · up ⌚ ${formatTime(w.base)} (phone ${formatTime(w.at)})`
-      : `${when}: routine ${formatTime(r.at)} · up ${formatTime(w.at)}`
+      ? `routine ⌚ ${formatTime(r.base)} · up ⌚ ${formatTime(w.base)} (phone ${formatTime(w.at)})`
+      : `routine ${formatTime(r.at)} · up ${formatTime(w.at)}`
     : w.wrist.length
-      ? `${when}: watch ${formatTime(w.base)} · phone ${formatTime(w.at)}`
-      : `Alarm ${when.toLowerCase()} at ${formatTime(w.at)}`;
+      ? `watch ${formatTime(w.base)} · phone ${formatTime(w.at)}`
+      : undefined;
+  if (w.skipped) {
+    return (
+      <ListRow
+        icon="alarm-off"
+        iconColor={colors.textFaint}
+        title={`No alarm ${when.toLowerCase()}`}
+        sub={`Skipped (${times ?? formatTime(w.at)}). It comes back the morning after.`}
+        right={<Button small kind="secondary" icon="undo" label="Undo" onPress={() => setMark(WAKE_SKIP_MARK, undefined)} />}
+      />
+    );
+  }
   return (
-    <Row gap={space.sm} style={{ marginTop: space.md }}>
-      <Icon name={w.skipped ? 'alarm-off' : 'alarm'} size={18} color={w.skipped ? colors.textFaint : colors.energy} />
-      <View style={{ flex: 1 }}>
-        <Text style={[font.body, w.skipped ? { color: colors.textDim, textDecorationLine: 'line-through' } : null]}>
-          {text}
-        </Text>
-        <Text style={font.tiny}>{w.skipped ? 'Skipped — sleep in. It comes back the morning after.' : 'Day off? Skip just this one.'}</Text>
-      </View>
-      {w.skipped ? (
-        <Button small kind="secondary" icon="undo" label="Undo" onPress={() => setMark(WAKE_SKIP_MARK, undefined)} />
-      ) : (
-        <Button small kind="secondary" icon="alarm-off" label="Skip" onPress={() => setMark(WAKE_SKIP_MARK, day)} />
-      )}
-    </Row>
+    <ListRow
+      icon="alarm"
+      iconColor={colors.energy}
+      title={times ? `${when}: ${times}` : `Alarm ${when.toLowerCase()} at ${formatTime(w.at)}`}
+      sub="Day off? Skip just this one."
+      right={<Button small kind="secondary" icon="alarm-off" label="Skip" onPress={() => setMark(WAKE_SKIP_MARK, day)} />}
+    />
   );
 }

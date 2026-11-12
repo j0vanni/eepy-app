@@ -5,16 +5,16 @@
  * and sleep mode follow — and Today goes back to the countdown to the new lights-out.
  */
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { formatDuration } from '@/engine/time';
 import { usePlanOptions } from '@/state/planOptions';
-import { Button, Card, Row } from '@/ui/components';
+import { Button, Card, Divider, Row } from '@/ui/components';
 import { HowEepyDecided, optionStats, takeOption } from '@/ui/planner/PlanOptions';
-import { colors, font, radius, space } from '@/ui/theme';
+import { colors, font, night, space } from '@/ui/theme';
 
-const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#2A2C55' };
+import { Caption, NIGHT_PANEL } from './nightParts';
 
 export function StillUpCard({ a, now }: { a: Analysis; now: number }) {
   const opts = usePlanOptions(a, now);
@@ -26,34 +26,34 @@ export function StillUpCard({ a, now }: { a: Analysis; now: number }) {
   const best = ahead.includes(opts.recommended) ? opts.recommended : ahead.reduce((b, o) => (o.utility > b.utility ? o : b));
   const alternatives = ahead.filter((o) => o !== best).slice(0, 3);
   return (
-    <Card style={NIGHT_CARD} animate={false}>
-      <Text style={[font.label, { color: colors.light }]}>STILL UP?</Text>
-      <Text style={[font.h2, { color: colors.text, marginTop: 4 }]}>{`${best.headline} → ${formatDuration(best.sleepMin)}`}</Text>
-      <Text style={[font.small, { marginTop: 2, fontVariant: ['tabular-nums'] }]}>{best.times}</Text>
-      {best.pros[0] ? <Text style={[font.small, { marginTop: 2 }]}>{best.pros[0]}</Text> : null}
-      <View style={{ marginTop: space.md }}>
-        <Button icon="check" label="Use this" onPress={() => takeOption(best)} />
-      </View>
+    <Card style={NIGHT_PANEL} animate={false}>
+      <Caption color={colors.sleep}>Still up?</Caption>
+      <Text style={[font.h2, { color: night.text, marginTop: space.xs }]}>{`${best.headline} → ${formatDuration(best.sleepMin)}`}</Text>
+      <Text style={[font.small, { color: night.textDim, marginTop: space.xxs, fontVariant: ['tabular-nums'] }]}>{best.times}</Text>
+      {best.pros[0] ? <Text style={[font.small, { color: night.textDim }]}>{best.pros[0]}</Text> : null}
+      <Button kind="secondary" icon="check" label="Use this" style={{ marginTop: space.md }} onPress={() => takeOption(best)} />
       {alternatives.length ? (
         <>
-          <Text style={[font.label, { marginTop: space.lg, marginBottom: space.xs }]}>OR</Text>
-          <View style={{ gap: space.sm }}>
-            {alternatives.map((o) => (
-              <Row key={o.id} gap={space.sm} style={{ paddingVertical: 8, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#1E2340' }}>
+          <Caption style={{ marginTop: space.lg }}>Or</Caption>
+          {alternatives.map((o, i) => (
+            <View key={o.id}>
+              {i ? <Divider spacing={0} /> : null}
+              <Row gap={space.md} style={{ paddingVertical: space.sm, minHeight: 56 }}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[font.body, { color: colors.textDim }]}>{o.title}</Text>
-                  <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>{optionStats(o)}</Text>
+                  <Text style={[font.body, { color: night.text }]}>{o.title}</Text>
+                  <Text style={[font.small, { color: night.textDim, fontVariant: ['tabular-nums'] }]}>{optionStats(o)}</Text>
                 </View>
                 <Button small kind="secondary" label="Use" onPress={() => takeOption(o)} />
               </Row>
-            ))}
-          </View>
+            </View>
+          ))}
         </>
       ) : null}
-      <HowEepyDecided steps={opts.thinking} color={colors.light} textColor={colors.textDim} />
-      <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm, minHeight: 32, justifyContent: 'center' }}>
-        <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Pick your own time</Text>
-      </Pressable>
+      <Divider spacing={space.sm} />
+      <HowEepyDecided steps={opts.thinking} />
+      <View style={{ alignItems: 'flex-start' }}>
+        <Button small kind="ghost" icon="clock-edit-outline" label="Pick your own time" onPress={() => router.push('/tonight')} />
+      </View>
     </Card>
   );
 }

@@ -1,8 +1,9 @@
 import { AdvanceRate, estimateAdvanceRate } from './adherence';
-import { CircadianParams, EnergyForecast, forecastEnergy, Interval, sleepPressureAt } from './alertness';
+import { CircadianParams, EnergyContext, EnergyForecast, forecastEnergy, Interval, sleepPressureAt } from './alertness';
 import { assessBreathing, breathingSummaryFor, breathingTrend, BreathingTrend } from './breathing';
 import { caffeineAt, caffeineCutoff, CaffeineCutoff } from './caffeine';
 import { CbtiProgram, currentCbtiWindow } from './cbti';
+import { energyAt } from './dayPhase';
 import { analyzeChronotype, ChronotypeResult, habitualTiming } from './chronotype';
 import { buildDailyPlan, buildTips, PlanItem, Tip } from './coach';
 import { generateInsights, Insight, NightRow } from './insights';
@@ -26,6 +27,7 @@ import { addDays, atMinutes, dateKey, daysBetween, HOUR, MINUTE, minutesOfDay, n
 import { isSleepStage, SleepDataset } from './types';
 import { detectRecoveryAlert, RecoveryAlert } from './recovery';
 import { computeReadiness, Readiness } from './vitals';
+import { buildSignalSource, DEFAULT_WEIGHTS, EnergyBreakdown, energyContext, EnergyWeights, explainEnergy, SignalSource } from './watchSignals';
 import { correctedMetrics, NightTimeline } from './wakeDetect';
 
 export interface Analysis {
@@ -79,6 +81,14 @@ export interface Analysis {
   sleeps: Interval[];
   /** The personal circadian adjustment in effect (learned from check-ins), if any. */
   circadian?: CircadianParams;
+  /** What the watch adds to the forecast (recovery signals, daytime heart rate, caffeine, body-clock shift). */
+  signals: SignalSource;
+  /** The weights those signals carry: learned from check-ins, or the population defaults. */
+  energyWeights: EnergyWeights;
+  /** The signals under those weights, as the forecast uses them. */
+  energyContext: EnergyContext;
+  /** The energy number right now, split into what each input contributes. */
+  energyNow?: EnergyBreakdown;
   /** Plain-English story of `lastNight` (nightStory.ts). */
   lastNightStory?: NightStory;
   /** 30-night breathing check from overnight SpO₂ (breathing.ts). */
@@ -92,6 +102,8 @@ export interface AnalyzeOptions {
   upcoming?: UpcomingDemand;
   /** Learned personal circadian parameters (calibration.ts). */
   circadian?: CircadianParams;
+  /** Weights of the watch signals (calibration.ts); the population defaults when missing. */
+  weights?: EnergyWeights;
   /** Start of tomorrow's first calendar event (epoch ms). */
   firstEventTomorrow?: number;
   /** Title of that event, for the plan's rationale. */
@@ -220,6 +232,20 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     sleeps.push({ start: wakeTime - need.needMin * MINUTE, end: wakeTime });
     assumedLastNight = true;
   }
+  // What the watch adds: last night's recovery signals, today's heart rate, caffeine, the body-clock shift.
+  const energyWeights = opts.weights ?? DEFAULT_WEIGHTS;
+  const signals = buildSignalSource({
+    nights,
+    vitals: data.vitals,
+    daily: data.daily,
+    caffeine: data.caffeine,
+    halfLifeH: profile.caffeineHalfLifeH,
+    sleeps: sleepIntervals(metrics, now - 80 * 24 * HOUR),
+    now,
+    habitualOnsetMin: chronotype.habitual?.onsetMin ?? normalizeMinutes(defaultWake - need.needMin),
+    habitualWakeMin: chronotype.habitual?.wakeMin ?? defaultWake,
+  });
+  const context = energyContext(signals, energyWeights);
   const energy = forecastEnergy({
     sleeps,
     now,
@@ -230,7 +256,13 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     debtMin: debt.debtMin,
     assumedLastNight,
     circadian: opts.circadian,
+    context,
   });
+  // The number is read off the curve at this very minute (the curve's points are 5 minutes apart).
+  const energyNow =
+    energy.now && !energy.now.asleep
+      ? explainEnergy({ ...energy.now, energy: energyAt(energy.points, now) ?? energy.now.energy }, { source: signals, weights: energyWeights, debtMin: debt.debtMin })
+      : undefined;
 
   const doses = data.caffeine.filter((d) => d.time > now - 36 * HOUR && d.time <= now);
   const cutoff = caffeineCutoff(doses, tonight.bedtime, profile.caffeineHalfLifeH, profile.caffeineBedtimeLimitMg);
@@ -265,6 +297,7 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     upcoming: opts.upcoming,
     forecast: energy,
     circadian: opts.circadian,
+    context,
   });
 
   const lastNight = [...nights].reverse().find((n) => n.main);
@@ -348,6 +381,10 @@ export function analyze(data: SleepDataset, now: number, opts: AnalyzeOptions = 
     recoveryAlert: detectRecoveryAlert({ nights, vitals: data.vitals, daily: data.daily, asOfDate: day }),
     sleeps,
     circadian: opts.circadian,
+    signals,
+    energyWeights,
+    energyContext: context,
+    ...(energyNow ? { energyNow } : {}),
     lastNightStory,
     breathing,
   };

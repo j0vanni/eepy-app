@@ -48,6 +48,11 @@ export function atMinutes(key: string, minutes: number): number {
   return new Date(y, m - 1, d, 0, whole, Math.round((minutes - whole) * 60)).getTime();
 }
 
+/** The calendar day a moment belongs to: before 4am counts as the previous day. */
+export function livingDay(t: number): string {
+  return minutesOfDay(t) < 240 ? addDays(dateKey(t), -1) : dateKey(t);
+}
+
 export function normalizeMinutes(m: number): number {
   return ((m % MIN_PER_DAY) + MIN_PER_DAY) % MIN_PER_DAY;
 }

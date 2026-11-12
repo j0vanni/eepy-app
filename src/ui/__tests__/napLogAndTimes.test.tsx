@@ -81,8 +81,9 @@ const press = async (label: string) => {
 describe('NapLogCard', () => {
   it('logs a nap you took (lay down at, how long), lists it, and Undo removes it', async () => {
     await render(<NapLogCard />);
-    expect(text()).toContain('Took a nap? Log it');
+    expect(text()).toContain('Took a nap?');
     await press('Log a nap');
+    expect(text()).toContain('Lay down at');
     await press('30 min');
     await press('Log nap');
     const naps = napsOn(useStore.getState().sessions, DAY).filter((n) => n.manual);
@@ -91,6 +92,15 @@ describe('NapLogCard', () => {
     expect(naps[0].end).toBeLessThanOrEqual(Date.now());
     expect(text()).toContain('Log another nap');
     await press('Undo');
+    expect(napsOn(useStore.getState().sessions, DAY).filter((n) => n.manual)).toHaveLength(0);
+  });
+
+  it('bare (inside another panel) has no heading of its own but the same form', async () => {
+    await render(<NapLogCard bare />);
+    expect(text()).not.toContain('Took a nap?');
+    await press('Log a nap');
+    await press('Cancel');
+    expect(text()).toContain('Log a nap');
     expect(napsOn(useStore.getState().sessions, DAY).filter((n) => n.manual)).toHaveLength(0);
   });
 });
@@ -103,7 +113,9 @@ describe('Adjust sleep & wake times (Today)', () => {
     const m = a.lastNight!.main!;
     const t = { ...a.timelines[m.id], confirmed: true };
     await render(<WakeCheck m={m} t={t} />);
-    await press('Adjust sleep & wake times');
+    // Nothing to ask: Today shows when you slept, as a row that opens the editor.
+    expect(text()).toContain('Asleep');
+    await press('Tap to change');
     expect(text()).toContain('Fell asleep');
     expect(text()).toContain('Woke up');
     expect(text()).toContain('Got up');
@@ -112,5 +124,38 @@ describe('Adjust sleep & wake times (Today)', () => {
     await press('Save');
     const fix = useStore.getState().wakeLog.fixes[m.id];
     expect(fix?.wake).toBe(t.woke.time - 5 * MINUTE);
+  });
+
+  it("eepy's question: \"Looks right\" confirms the night, \"Change\" edits the wake-up only", async () => {
+    const now = atMinutes(DAY, 9 * 60);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    const a = analyze(selectDataset(useStore.getState()), now);
+    const m = a.lastNight!.main!;
+    // The recording ran on 40 minutes after you got up.
+    const t = { ...a.timelines[m.id], fixed: false, confirmed: false, trimmedMin: 40 };
+    await render(<WakeCheck m={m} t={t} />);
+    expect(text()).toContain('recorded sleep until');
+    await press('Change');
+    expect(text()).toContain('Woke up');
+    expect(text()).not.toContain('Fell asleep');
+    await press('Cancel');
+    await press('Looks right');
+    expect(useStore.getState().wakeLog.fixes[m.id]?.ok).toBe(true);
+  });
+
+  it('on the night screen (full): your own times can be changed or undone', async () => {
+    const now = atMinutes(DAY, 9 * 60);
+    (Date.now as jest.Mock).mockReturnValue(now);
+    const a = analyze(selectDataset(useStore.getState()), now);
+    const m = a.lastNight!.main!;
+    useStore.getState().updateWakeLog((log) => ({ ...log, fixes: { ...log.fixes, [m.id]: { ok: true, at: now } } }));
+    const t = { ...a.timelines[m.id], fixed: false, confirmed: true };
+    await render(<WakeCheck m={m} t={t} full />);
+    expect(text()).toContain('You confirmed these times.');
+    await press('Change');
+    expect(text()).toContain('Got up');
+    await press('Cancel');
+    await press('Undo');
+    expect(useStore.getState().wakeLog.fixes[m.id]).toBeUndefined();
   });
 });

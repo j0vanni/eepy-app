@@ -1,13 +1,13 @@
 /**
  * Two-step mornings (engine/twoStep.ts): "up at 5 for my face routine, back to sleep until 6:05".
- * On/off, the routine alarm, how long the routine takes and which mornings, with a live preview of
- * the next two-step night from the shared analysis ("Lights out 11:05 PM → 4:47 routine alarm →
- * back to sleep ~5:17 → up 6:05 · 7h 10m sleep").
+ * One switch; once on, the routine alarm, how long the routine takes and which mornings, with the
+ * next two-step night from the shared analysis ("Lights out 11:05 PM → 4:47 routine alarm → back
+ * to sleep ~5:17 → up 6:05").
  *
- * Self-contained: reads and writes Profile.twoStepMorning and needs no props — mount it in the
- * planner or Settings (`embedded` drops the card frame to sit inside another card or section).
+ * Self-contained: reads and writes Profile.twoStepMorning and needs no props. `embedded` drops the
+ * panel so it can sit as a row inside another panel (Plan → Your usual week, Settings).
  */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { clockDiff, formatClock, formatDuration, normalizeMinutes } from '@/engine/time';
@@ -15,20 +15,18 @@ import { checkTwoStep, switchTwoStep, TWO_STEP, twoStepLine, twoStepSetting, two
 import type { TwoStepMorning } from '@/engine/types';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { AppSwitch, Card, CardTitle, Icon, Note, Row, Stepper } from '@/ui/components';
+import { Card, Fold, KeyValue, Stepper } from '@/ui/components';
 import { dayLabel } from '@/ui/format';
 import { selectionTick } from '@/ui/haptics';
+import { Bullet, Caption, DayPicker, WEEK_ORDER } from '@/ui/planner/parts';
+import { DAY_NAMES, DAY_SHORT } from '@/ui/planner/planText';
 import { Toggle } from '@/ui/settings/Toggle';
-import { colors, font, radius, space } from '@/ui/theme';
+import { colors, font, space } from '@/ui/theme';
 
-const DAY_CHIPS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-/** Show Monday first. */
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const STEP_MIN = 5;
 
 function listDays(days: number[]): string {
-  const names = DAY_ORDER.filter((d) => days.includes(d)).map((d) => DAY_NAMES[d]);
+  const names = WEEK_ORDER.filter((d) => days.includes(d)).map((d) => DAY_NAMES[d]);
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
@@ -36,23 +34,23 @@ function listDays(days: number[]): string {
 function Preview({ a }: { a: Analysis }) {
   const next = a.upcoming.find((n) => n.twoStep);
   if (!next?.twoStep) {
-    return <Text style={font.small}>No two-step mornings in the next two weeks — free days, days off and dates you switched the routine off for keep one alarm.</Text>;
+    return <Text style={font.small}>No two-step mornings in the next two weeks. Free days, days off and dates you switched the routine off for keep one alarm.</Text>;
   }
   const two = next.twoStep;
   const sleep = twoStepSleep(next.bedtime, two, a.latencyMin, a.efficiency);
   const short = Math.round(a.need.needMin - sleep.totalMin);
   return (
-    <View style={{ gap: 4 }}>
-      <Text style={font.label}>{dayLabel(next.wakeDate).toUpperCase()}</Text>
+    <View style={{ gap: space.xs }}>
+      <Caption>{dayLabel(next.wakeDate)}</Caption>
       <Text style={[font.body, { fontVariant: ['tabular-nums'] }]}>{twoStepLine({ bedtime: next.bedtime, wake: next.wake, twoStep: two }, a.latencyMin, a.efficiency)}</Text>
       <Text style={font.small}>
         {formatDuration(sleep.mainMin)} before the routine + {formatDuration(sleep.backMin)} after it.
-        {next.heldBack ? '' : ` Lights out ${two.awakeMin} min earlier than a one-alarm night, so the routine and falling back asleep don't come out of your sleep.`}
+        {next.heldBack ? '' : ` Lights out is ${two.awakeMin} min earlier than on a one-alarm night, so the routine doesn't come out of your sleep.`}
       </Text>
       {short > 15 ? (
-        <Note tone="warn" icon="clock-alert-outline">
-          About {formatDuration(short)} short of your {formatDuration(a.need.needMin)} need — your body clock won't let lights-out move that much earlier at once.
-        </Note>
+        <Bullet icon="clock-alert-outline" color={colors.warn} strong>
+          About {formatDuration(short)} short of your {formatDuration(a.need.needMin)} need. Your body clock won't let lights-out move that much earlier at once.
+        </Bullet>
       ) : null}
     </View>
   );
@@ -76,63 +74,44 @@ export function TwoStepMorningCard({ embedded = false }: { embedded?: boolean })
   const toggleDay = (d: number) => update({ days: days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((x, y) => x - y) });
   const routineEnd = setting.firstWakeMin + setting.routineMin;
 
-  const describe = 'A gentle alarm for a short routine (washing, moisturiser), back to bed, then your normal wake-up.';
-  const onSwitch = (v: boolean) => save(switchTwoStep(setting, v, Date.now()));
   const body = (
     <>
-      {/* In a card the switch sits in the title; embedded (inside another card) it's a plain row. */}
-      {embedded ? <Toggle label="Two-step mornings" sub={describe} value={setting.enabled} onChange={onSwitch} /> : null}
+      <Toggle
+        label="Two-step mornings"
+        sub="A gentle alarm for a short routine, back to bed, then your normal wake-up."
+        value={setting.enabled}
+        onChange={(v) => save(switchTwoStep(setting, v, Date.now()))}
+      />
       {setting.enabled ? (
-        <>
+        <View style={{ paddingBottom: space.md }}>
           <Stepper
             label="Routine alarm"
-            sub={gap > 0 ? `${formatDuration(gap)} before your wake-up · cycle-timed, up to 30 min earlier` : 'Must be before your wake-up'}
+            sub={gap > 0 ? `${formatDuration(gap)} before your wake-up · rings up to 30 min earlier, at the end of a sleep cycle` : 'Must be before your wake-up'}
             value={formatClock(setting.firstWakeMin)}
             onDec={() => update({ firstWakeMin: normalizeMinutes(setting.firstWakeMin - STEP_MIN) })}
             onInc={() => update({ firstWakeMin: normalizeMinutes(setting.firstWakeMin + STEP_MIN) })}
           />
           <Stepper
             label="Routine"
-            sub={`Up with the lights low · back in bed by ~${formatClock(routineEnd)}`}
+            sub={`Lights low · back in bed by about ${formatClock(routineEnd)}`}
             value={`${setting.routineMin} min`}
             onDec={() => update({ routineMin: Math.max(TWO_STEP.routineMin.min, setting.routineMin - STEP_MIN) })}
             onInc={() => update({ routineMin: Math.min(TWO_STEP.routineMin.max, setting.routineMin + STEP_MIN) })}
           />
-          <Row gap={space.sm} style={{ paddingVertical: space.sm }}>
-            <View style={{ flex: 1 }}>
-              <Text style={font.body}>Final alarm</Text>
-              <Text style={font.small}>Your workday wake-up{gap > 0 ? ` · calendar wake-ups keep the ${formatDuration(gap)} gap` : ''}</Text>
-            </View>
-            <Text style={[font.h3, { minWidth: 76, textAlign: 'center' }]}>{formatClock(profile.workWakeMin)}</Text>
-          </Row>
-          <Text style={[font.small, { marginTop: space.xs }]}>Mornings</Text>
-          {/* One even row of seven, like the workday picker above. */}
-          <Row gap={4} style={{ marginTop: space.xs }}>
-            {DAY_ORDER.map((d) => {
-              const on = days.includes(d);
-              return (
-                <Pressable
-                  key={d}
-                  onPress={() => toggleDay(d)}
-                  style={({ pressed }) => [styles.day, on ? styles.dayOn : null, pressed ? { opacity: 0.7 } : null]}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  accessibilityLabel={DAY_NAMES[d]}
-                >
-                  <Text style={[styles.dayText, on ? { color: colors.onAccent } : null]}>{DAY_CHIPS[d]}</Text>
-                </Pressable>
-              );
-            })}
-          </Row>
+          <KeyValue label="Final alarm" sub={`Your workday wake-up${gap > 0 ? ` · calendar wake-ups keep the ${formatDuration(gap)} gap` : ''}`} value={formatClock(profile.workWakeMin)} />
+          <View style={{ marginTop: space.sm, marginBottom: space.sm }}>
+            <Caption>Mornings</Caption>
+          </View>
+          <DayPicker days={days} onToggle={toggleDay} short={DAY_SHORT} label={(d) => DAY_NAMES[d]} />
           {offDays.length ? (
-            <Text style={[font.tiny, { marginTop: space.xs }]}>
-              {listDays(offDays)} {offDays.length > 1 ? "aren't workdays" : "isn't a workday"} — only two-step when you set a wake-up for it in the calendar.
-            </Text>
+            <Text style={[font.tiny, { marginTop: space.sm }]}>{`${listDays(offDays)} ${offDays.length > 1 ? "aren't workdays" : "isn't a workday"}: two-step only when you set a wake-up for that date.`}</Text>
           ) : null}
-          <Text style={[font.tiny, { marginTop: space.xs }]}>Want it on or off for one date? Tap that morning in the Planner's week (or use Tonight's plan) → "Routine alarm this morning".</Text>
+          <Text style={[font.tiny, { marginTop: space.sm }]}>For one date only, tap that morning in the Plan tab's week and use “Routine alarm this morning”.</Text>
           <View style={{ marginTop: space.md }}>
             {!check.ok ? (
-              <Note tone="warn">{check.reason}</Note>
+              <Bullet icon="alert-outline" color={colors.warn} strong>
+                {check.reason}
+              </Bullet>
             ) : a ? (
               <Preview a={a} />
             ) : (
@@ -142,45 +121,19 @@ export function TwoStepMorningCard({ embedded = false }: { embedded?: boolean })
               </Text>
             )}
           </View>
-          <Row gap={6} style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-            <Icon name="information-outline" size={16} color={colors.textFaint} />
-            <Text style={[font.tiny, { flex: 1 }]}>
-              The routine alarm is cycle-timed so it's easy to get up; the final one rings right at your wake-up. Sleep mode stays on until then, and the routine doesn't
-              count as waking in the night.
-            </Text>
-          </Row>
-        </>
+          <View style={{ marginTop: space.sm }}>
+            <Fold bare title="How it works">
+              <Text style={font.small}>
+                The routine alarm rings at the end of a sleep cycle, so it is easy to get up. The final one rings right at your wake-up. Sleep mode stays on until then, and the routine doesn't
+                count as waking in the night.
+              </Text>
+            </Fold>
+          </View>
+        </View>
       ) : null}
     </>
   );
 
   if (embedded) return <View>{body}</View>;
-  return (
-    <Card>
-      <CardTitle
-        icon="weather-sunset-up"
-        title="Two-step mornings"
-        color={colors.energy}
-        right={<AppSwitch value={setting.enabled} onChange={onSwitch} label="Two-step mornings" />}
-      />
-      <Text style={[font.small, setting.enabled ? { marginBottom: space.xs } : null]}>{describe}</Text>
-      {body}
-    </Card>
-  );
+  return <Card style={{ paddingVertical: space.xs }}>{body}</Card>;
 }
-
-const styles = StyleSheet.create({
-  day: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  dayOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  dayText: { color: colors.text, fontWeight: '700', fontSize: 13 },
-});

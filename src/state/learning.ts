@@ -52,6 +52,10 @@ export function calibrationKey(state: AppState, now = Date.now()): string {
     profile,
     learningSince(state) ?? 0,
     state.settings.preferredOrigins.join(','),
+    // The watch signals and caffeine feed the fit too.
+    state.caffeine.length,
+    state.caffeine[state.caffeine.length - 1]?.time ?? 0,
+    Object.keys(state.daily).length,
   ].join(':');
 }
 
@@ -100,6 +104,8 @@ export function useLearning(): void {
   const profile = useStore((s) => s.profile);
   const origins = useStore((s) => s.settings.preferredOrigins);
   const resetAt = useStore((s) => s.settings.marks[LEARNING_RESET_MARK]);
+  const caffeine = useStore((s) => s.caffeine);
+  const daily = useStore((s) => s.daily);
   const day = dateKey(useNow(30 * MINUTE));
   useEffect(() => {
     if (!hydrated) return;
@@ -112,5 +118,5 @@ export function useLearning(): void {
       }
     }, 250);
     return () => clearTimeout(id);
-  }, [hydrated, checkins, sessions, profile, origins, resetAt, day]);
+  }, [hydrated, checkins, sessions, profile, origins, resetAt, day, caffeine, daily]);
 }

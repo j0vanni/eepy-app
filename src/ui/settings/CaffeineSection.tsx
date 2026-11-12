@@ -1,11 +1,12 @@
 // Settings → Caffeine & drinks: how fast caffeine wears off for you, the bedtime limit and your own drinks.
 import { router } from 'expo-router';
-import { Pressable, Text } from 'react-native';
 
 import { HALF_LIFE_OPTIONS } from '@/engine/caffeine';
 import { useStore } from '@/state/store';
-import { Card, Icon, ListRow, Row, Section, Segmented, Stepper } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { IconButton, ListCard, ListRow, Section, Stepper } from '@/ui/components';
+import { colors } from '@/ui/theme';
+
+import { ChoiceRow } from './parts';
 
 export function CaffeineSection() {
   const profile = useStore((s) => s.profile);
@@ -15,40 +16,40 @@ export function CaffeineSection() {
   return (
     <>
       <Section title="How caffeine affects you">
-        <Card>
-          <Text style={[font.body, { marginBottom: 4 }]}>Caffeine half-life</Text>
-          <Text style={[font.small, { marginBottom: space.sm }]}>How long half of a coffee takes to wear off in your body.</Text>
-          <Segmented value={profile.caffeineHalfLifeH} onChange={(v) => setProfile({ caffeineHalfLifeH: v })} options={HALF_LIFE_OPTIONS.map((o) => ({ label: o.label, value: o.hours }))} />
-          <Text style={[font.tiny, { marginTop: 4 }]}>{HALF_LIFE_OPTIONS.find((o) => o.hours === profile.caffeineHalfLifeH)?.hint}</Text>
+        <ListCard>
+          <ChoiceRow
+            title="How fast it wears off"
+            sub="The time half of a coffee takes to leave your body (half-life)"
+            value={profile.caffeineHalfLifeH}
+            onChange={(v) => setProfile({ caffeineHalfLifeH: v })}
+            options={HALF_LIFE_OPTIONS.map((o) => ({ label: o.label, value: o.hours }))}
+            hint={HALF_LIFE_OPTIONS.map((o) => `${o.label.split(' ')[0]}: ${o.hint}`).join('\n')}
+          />
           <Stepper
             label="Caffeine allowed at bedtime"
-            sub="Lower = an earlier last coffee"
+            sub="Lower means an earlier last coffee"
             value={`${profile.caffeineBedtimeLimitMg} mg`}
             onDec={() => setProfile({ caffeineBedtimeLimitMg: Math.max(10, profile.caffeineBedtimeLimitMg - 10) })}
             onInc={() => setProfile({ caffeineBedtimeLimitMg: Math.min(150, profile.caffeineBedtimeLimitMg + 10) })}
           />
-          <ListRow icon="chart-bell-curve-cumulative" title="See caffeine in your system" sub="Planner → More planning tools" onPress={() => router.navigate({ pathname: '/planner', params: { show: 'caffeine' } })} />
-        </Card>
+          <ListRow title="Caffeine in your system" sub="Plan › Tools" onPress={() => router.navigate({ pathname: '/planner', params: { show: 'caffeine' } })} />
+        </ListCard>
       </Section>
       <Section title="Your drinks">
-        <Card>
-          {customDrinks.length === 0 ? (
-            <Text style={font.small}>None yet. When logging a drink, tap "Your own drink" to save one with your own amount (e.g. how strong you make instant coffee).</Text>
-          ) : (
-            customDrinks.map((d) => (
-              <Row key={d.label} style={{ paddingVertical: 6 }}>
-                <Icon name="star-outline" size={16} color={colors.caffeine} />
-                <Text style={[font.body, { flex: 1 }]}>
-                  {d.label} · {d.mg} mg
-                </Text>
-                <Pressable onPress={() => setSettings({ customDrinks: customDrinks.filter((c) => c.label !== d.label) })} hitSlop={8} accessibilityLabel={`Remove ${d.label}`}>
-                  <Icon name="close" color={colors.textFaint} />
-                </Pressable>
-              </Row>
-            ))
-          )}
+        <ListCard>
+          {customDrinks.length === 0 ? <ListRow icon="star-outline" title="None yet" sub={'When you log a drink, "Your own drink" saves one with your own amount'} /> : null}
+          {customDrinks.map((d) => (
+            <ListRow
+              key={d.label}
+              icon="star-outline"
+              iconColor={colors.caffeine}
+              title={d.label}
+              sub={`${d.mg} mg`}
+              right={<IconButton icon="close" label={`Remove ${d.label}`} color={colors.textFaint} onPress={() => setSettings({ customDrinks: customDrinks.filter((c) => c.label !== d.label) })} />}
+            />
+          ))}
           <ListRow icon="plus" title="Log a drink" sub="Coffee, tea or energy drink, at the time you had it" onPress={() => router.push('/caffeine')} />
-        </Card>
+        </ListCard>
       </Section>
     </>
   );

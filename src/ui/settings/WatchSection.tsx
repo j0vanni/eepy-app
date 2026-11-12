@@ -1,37 +1,25 @@
 /**
- * The CMF Watch beyond Health Connect: Nothing X mirrors eepy's notifications to the watch, so
- * nap and wake alarms can buzz the wrist silently first, with the phone alarm only as a backup.
+ * Settings → Alarms & watch: the CMF Watch beyond Health Connect. Nothing X mirrors eepy's
+ * notifications to the watch, so nap and wake alarms can buzz the wrist silently first, with the
+ * phone alarm only as a backup.
  */
-import { Linking, Platform, Text, View } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { sendWatchTestBuzz } from '../../notifications/alarms';
 import { useStore, WatchSettings } from '../../state/store';
-import { Button, Card, CardTitle, Note, Row, Section, Segmented } from '../components';
+import { Fold, ListCard, ListRow, Note, Section } from '../components';
 import { notify } from '../confirm';
 import { relativeTime } from '../format';
-import { colors, font, space } from '../theme';
+import { Choice, ChoiceRow, Para, Steps } from './parts';
 
 const NOTHING_X = 'com.nothing.smartcenter';
-const ALARM_STYLES: { label: string; value: WatchSettings['napAlarm'] }[] = [
+const ALARM_STYLES: Choice<WatchSettings['napAlarm']>[] = [
   { label: 'Phone alarm', value: 'phone' },
   { label: 'Watch first', value: 'wrist' },
 ];
 
 function openNothingX() {
   Linking.openURL(`market://details?id=${NOTHING_X}`).catch(() => Linking.openURL(`https://play.google.com/store/apps/details?id=${NOTHING_X}`));
-}
-
-function Steps({ items }: { items: string[] }) {
-  return (
-    <View style={{ gap: 6, marginTop: space.sm }}>
-      {items.map((t, i) => (
-        <Row key={t} gap={space.sm} style={{ alignItems: 'flex-start' }}>
-          <Text style={[font.small, { color: colors.accent, fontWeight: '700', width: 16 }]}>{i + 1}</Text>
-          <Text style={[font.small, { flex: 1 }]}>{t}</Text>
-        </Row>
-      ))}
-    </View>
-  );
 }
 
 export function WatchSection() {
@@ -50,65 +38,56 @@ export function WatchSection() {
   };
 
   return (
-    <Section title="CMF Watch">
-      <Card>
-        <CardTitle icon="watch-variant" title="Alarms on your wrist" />
-        <Text style={font.small}>
-          With "Watch first" the watch buzzes silently three times, a minute apart; the phone only rings if you haven't tapped "I'm up". Handy next to a sleeping partner.
-        </Text>
-
-        <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Nap alarm</Text>
-        <Segmented options={ALARM_STYLES} value={watch.napAlarm} onChange={(napAlarm) => setWatch({ napAlarm })} />
-        <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Morning alarm</Text>
-        <Segmented options={ALARM_STYLES} value={watch.wakeAlarm} onChange={(wakeAlarm) => setWatch({ wakeAlarm })} />
-        {watch.wakeAlarm === 'wrist' && !smartAlarm ? <Text style={[font.tiny, { marginTop: 4 }]}>Turn on "Wake alarm" above for the morning buzz.</Text> : null}
-
+    <>
+      <Section title="Alarms on your wrist">
+        <ListCard>
+          <ChoiceRow title="Nap alarm" value={watch.napAlarm} options={ALARM_STYLES} onChange={(napAlarm) => setWatch({ napAlarm })} />
+          <ChoiceRow
+            title="Morning alarm"
+            sub={watch.wakeAlarm === 'wrist' && !smartAlarm ? 'Turn on "Wake alarm" above for the morning buzz' : undefined}
+            value={watch.wakeAlarm}
+            options={ALARM_STYLES}
+            onChange={(wakeAlarm) => setWatch({ wakeAlarm })}
+          />
+          {wristAny ? (
+            <ChoiceRow title="Phone backup after" value={watch.backupMin} options={[3, 5, 10].map((m) => ({ label: `${m} min`, value: m }))} onChange={(backupMin) => setWatch({ backupMin })} />
+          ) : null}
+          <Fold bare title="What Watch first does">
+            <Para first>The watch buzzes silently three times, a minute apart. The phone only rings if you haven't tapped "I'm up". Handy next to a sleeping partner.</Para>
+          </Fold>
+        </ListCard>
         {wristAny ? (
-          <>
-            <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Phone backup after</Text>
-            <Segmented
-              options={[3, 5, 10].map((m) => ({ label: `${m} min`, value: m }))}
-              value={watch.backupMin}
-              onChange={(backupMin) => setWatch({ backupMin })}
-            />
-            <Note tone="warn" icon="sleep">
-              If the watch is in Do Not Disturb or sleep mode it won't vibrate — the phone backup still rings. Check the watch's DND schedule in Nothing X.
-            </Note>
-          </>
+          <Note tone="warn" icon="sleep">
+            A watch in Do Not Disturb or sleep mode won't vibrate. The phone backup still rings. Check the watch's DND schedule in Nothing X.
+          </Note>
         ) : null}
-      </Card>
+      </Section>
 
-      <Card>
-        <CardTitle icon="bell-ring-outline" title="Set up watch notifications" />
-        <Steps
-          items={[
-            'Open Nothing X → your CMF Watch 3 Pro → Notifications, and turn on eepy.',
-            'If Android asks, allow Nothing X "Notification access".',
-            'Tap "Send test buzz" below — the watch should vibrate and show "eepy test buzz".',
-          ]}
-        />
-        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
-          <Button small icon="vibrate" label="Send test buzz" onPress={test} />
-          <Button small kind="secondary" icon="open-in-new" label="Open Nothing X" onPress={openNothingX} />
-        </Row>
-        {watch.testSentAt ? <Text style={[font.tiny, { marginTop: 6 }]}>Test sent {relativeTime(watch.testSentAt)}. No buzz? Re-check step 1 and that the watch is connected.</Text> : null}
-      </Card>
-
-      <Card>
-        <CardTitle icon="music-note-outline" title="Also on the watch" />
-        <View style={{ gap: space.sm }}>
-          {[
-            'Sleep sounds appear in the watch’s music controls — pause them from your wrist.',
-            'Check-in pings, the morning report and reminders buzz the watch too; answer them on the phone.',
-            'Sleep, heart rate, HRV, SpO₂ and steps come from the watch through Health Connect (Settings → Health Connect & data).',
-          ].map((t) => (
-            <Row key={t} gap={space.sm} style={{ alignItems: 'flex-start' }}>
-              <Text style={[font.small, { color: colors.accent }]}>•</Text>
-              <Text style={[font.small, { flex: 1 }]}>{t}</Text>
-            </Row>
-          ))}
-        </View>
-      </Card>
-    </Section>
+      <Section title="Watch notifications">
+        <ListCard>
+          <ListRow
+            icon="vibrate"
+            title="Send test buzz"
+            sub={watch.testSentAt ? `Sent ${relativeTime(watch.testSentAt)}. No buzz? Check step 1 and that the watch is connected.` : 'The watch should vibrate and show "eepy test buzz"'}
+            onPress={test}
+          />
+          <ListRow icon="open-in-new" title="Open Nothing X" onPress={openNothingX} />
+          <Fold bare title="How to set it up">
+            <Steps
+              items={[
+                'Open Nothing X → your CMF Watch 3 Pro → Notifications, and turn on eepy.',
+                'If Android asks, allow Nothing X "Notification access".',
+                'Tap "Send test buzz" above.',
+              ]}
+            />
+          </Fold>
+          <Fold bare title="Also on the watch">
+            <Para first>Sleep sounds appear in the watch’s music controls: pause them from your wrist.</Para>
+            <Para>Check-in reminders, the morning report and other reminders buzz the watch too. Answer them on the phone.</Para>
+            <Para>Sleep, heart rate, HRV, blood oxygen and steps come from the watch through Health Connect (Settings → Watch and data).</Para>
+          </Fold>
+        </ListCard>
+      </Section>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * "I'm up" before this morning's alarm (state/earlyUp.ts): from 3am until the alarm, on the night view
- * and the morning, with or without a sleep session, on two-step mornings too. Then "Up at 4:42 AM —
- * this morning's 5:00 AM and 6:00 AM alarms are off" with Undo, for a few hours.
+ * and the morning, with or without a sleep session, on two-step mornings too. Then "Up at 4:42 AM ·
+ * this morning's alarms are off" with Undo and "Change the time", for a few hours.
  */
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -13,11 +13,11 @@ import type { Profile } from '@/engine/types';
 import { WAKE_FINAL_SKIP_MARK } from '@/notifications/fullScreenAlarm';
 import { EarlyUpUndo, earlyUpConfirmShows, earlyUpOffer, imUpEarly, setMorningWakeTime, undoEarlyUp, upEarlyAt, wakeTimeRange } from '@/state/earlyUp';
 import { Settings, useStore } from '@/state/store';
-import { Button, Card, Chip, Icon, Row, Stepper } from '@/ui/components';
+import { Button, Card, Chip, Divider, Row, Stepper } from '@/ui/components';
 import { confirmHaptic, selectionTick } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { font, night as nightColors, space } from '@/ui/theme';
 
-const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
+import { Caption, NIGHT_PANEL, NightButton } from './nightParts';
 
 /** Whether Today shows the early "I'm up" (or its confirmation) right now. */
 export function earlyUpShows(a: Analysis, settings: Settings, profile: Profile, now: number): boolean {
@@ -43,18 +43,20 @@ export function WakeTimeEditor({ initial, now, onDone }: { initial: number; now:
     confirmHaptic();
     onDone(setMorningWakeTime(t, now));
   };
+  const shortcuts = EARLIER.map((m) => ({ m, v: fit(initial - m * MINUTE) })).filter((x) => x.v < initial);
   return (
-    <View style={{ marginTop: space.sm }}>
+    <View>
       <Stepper label="Woke up at" sub="5-minute steps" value={formatTime(t)} onDec={() => move(t - 5 * MINUTE)} onInc={() => move(t + 5 * MINUTE)} />
-      <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
-        {EARLIER.map((m) => {
-          const v = fit(initial - m * MINUTE);
-          return v < initial ? <Chip key={m} label={m === 60 ? '1 h earlier' : `${m} min earlier`} selected={t === v} onPress={() => move(v)} /> : null;
-        })}
-      </Row>
-      <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap' }}>
-        <Button small icon="check" label="Save" onPress={save} />
-        <Button small kind="ghost" label="Cancel" onPress={() => onDone()} />
+      {shortcuts.length ? (
+        <Row gap={space.sm} style={{ flexWrap: 'wrap', marginTop: space.xs }}>
+          {shortcuts.map(({ m, v }) => (
+            <Chip key={m} label={m === 60 ? '1 h earlier' : `${m} min earlier`} selected={t === v} onPress={() => move(v)} />
+          ))}
+        </Row>
+      ) : null}
+      <Row gap={space.sm} style={{ marginTop: space.md }}>
+        <Button icon="check" label="Save" style={{ flex: 1 }} onPress={save} />
+        <Button kind="ghost" label="Cancel" onPress={() => onDone()} />
       </Row>
     </View>
   );
@@ -67,6 +69,8 @@ export function EarlyUpCard({ a, now, night }: { a: Analysis; now: number; night
   const [undo, setUndo] = useState<EarlyUpUndo>();
   const [editing, setEditing] = useState(false);
   const upAt = upEarlyAt(settings, now);
+  const panel = night ? NIGHT_PANEL : undefined;
+  const main = night ? { color: nightColors.text } : null;
 
   const planned = atMinutes(dateKey(now), wakeTargetFor(profile, dateKey(now)).wakeMin);
   if (earlyUpConfirmShows(upAt, now)) {
@@ -80,22 +84,19 @@ export function EarlyUpCard({ a, now, night }: { a: Analysis; now: number; night
       setBusy(false);
     };
     return (
-      <Card accent={colors.good}>
-        <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
-          <Icon name="weather-sunset-up" size={22} color={colors.energy} />
-          <View style={{ flex: 1 }}>
-            <Text style={font.h3}>Up at {formatTime(upAt)}</Text>
-            <Text style={[font.small, { marginTop: 2 }]}>
-              {alarmsOff ? "This morning's alarms are off. " : ''}Good morning — get some daylight soon.
-            </Text>
-          </View>
-        </Row>
+      <Card style={panel}>
+        <Text style={[font.h2, main]}>Up at {formatTime(upAt)}</Text>
+        <Text style={font.small}>{alarmsOff ? "This morning's alarms are off. " : ''}Get some daylight soon.</Text>
         {editing ? (
-          <WakeTimeEditor initial={upAt} now={Math.max(now, Date.now())} onDone={() => setEditing(false)} />
+          <>
+            <Divider spacing={space.sm} />
+            <WakeTimeEditor initial={upAt} now={Math.max(now, Date.now())} onDone={() => setEditing(false)} />
+          </>
         ) : (
-          <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap' }}>
-            <Button small kind="ghost" icon="clock-edit-outline" label="Woke up earlier? Change time" disabled={busy} onPress={() => setEditing(true)} />
-            <Button small kind="ghost" icon="undo" label={now < planned ? "Undo — I'm going back to sleep" : 'Undo'} disabled={busy} onPress={back} />
+          <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+            {/* Before the planned wake-up, Undo means going back to sleep: the alarms ring again. */}
+            <Button small kind="secondary" icon="undo" label={now < planned ? 'Undo, back to sleep' : 'Undo'} disabled={busy} onPress={back} />
+            <Button small kind="ghost" icon="clock-edit-outline" label="Woke earlier? Change the time" disabled={busy} onPress={() => setEditing(true)} />
           </Row>
         )}
       </Card>
@@ -105,9 +106,7 @@ export function EarlyUpCard({ a, now, night }: { a: Analysis; now: number; night
   const offer = earlyUpOffer(a, settings, profile, now);
   if (!offer) return null;
   const alarms = offer.routineAt !== undefined ? `${formatTime(offer.routineAt)} and ${formatTime(offer.wakeAt)} alarms` : `${formatTime(offer.wakeAt)} alarm`;
-  const what = offer.eepyAlarm
-    ? `Ends the night and turns off this morning's ${alarms}.`
-    : `Ends the night — remember to turn off your own ${formatTime(offer.wakeAt)} alarm.`;
+  const what = offer.eepyAlarm ? `Ends the night and turns off this morning's ${alarms}.` : `Ends the night. Remember to turn off your own ${formatTime(offer.wakeAt)} alarm.`;
   const up = async () => {
     setBusy(true);
     confirmHaptic();
@@ -115,20 +114,19 @@ export function EarlyUpCard({ a, now, night }: { a: Analysis; now: number; night
     setBusy(false);
   };
   return (
-    <Card style={night ? NIGHT_CARD : undefined} accent={night ? '#1F2647' : colors.energy}>
-      <Text style={font.label}>UP BEFORE YOUR ALARM?</Text>
-      <Text style={[font.small, { marginTop: 4 }]}>{what}</Text>
-      <View style={{ marginTop: space.md }}>
-        <Button big kind={night ? 'secondary' : 'primary'} icon="weather-sunny" label="I'm up" disabled={busy} onPress={up} />
-      </View>
+    <Card style={panel}>
+      <Caption>Up before your alarm?</Caption>
+      <Text style={[font.small, { marginTop: space.xs, marginBottom: space.md }]}>{what}</Text>
+      {night ? <NightButton icon="weather-sunny" label="I'm up" disabled={busy} onPress={up} /> : <Button big icon="weather-sunny" label="I'm up" disabled={busy} onPress={up} />}
     </Card>
   );
 }
 
 /**
- * On the morning check-in until last night syncs: "Up at 4:45 AM · Change" — or, with no "I'm up"
- * tapped, "Woke up before 6:00 AM? Set the time". Hidden while the "Up at …" card (with its own
- * Change) is on Today, and once the night has synced (the night's own corrections take over).
+ * On the morning check-in until last night syncs: "You were up at 4:45 AM · Change" — or, with no
+ * "I'm up" tapped, "Woke up before 6:00 AM? Set the time". Hidden while the "Up at …" card (with its
+ * own change) is on Today, and once the night has synced (the night's own corrections take over).
+ * A plain row: it sits inside the check-in panel.
  */
 export function MorningWakeRow({ a, now }: { a: Analysis; now: number }) {
   const settings = useStore((s) => s.settings);
@@ -143,17 +141,16 @@ export function MorningWakeRow({ a, now }: { a: Analysis; now: number }) {
   const planned = atMinutes(dateKey(now), wakeTargetFor(profile, dateKey(now)).wakeMin);
   if (known === undefined && now < planned) return null;
   return (
-    <View style={{ marginBottom: space.md }}>
-      <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
-        <Text style={[font.small, { color: colors.text, flex: 1, minWidth: 160 }]}>
-          {known !== undefined ? `You were up at ${formatTime(known)}.` : `Woke up before ${formatTime(planned)}?`}
-        </Text>
-        {editing ? null : (
-          <Button small kind="ghost" icon="clock-edit-outline" label={known !== undefined ? 'Change' : 'Set the time'} onPress={() => setEditing(true)} />
-        )}
-      </Row>
-      {editing ? <WakeTimeEditor initial={known ?? planned} now={now} onDone={() => setEditing(false)} /> : null}
+    <View>
+      {editing ? (
+        <WakeTimeEditor initial={known ?? planned} now={now} onDone={() => setEditing(false)} />
+      ) : (
+        <Row gap={space.sm}>
+          <Text style={[font.body, { flex: 1 }]}>{known !== undefined ? `You were up at ${formatTime(known)}.` : `Woke up before ${formatTime(planned)}?`}</Text>
+          <Button small kind="secondary" icon="clock-edit-outline" label={known !== undefined ? 'Change' : 'Set the time'} onPress={() => setEditing(true)} />
+        </Row>
+      )}
+      <Divider spacing={space.md} />
     </View>
   );
 }
-

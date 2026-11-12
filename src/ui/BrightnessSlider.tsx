@@ -7,10 +7,12 @@ import { useState } from 'react';
 import { GestureResponderEvent, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { colors, font, radius, space, touch } from '@/ui/theme';
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const MIN = 0.01;
+const THUMB = 24;
+const TRACK = 6;
 
 export function BrightnessSlider({
   value,
@@ -43,12 +45,11 @@ export function BrightnessSlider({
     onCommit(v);
   };
   const step = (d: number) => onCommit(Math.max(MIN, Math.round(clamp01(value + d) * 20) / 20));
-  const fill = over ? colors.warn : colors.light;
 
   return (
     <View style={[styles.row, disabled ? { opacity: 0.4 } : null]} pointerEvents={disabled ? 'none' : 'auto'}>
-      <Pressable onPress={() => step(-0.05)} hitSlop={8} accessibilityLabel="Dimmer" style={styles.btn}>
-        <Icon name="brightness-4" size={18} color={colors.textDim} />
+      <Pressable onPress={() => step(-0.05)} accessibilityRole="button" accessibilityLabel="Dimmer" style={({ pressed }) => [styles.btn, pressed ? styles.btnPressed : null]}>
+        <Icon name="brightness-4" />
       </Pressable>
       <View
         style={styles.hit}
@@ -70,13 +71,14 @@ export function BrightnessSlider({
         onAccessibilityAction={(e) => step(e.nativeEvent.actionName === 'increment' ? 0.05 : -0.05)}
       >
         <View style={[styles.track, styles.pass]}>
-          <View style={[styles.fill, { width: `${shown * 100}%`, backgroundColor: fill }]} />
+          {/* Past the target the fill turns to the warning colour. */}
+          <View style={[styles.fill, { width: `${shown * 100}%`, backgroundColor: over ? colors.warn : colors.textDim }]} />
         </View>
         {target !== undefined && target < 1 ? <View style={[styles.marker, styles.pass, { left: Math.max(0, target * width - 1) }]} /> : null}
-        <View style={[styles.thumb, styles.pass, { left: Math.min(Math.max(0, shown * width - 11), Math.max(0, width - 22)) }]} />
+        <View style={[styles.thumb, styles.pass, { left: Math.min(Math.max(0, shown * width - THUMB / 2), Math.max(0, width - THUMB)) }]} />
       </View>
-      <Pressable onPress={() => step(0.05)} hitSlop={8} accessibilityLabel="Brighter" style={styles.btn}>
-        <Icon name="brightness-7" size={18} color={colors.textDim} />
+      <Pressable onPress={() => step(0.05)} accessibilityRole="button" accessibilityLabel="Brighter" style={({ pressed }) => [styles.btn, pressed ? styles.btnPressed : null]}>
+        <Icon name="brightness-7" />
       </Pressable>
       <Text style={[font.small, styles.pct, over ? { color: colors.warn } : null]}>{Math.round(shown * 100)}%</Text>
     </View>
@@ -84,13 +86,14 @@ export function BrightnessSlider({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
-  btn: { padding: 4 },
-  hit: { flex: 1, height: 36, justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.xs },
+  btn: { width: touch.min, height: touch.min, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  btnPressed: { opacity: 0.6 },
+  hit: { flex: 1, height: touch.min, justifyContent: 'center' },
   pass: { pointerEvents: 'none' },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 4 },
-  marker: { position: 'absolute', top: 6, width: 2, height: 24, borderRadius: 1, backgroundColor: colors.text },
-  thumb: { position: 'absolute', top: 7, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.text, borderWidth: 3, borderColor: colors.bg },
-  pct: { width: 40, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  track: { height: TRACK, borderRadius: TRACK / 2, backgroundColor: colors.border, overflow: 'hidden' },
+  fill: { height: TRACK, borderRadius: TRACK / 2 },
+  marker: { position: 'absolute', top: (touch.min - 20) / 2, width: 2, height: 20, borderRadius: 1, backgroundColor: colors.text },
+  thumb: { position: 'absolute', top: (touch.min - THUMB) / 2, width: THUMB, height: THUMB, borderRadius: THUMB / 2, backgroundColor: colors.text },
+  pct: { width: 40, textAlign: 'right', color: colors.text, fontVariant: ['tabular-nums'] },
 });

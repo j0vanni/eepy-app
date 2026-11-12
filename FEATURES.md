@@ -541,6 +541,32 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 
 ---
 
+## 39. New in 0.13 — energy from your watch
+
+| | |
+| --- | --- |
+| ✅ | **Recovery signals move the day's energy**: last night's HRV (ln RMSSD), sleeping heart rate, breathing rate, deep-sleep minutes and time awake, each as "how far from your own last 30 nights" (at least 7 nights of baseline, capped at ±3 SD, a floor on the spread so a very steady baseline can't blow up a small change). `engine/watchSignals.ts` |
+| ✅ | **Daytime heart rate is kept**: every sync stores, per clock hour, the hour's low (25th-percentile) heart rate and its steps (`DailyStats.hours`). Each waking hour is compared with your usual for that clock hour; what steps explain is taken out with one fitted slope; the rest, in SDs, is the signal. Past the last reading it fades out over a couple of hours |
+| ✅ | **Body clock from the watch** (`engine/bodyClock.ts`): (1) a limit-cycle model of the human clock (Forger, Jewett & Kronauer 1999) run hour by hour on a light estimate — dark while asleep, room light while awake, brighter in daytime hours with a lot of steps; (2) the trough of the daily heart-rate wave after taking out steps. Neither is trusted as an absolute time: each day is compared with the median of the 28 days before it ("about 40 min later than usual"). One late night barely moves it, a week of them does, and the clocks changing shows up as a shift that fades over about a week |
+| ✅ | **Caffeine lifts the curve**: caffeine in the body (the existing pharmacokinetic model) with a saturating effect, mg / (mg + 150) |
+| ✅ | **Weights are yours** (`engine/calibration.ts`): the fit that already learned your body-clock timing from check-ins now also learns how much each signal counts, starting from modest population values. For a fixed phase the rest is a ridge regression solved in closed form, then refined. Four models are scored on held-out check-ins — sleep times only (population / personal) and with the watch (default weights / fitted) — and the one in effect is whichever predicted them best; a model that uses the watch only wins when it is at least as good. Recovery signals can count for nothing but never backwards |
+| ✅ | **Energy screen** (tap the number on Today, or More → Energy): the number now; **Why this number** — what sleep and the body clock give, then what sleep debt, last night's recovery, today's heart rate and caffeine add or take, in points, with the values behind them; peaks, dip, sleep pressure, the body-clock shift; **How well eepy knows you** — accuracy on unseen check-ins, with and without the watch; **What counts for you** — how much each signal has moved your energy; **What your watch sends** — nights with recovery signals, hours of daytime heart rate, days of body-clock tracking |
+| ✅ | **Reaction test** (`/reaction`, `engine/reaction.ts`): a one-minute psychomotor vigilance task — the panel lights up 12 times, tap as fast as you can. Result against your own earlier tests (speed, slowest taps, lapses, taps that came too soon), never against lab norms. With 8+ tests the Energy screen says whether your reaction speed rises and falls with the forecast |
+| ✅ | **One full sync after updating** re-reads the history so daytime heart rate and steps per hour exist for past days (automatic on the first foreground sync; also More → Watch and data → Re-read my whole history) |
+| ✅ | **Backups keep check-ins**: restoring a backup used to drop check-ins and workouts; it keeps them (and reaction tests) now. Backups and the nights CSV can be **saved into a folder** you pick, as well as shared |
+| ℹ️ | A watch can't measure alertness. These signals improve what goes into the forecast; your check-ins and the reaction test are what it is checked against |
+
+## 40. New in 0.13 — a new interface
+
+| | |
+| --- | --- |
+| ✅ | **Rebuilt from scratch** on one small kit (`src/ui/components.tsx`, tokens in `src/ui/theme.ts`, the brief in `docs/DESIGN.md`): near-black page, warm white type, one amber accent (the main action, "now", energy), blue for sleep, no borders or tinted icon circles, big numbers |
+| ✅ | **Four tabs**: Today · Sleep · Plan · More. Nap is one tap from Today and in More |
+| ✅ | **Today is about one thing**: last night in the morning (with the two morning questions), energy during the day (number, curve, "Why this number"), the countdown to lights-out in the evening, the in-bed view at night. Then four one-tap actions, **Up next** (the rest of today as a timeline) and a short list — energy, last night, sleep debt, nap, caffeine, recovery — that leads to the screen with the whole story |
+| ✅ | **Every screen follows the same order**: the one number or question first, the action, then details as rows; explanations fold away |
+| ✅ | **Check-in in two seconds**: the question, three big answers and the 1–9 scale; a tap saves, with Undo |
+| ✅ | **Settings** are short pages of one-row settings; **search** covers every feature and setting |
+
 ## Science behind it
 
 * Borbély (1982); Daan, Beersma & Borbély (1984) — two-process model of sleep regulation
@@ -555,6 +581,10 @@ For people who read on a Kindle, Kobo, Boox or similar. E-ink reflects light lik
 * Khalsa et al. (2003) — human phase-response curve to light; Eastman & Burgess (2009) — avoiding jet lag
 * Adan & Almirall (1991) — reduced MEQ; Johns (1991) — ESS; Morin (1993) — ISI; Chung et al. (2008) — STOP-Bang
 * Plews et al. (2013) — day-to-day HRV interpretation with ln RMSSD
+* Forger, Jewett & Kronauer (1999) — a simpler model of the human circadian pacemaker
+* Huang et al. (2021) — predicting circadian phase from wearable activity
+* Bowman et al. (2021) — daily heart-rate rhythm from wearables, adjusted for activity
+* Basner & Dinges (2011) — the psychomotor vigilance test and its most sensitive measures
 * Chang et al. (2015) — reading on a light-emitting tablet vs a printed book before bed; Haghayegh et al. (2019) — warm bath or shower 1–2 h before bed; Scullin et al. (2018) — writing a to-do list before bed
 
 eepy is a wellness tool, not a medical device. Wrist-based sleep staging is an estimate.

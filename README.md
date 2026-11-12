@@ -10,23 +10,33 @@ A sleep coach for Android that works with the **CMF Watch 3 Pro**. It answers th
 
 The full, detailed feature list (built ✅ / to verify on-device 🧪 / planned 🗺️) is in **[FEATURES.md](FEATURES.md)**. What's next is in **[PLAN.md](PLAN.md)**.
 
-| Today | Planner | Nap coach | Sleep | More | Night | Journal |
+| Today | Energy | Sleep | Plan | Nap | Night | More |
 | --- | --- | --- | --- | --- | --- | --- |
-| ![Today](docs/screenshots/today.png) | ![Planner](docs/screenshots/planner.png) | ![Nap](docs/screenshots/nap.png) | ![Sleep](docs/screenshots/sleep.png) | ![More](docs/screenshots/more.png) | ![Night](docs/screenshots/night.png) | ![Journal](docs/screenshots/journal.png) |
+| ![Today](docs/screenshots/today.png) | ![Energy](docs/screenshots/energy.png) | ![Sleep](docs/screenshots/sleep.png) | ![Plan](docs/screenshots/planner.png) | ![Nap](docs/screenshots/nap.png) | ![Night](docs/screenshots/night.png) | ![More](docs/screenshots/more.png) |
 
 *(Screenshots use the built-in demo data.)*
 
-## NEW — easier navigation and planner
+## NEW in 0.13 — energy from your watch, and a new interface
 
-Five tabs with plain names — **Today · Planner · Nap · Sleep · More**:
+**Energy uses the watch now.** Until 0.13 the energy number came from sleep times alone. It now also uses:
 
-- **Today** changes through the day (morning report → energy now → bedtime countdown → a dimmed "time to sleep" view), with big one-tap buttons at the top: *Log coffee*, *Check in*, *Nap* and *Adjust tonight* (*Wind down* in the evening).
-- **Planner** — the week ahead at a glance (tap a day to set a wake-up time, make it a free day with no alarm, or see why it's planned that way), **Tonight** in big type with *Can't make it? Adjust tonight*, **Your usual week** (workdays and wake-up times) and folded tools (bedtime calculator, move your schedule, caffeine, phone light). *Month view* opens the calendar.
-- **Nap** — should you nap, when, and for how long.
-- **Sleep** — your history: *Trends*, the month *Calendar* and every *Night*.
-- **More** — coach, body clock, self-checks, wind-down, programmes, journal, reports and settings, with a **"Find a feature or setting…"** search box (also at the top of Settings).
+- **last night's recovery signals** — HRV, sleeping heart rate, breathing rate, deep sleep and time awake, each against your own last 30 nights;
+- **your heart rate during the day**, against your usual for that hour and that much movement (it used to be read and thrown away);
+- **where your body clock is today** — a model of the clock driven by when you slept and moved, plus the daily rhythm in your heart rate;
+- **the caffeine you log.**
 
-Settings are split into short pages (You & schedule, Alarms & watch, Notifications & shortcuts, Wind-down & phone light, Caffeine & drinks, Health Connect & data, App updates, About). After updating, a one-time *What's new* sheet shows where things moved (also in More → What's new).
+How much each one counts is fitted to your own check-ins and tested on check-ins the fit hasn't seen; a signal that doesn't make the forecast more accurate for you is switched off. **Energy** (tap the number on Today) shows what each input adds right now, how accurate the forecast has been with and without the watch, and what your watch has delivered. A one-minute **reaction test** gives an objective reading to set beside your own ratings.
+
+After updating, open **More → Watch and data → Re-read my whole history** once, so eepy can read the daytime heart rate and steps it used to discard.
+
+**The interface was rebuilt from scratch** (`docs/DESIGN.md`): a near-black page, one amber accent, big numbers, four tabs —
+
+- **Today** shows one thing, depending on the time of day: last night in the morning, your energy during the day, the countdown to lights-out in the evening, the in-bed view at night. Under it: *Log coffee*, *Check in*, *Nap*, *Adjust tonight*, what's next, and a short list that leads to everything else.
+- **Sleep** — last night, your need and debt, every night, trends.
+- **Plan** — tonight, the options for tonight, the week ahead, your usual week, tools.
+- **More** — every tool and setting in one list, with search.
+
+Backups and the CSV can be saved straight into a folder (Android's folder picker) instead of only through the share sheet.
 
 ## Install the APK
 
@@ -66,6 +76,9 @@ src/
     sleepNeed.ts     age prior + debt-corrected natural nights + energy dose–response → personal need
     sleepDebt.ts     14-night weighted debt, payback simulation
     alertness.ts     three-process energy forecast; two-process sleep pressure for nap/bedtime effects
+    watchSignals.ts  what the watch adds to the forecast: recovery signals, daytime heart rate, caffeine
+    bodyClock.ts     body-clock shift from steps, sleep and the heart-rate rhythm
+    reaction.ts      reaction-time test (objective alertness)
     nap.ts           nap need score, timing, option simulation, verdict
     schedule.ts      tonight's plan, bedtime calculator, cycle-timed alarm, schedule shifting
     jetlag.ts        day-by-day light & sleep plan across time zones

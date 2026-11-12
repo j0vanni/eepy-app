@@ -1,10 +1,10 @@
 /**
- * Bedtime autopilot: the phone's own sleep mode ("eepy sleep", an Android mode) from lights-out or
- * the start of wind-down until the morning alarm. Scheduled natively, so it works while eepy is
- * closed (see notifications/sleepMode.ts and the native module's SleepMode.kt).
+ * Settings → Wind-down & phone light → Bedtime autopilot: the phone's own sleep mode ("eepy sleep",
+ * an Android mode) from lights-out or the start of wind-down until the morning alarm. Scheduled
+ * natively, so it works while eepy is closed (notifications/sleepMode.ts, the native SleepMode.kt).
  */
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { formatTime, HOUR } from '../../engine/time';
 import {
@@ -21,12 +21,13 @@ import {
 import { SleepModeSettings, useStore } from '../../state/store';
 import { useAnalysis, useNow } from '../../state/useAnalysis';
 import { useSleepModeStatus } from '../../state/useSleepMode';
-import { Button, Card, CardTitle, Icon, Note, Row, Section, Segmented } from '../components';
+import { Fold, ListCard, ListRow, Note, Section } from '../components';
 import { confirm, notify } from '../confirm';
 import { colors, font, space } from '../theme';
+import { Choice, ChoiceRow, Para } from './parts';
 import { Toggle } from './Toggle';
 
-const START_OPTIONS: { label: string; value: SleepModeSettings['startAt'] }[] = [
+const START_OPTIONS: Choice<SleepModeSettings['startAt']>[] = [
   { label: 'At lights-out', value: 'lightsout' },
   { label: 'At wind-down', value: 'winddown' },
 ];
@@ -74,6 +75,7 @@ export function SleepModeSection() {
   };
 
   const run = async (action: () => Promise<boolean>, failTitle: string) => {
+    if (busy) return;
     setBusy(true);
     const ok = await action();
     setBusy(false);
@@ -84,6 +86,13 @@ export function SleepModeSection() {
     }
   };
 
+  const customise = () => {
+    openSleepModeSettings()
+      .then((ok) => !ok && notify('Settings', 'Open Settings → Modes (or Do Not Disturb) to change what "eepy sleep" lets through.'))
+      .catch(() => undefined);
+  };
+
+  // What the mode does on this phone.
   let capability: string | undefined;
   if (!status) capability = undefined;
   else if (!status.supported) capability = `Needs Android 10 or newer (this phone runs Android ${androidVersion(status.sdk)}).`;
@@ -96,99 +105,65 @@ export function SleepModeSection() {
   let state: string | undefined;
   if (sleepMode.enabled && status?.supported) {
     if (status.active) state = live ? `On now · off at ${formatTime(live.offAt)}` : 'On now';
-    else if (stoppedTonight) state = 'Stopped for tonight — back tomorrow night';
-    else if (onAt !== undefined && offAt !== undefined) state = status.access ? 'Scheduled — switches by itself, even with eepy closed' : 'Waiting for access';
+    else if (stoppedTonight) state = 'Stopped for tonight. Back tomorrow night.';
+    else if (onAt !== undefined && offAt !== undefined) state = status.access ? 'Scheduled. Switches by itself, even with eepy closed.' : 'Waiting for access';
   }
 
-  return (
-    <Section title="Bedtime autopilot">
-      <Card>
-        <CardTitle icon="moon-waning-crescent" title="Sleep mode at bedtime" />
-        <Text style={font.small}>
-          Turns on "eepy sleep" — your phone's sleep mode — {sleepMode.startAt === 'winddown' ? 'when wind-down starts' : 'at lights-out'} and off when your alarm starts,
-          following tonight's plan (and "Adjust tonight"), even while eepy is closed. Alarms and sleep sounds always get through.
-        </Text>
-        {capability ? <Text style={[font.small, { marginTop: space.sm }]}>{capability}</Text> : null}
-        {Platform.OS !== 'android' ? <Note tone="info">Android only — use the eepy APK on your phone.</Note> : null}
-        {Platform.OS === 'android' && !available ? <Note tone="info">Needs the latest eepy APK.</Note> : null}
+  const on = sleepMode.enabled;
+  const ready = on && available && !!status?.supported;
+  const access = !!status?.access;
 
+  return (
+    <Section title="Sleep mode at bedtime">
+      {Platform.OS !== 'android' ? <Note tone="info">Android only. Use the eepy APK on your phone.</Note> : null}
+      {Platform.OS === 'android' && !available ? <Note tone="info">Needs the latest eepy APK.</Note> : null}
+      {on && status?.supported && !access ? (
+        <Note tone="warn" icon="shield-lock-outline">
+          eepy can't switch sleep mode yet: allow it once under Do Not Disturb (Modes) access.
+        </Note>
+      ) : null}
+      {on && status?.lastError && access ? <Note tone="warn">Last problem: {status.lastError}</Note> : null}
+      {on && status?.supported && access && !status.exactAlarms ? <Note tone="info">Exact alarms are off for eepy, so sleep mode may switch a few minutes late.</Note> : null}
+      <ListCard>
         <Toggle
           label="Bedtime autopilot"
-          sub={sleepMode.enabled ? 'On — eepy switches sleep mode by itself' : 'Off — your phone\'s sleep mode is left alone'}
-          value={sleepMode.enabled}
+          sub="Your phone's sleep mode switches on at bedtime and off at your alarm"
+          value={on}
           onChange={(v) => {
             toggle(v).catch(() => undefined);
           }}
         />
-
-        {sleepMode.enabled ? (
-          <>
-            <Text style={[font.body, { marginTop: space.sm, marginBottom: 6 }]}>Switch on</Text>
-            <Segmented options={START_OPTIONS} value={sleepMode.startAt} onChange={(startAt) => setSleepMode({ startAt })} />
-            <Toggle
-              label="Offer sleep sounds"
-              sub={`"Sleep mode on 🌙 — play sleep sounds?" (${sleepSoundsLabel(settings.audio)})`}
-              value={sleepMode.offerSounds}
-              onChange={(offerSounds) => setSleepMode({ offerSounds })}
-            />
-
-            {onAt !== undefined && offAt !== undefined ? (
-              <Row gap={space.sm} style={{ marginTop: space.sm }}>
-                <Icon name={status?.active ? 'moon-waning-crescent' : 'clock-outline'} size={18} color={status?.active ? colors.light : colors.textDim} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[font.body, { fontVariant: ['tabular-nums'] }]}>
-                    Tonight: on {formatTime(onAt)} · off {formatTime(offAt)}
-                    {window && !window.offAtAlarm ? ' (wake-up)' : ' (alarm)'}
-                  </Text>
-                  {state ? <Text style={font.tiny}>{state}</Text> : null}
-                </View>
-              </Row>
-            ) : analysis ? null : (
-              <Text style={[font.small, { marginTop: space.sm }]}>Tonight's times appear once eepy has your sleep data.</Text>
-            )}
-
-            {status?.supported && !status.access ? (
-              <Note tone="warn" icon="shield-lock-outline">
-                eepy can't switch sleep mode yet: allow it once under Do Not Disturb (Modes) access.
-              </Note>
-            ) : null}
-            {status?.supported && status.access && !status.exactAlarms ? (
-              <Note tone="info">Exact alarms are off for eepy, so sleep mode may switch a few minutes late.</Note>
-            ) : null}
-            {status?.lastError && status.access ? <Note tone="warn">Last problem: {status.lastError}</Note> : null}
-
-            {available && status?.supported ? (
-              <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
-                {!status.access ? <Button small icon="shield-check-outline" label="Allow access" onPress={() => askForAccess().catch(() => undefined)} /> : null}
-                {status.access && target && status.active ? (
-                  <Button small kind="secondary" icon="stop" label="Stop now" disabled={busy} onPress={() => run(() => stopSleepModeNow(target.night), 'Sleep mode')} />
-                ) : null}
-                {status.access && target && !status.active && canStart ? (
-                  <Button small icon="moon-waning-crescent" label="Start now" disabled={busy} onPress={() => run(() => startSleepModeNow(target.night, target.off), 'Sleep mode')} />
-                ) : null}
-                {status.access ? (
-                  <Button
-                    small
-                    kind="ghost"
-                    icon="tune-variant"
-                    label={status.deviceEffects ? 'Customise the mode' : 'Do Not Disturb settings'}
-                    onPress={() => {
-                      openSleepModeSettings()
-                        .then((ok) => !ok && notify('Settings', 'Open Settings → Modes (or Do Not Disturb) to change what "eepy sleep" lets through.'))
-                        .catch(() => undefined);
-                    }}
-                  />
-                ) : null}
-              </Row>
-            ) : null}
-            {status?.deviceEffects && status.access ? (
-              <Text style={[font.tiny, { marginTop: space.sm }]}>
-                "eepy sleep" is listed with your phone's modes{status.userManaged ? ' (Settings → Modes)' : ''}: choose there who may still call and which apps may notify you.
-              </Text>
-            ) : null}
-          </>
+        {on ? <ChoiceRow title="Switch on" value={sleepMode.startAt} options={START_OPTIONS} onChange={(startAt) => setSleepMode({ startAt })} /> : null}
+        {on ? (
+          <Toggle label="Offer sleep sounds" sub={`A notification asks to play ${sleepSoundsLabel(settings.audio)}`} value={sleepMode.offerSounds} onChange={(offerSounds) => setSleepMode({ offerSounds })} />
         ) : null}
-      </Card>
+        {on && onAt !== undefined && offAt !== undefined ? (
+          <ListRow
+            icon={status?.active ? 'moon-waning-crescent' : 'clock-outline'}
+            iconColor={status?.active ? colors.sleep : undefined}
+            title={`Tonight: on ${formatTime(onAt)} · off ${formatTime(offAt)}${window && !window.offAtAlarm ? ' (wake-up)' : ' (alarm)'}`}
+            sub={state}
+          />
+        ) : on && !analysis ? (
+          <ListRow icon="clock-outline" title="Tonight's times" sub="They appear once eepy has your sleep data" />
+        ) : null}
+        {ready && !access ? <ListRow icon="shield-check-outline" title="Allow access" onPress={() => askForAccess().catch(() => undefined)} /> : null}
+        {ready && access && target && status?.active ? <ListRow icon="stop" title="Stop now" onPress={() => run(() => stopSleepModeNow(target.night), 'Sleep mode')} /> : null}
+        {ready && access && target && !status?.active && canStart ? (
+          <ListRow icon="moon-waning-crescent" title="Start now" onPress={() => run(() => startSleepModeNow(target.night, target.off), 'Sleep mode')} />
+        ) : null}
+        {ready && access ? <ListRow icon="tune-variant" title={status?.deviceEffects ? 'Customise the mode' : 'Do Not Disturb settings'} onPress={customise} /> : null}
+        <Fold bare title="How it works">
+          <Para first>
+            "eepy sleep" turns on {sleepMode.startAt === 'winddown' ? 'when wind-down starts' : 'at lights-out'} and off when your alarm starts. It follows tonight's plan (and "Adjust tonight"), even while eepy
+            is closed. Alarms and sleep sounds always get through.
+          </Para>
+          {status?.deviceEffects && access ? (
+            <Para>"eepy sleep" is listed with your phone's modes{status.userManaged ? ' (Settings → Modes)' : ''}: choose there who may still call and which apps may notify you.</Para>
+          ) : null}
+        </Fold>
+      </ListCard>
+      {capability ? <Text style={[font.small, { paddingHorizontal: space.xs }]}>{capability}</Text> : null}
     </Section>
   );
 }

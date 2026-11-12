@@ -1,6 +1,6 @@
 /**
  * Today, around a two-step morning's routine (from an hour before the routine alarm until the final
- * alarm): before it, "Routine alarm at 5:00 — up at 6:00" with **Skip the routine — sleep until 6:00**;
+ * alarm): before it, "Routine alarm 5:00, up at 6:00" with **Skip the routine — sleep until 6:00**;
  * during it, "Back to bed by 5:20 — alarm at 6:05. Lights low, screens off." with **Skip it — back to
  * sleep** and "Staying up? Skip the 6:05 alarm" (each with Undo). Renders nothing outside that
  * window, so it can sit at the top of Today all the time. The routine alarm's "I'm up" opens Today
@@ -12,7 +12,7 @@
  * switches the phone's sleep mode off (on again on Undo), and ends a running sleep session ("I'm up";
  * Undo opens it again).
  */
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
@@ -24,15 +24,29 @@ import { endInBedSession, undoEndInBedSession } from '@/state/inBed';
 import { RoutineSkipUndo, skipRoutine, undoSkipRoutine } from '@/state/routineSkip';
 import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
-import { Button, Card, Icon, Row } from '@/ui/components';
+import { Button, Card } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { font, night, space } from '@/ui/theme';
+import { Caption, NIGHT_PANEL } from '@/ui/today/nightParts';
 
 /** The card shows from this long before the routine alarm, so you can skip the routine if you're awake early. */
 export const ROUTINE_CARD_LEAD_MIN = 60;
 
-/** Dim, like Today's night view: it's still dark and the point is to go back to sleep. */
-const DIM_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
+/**
+ * One dim panel (it's still dark and the point is to go back to sleep): what is happening, one
+ * line under it, and the one or two things you can do about it.
+ */
+function Panel({ label, title, sub, foot, children }: { label: string; title: ReactNode; sub: ReactNode; foot?: string; children: ReactNode }) {
+  return (
+    <Card style={NIGHT_PANEL}>
+      <Caption>{label}</Caption>
+      <Text style={[font.h2, { color: night.text, marginTop: space.xs }]}>{title}</Text>
+      <Text style={[font.small, { color: night.textDim, marginTop: space.xs }]}>{sub}</Text>
+      <View style={{ marginTop: space.md, gap: space.sm }}>{children}</View>
+      {foot ? <Text style={[font.tiny, { marginTop: space.sm }]}>{foot}</Text> : null}
+    </Card>
+  );
+}
 
 export function RoutineMorningNow({ a }: { a?: Analysis }) {
   const shared = useAnalysis();
@@ -50,6 +64,7 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
   if (!analysis || !r || (typeof upEarly === 'number' && dateKey(upEarly) === r.date)) return null;
 
   const final = formatTime(r.finalAt);
+  const routine = formatTime(r.routineAt);
   const watchFirst = r.finalPhoneAt !== r.finalAt;
   // The alarms (and the planner fallback) follow the new mark right away, not at the next re-plan.
   const replan = () => {
@@ -70,8 +85,6 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
     }
     setBusy(false);
   };
-
-  const routine = formatTime(r.routineAt);
   const skipTheRoutine = async () => {
     setBusy(true);
     confirmHaptic();
@@ -85,84 +98,52 @@ export function RoutineMorningNow({ a }: { a?: Analysis }) {
     setBusy(false);
   };
 
+  // Skipped the routine: one alarm left.
   if (r.routineSkipped && !r.skipped) {
     return (
-      <Card style={DIM_CARD}>
-        <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
-          <Icon name="sleep" size={20} color={colors.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={font.label}>ROUTINE SKIPPED</Text>
-            <Text style={[font.h2, { color: colors.textDim, marginTop: 2 }]}>Sleep until {final}.</Text>
-            <Text style={[font.small, { marginTop: 4 }]}>
-              {r.eepyAlarm ? `The ${routine} routine alarm is off; the ${final} alarm still rings.` : `Turn off your own ${routine} alarm — your ${final} one stays.`} An early
-              wake-up this morning counts as waking, not as your routine.
-            </Text>
-          </View>
-        </Row>
-        <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-          <Button small kind="ghost" icon="undo" label={now < r.routineAt ? `Undo — routine alarm at ${routine}` : 'Undo — I did my routine'} disabled={busy} onPress={undoRoutineSkip} />
-        </View>
-      </Card>
+      <Panel
+        label="Routine skipped"
+        title={<>Sleep until {final}.</>}
+        sub={r.eepyAlarm ? `The ${routine} routine alarm is off; the ${final} alarm still rings.` : `Turn off your own ${routine} alarm. Your ${final} one stays.`}
+      >
+        <Button kind="ghost" icon="undo" label={now < r.routineAt ? `Undo — routine alarm at ${routine}` : 'Undo — I did my routine'} disabled={busy} onPress={undoRoutineSkip} />
+      </Panel>
     );
   }
 
+  // Awake before the routine alarm.
   if (now < r.routineAt) {
     return (
-      <Card style={DIM_CARD} accent="#1F2647">
-        <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
-          <Icon name="face-woman-shimmer-outline" size={20} color={colors.light} />
-          <View style={{ flex: 1 }}>
-            <Text style={font.label}>MORNING ROUTINE</Text>
-            <Text style={[font.h2, { color: colors.textDim, marginTop: 2 }]}>
-              Routine alarm at {routine} — up at {final}.
-            </Text>
-            <Text style={[font.small, { marginTop: 4 }]}>Not doing it today? Skip it and sleep straight through to {final}.</Text>
-          </View>
-        </Row>
-        <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-          <Button small kind="secondary" icon="sleep" label={`Skip the routine — sleep until ${final}`} disabled={busy} onPress={skipTheRoutine} />
-        </View>
-      </Card>
+      <Panel label="Morning routine" title={`Routine alarm ${routine}, up at ${final}`} sub={`Not doing it today? Sleep straight through to ${final}.`}>
+        <Button kind="secondary" icon="sleep" label={`Skip the routine — sleep until ${final}`} disabled={busy} onPress={skipTheRoutine} />
+      </Panel>
     );
   }
 
+  // Staying up after the routine: the final alarm is off.
   if (r.skipped) {
     return (
-      <Card style={DIM_CARD}>
-        <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
-          <Icon name="weather-sunset-up" size={20} color={colors.energy} />
-          <View style={{ flex: 1 }}>
-            <Text style={font.h3}>Staying up — the {final} alarm is off</Text>
-            <Text style={[font.small, { marginTop: 2 }]}>Get some daylight soon. With no sleep after your routine, eepy counts it as your wake-up.</Text>
-          </View>
-        </Row>
-        <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-          <Button small kind="ghost" icon="undo" label={`Undo — alarm at ${final}`} disabled={busy} onPress={() => setSkipped(false)} />
-        </View>
-      </Card>
+      <Panel label="Morning routine" title={`Staying up — the ${final} alarm is off`} sub="Get some daylight soon. eepy counts this as your wake-up.">
+        <Button kind="ghost" icon="undo" label={`Undo — alarm at ${final}`} disabled={busy} onPress={() => setSkipped(false)} />
+      </Panel>
     );
   }
 
+  // During the routine.
   const backToBed = now < r.backToBedBy;
   return (
-    <Card style={DIM_CARD} accent="#1F2647">
-      <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
-        <Icon name="face-woman-shimmer-outline" size={20} color={colors.light} />
-        <View style={{ flex: 1 }}>
-          <Text style={font.label}>MORNING ROUTINE</Text>
-          <Text style={[font.h2, { color: colors.textDim, marginTop: 2 }]}>
-            {backToBed ? `Back to bed by ${formatTime(r.backToBedBy)}` : 'Back to bed'} — alarm at {final}.
-          </Text>
-          <Text style={[font.small, { marginTop: 4 }]}>
-            Lights low, screens off.{watchFirst ? ` Your watch buzzes at ${final}, the phone at ${formatTime(r.finalPhoneAt)}.` : ''}
-          </Text>
-        </View>
-      </Row>
-      <View style={{ marginTop: space.md, gap: space.sm, alignItems: 'flex-start' }}>
-        <Button small kind="secondary" icon="sleep" label={`Skip it — back to sleep until ${final}`} disabled={busy} onPress={skipTheRoutine} />
-        {r.eepyAlarm ? <Button small kind="ghost" icon="alarm-off" label={`Staying up? Skip the ${final} alarm`} disabled={busy} onPress={() => setSkipped(true)} /> : null}
-      </View>
-      {r.eepyAlarm ? null : <Text style={[font.tiny, { marginTop: space.sm }]}>From your two-step plan — your own alarm rings.</Text>}
-    </Card>
+    <Panel
+      label="Morning routine"
+      title={
+        <>
+          {backToBed ? `Back to bed by ${formatTime(r.backToBedBy)}` : 'Back to bed'} — alarm at {final}.
+        </>
+      }
+      sub={`Lights low, screens off.${watchFirst ? ` Your watch buzzes at ${final}, the phone at ${formatTime(r.finalPhoneAt)}.` : ''}`}
+      foot={r.eepyAlarm ? undefined : 'From your two-step plan. Your own alarm rings.'}
+    >
+      <Button kind="secondary" icon="sleep" label={`Skip it — back to sleep until ${final}`} disabled={busy} onPress={skipTheRoutine} />
+      {r.eepyAlarm ? <Button kind="ghost" icon="alarm-off" label={`Staying up? Skip the ${final} alarm`} disabled={busy} onPress={() => setSkipped(true)} /> : null}
+    </Panel>
   );
 }

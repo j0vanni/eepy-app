@@ -32,6 +32,7 @@ import { createRoot, Root, TestInstance } from 'test-renderer';
 import { useStore } from '../../state/store';
 import { useSignIn } from '../../updates/account';
 import { githubClientId } from '../../updates/current';
+import { downloadAndInstall, openInstallPermissionSettings } from '../../updates/install';
 import { parseReleases } from '../../updates/releases';
 import { useUpdateStatus } from '../../updates/status';
 import { GitHubAccount } from '../settings/GitHubAccount';
@@ -128,7 +129,14 @@ describe('UpdatesSection', () => {
     expect(text()).toContain('Build 15 is ready');
     expect(text()).toContain('Fix the nap alarm');
     expect(button('Update to build 15 (49.4 MB)')).toBeDefined();
-    expect(button('Allow installs from eepy')).toBeDefined();
+    // What Android asks the first time is folded away, with the way to allow it.
+    expect(button('Allow installs from eepy')).toBeUndefined();
+    await press('The first install on this phone');
+    expect(text()).toContain('Allow from this source');
+    await press('Allow installs from eepy');
+    expect(openInstallPermissionSettings).toHaveBeenCalled();
+    await press('Update to build 15 (49.4 MB)');
+    expect(downloadAndInstall).toHaveBeenCalledWith(latest);
     await act(async () => useUpdateStatus.setState({ download: { phase: 'downloading', build: 15, written: 23_000_000, total: 51_771_954 } }));
     expect(text()).toContain('Downloading… 44%');
     await act(async () => useUpdateStatus.setState({ download: { phase: 'installing', build: 15 } }));

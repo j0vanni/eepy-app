@@ -11,6 +11,12 @@ export function dayLabel(key: string, today = dateKey(Date.now())): string {
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+/** "Wed 11 Nov" — for a header that already says "Today". */
+export function fullDate(key: string): string {
+  const d = new Date(startOfDateKey(key) + 12 * 3600_000);
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 export function nightLabel(wakeDate: string, today = dateKey(Date.now())): string {
   if (wakeDate === today) return 'Last night';
   const d = new Date(startOfDateKey(addDays(wakeDate, -1)) + 12 * 3600_000);
@@ -46,6 +52,17 @@ export function countdown(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(s / 60);
   return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** Time left, for a live countdown: "2h 14m", "9m 05s", "now". */
+export function until(ms: number): string {
+  if (ms <= 0) return 'now';
+  if (ms < 10 * 60_000) {
+    const m = Math.floor(ms / 60_000);
+    const s = Math.floor((ms % 60_000) / 1000);
+    return m ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
+  }
+  return formatDuration(Math.floor(ms / 60_000));
 }
 
 export { formatDuration, formatTime };

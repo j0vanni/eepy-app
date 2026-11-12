@@ -1,6 +1,15 @@
+/**
+ * Quick check-in: "How alert are you right now?" answered with one tap — the rating eepy's energy
+ * forecast is fitted to. Saving is the tap itself (Undo takes it back). Under it, the other things
+ * worth logging in passing: a coffee, the day's energy, a nap, tags — each a row that opens in
+ * place — and the reaction test, the journal and Log sleep.
+ *
+ * Param `up`: opened by the wake alarm's "I'm up" (alarm = the full-screen alarm, watch = the
+ * watch buzz), which also ends the night's sleep session.
+ */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { caffeineAt } from '@/engine/caffeine';
@@ -8,30 +17,19 @@ import { drinkOptions, frequentDrinks, relativeTimeOptions, usualCaffeine, usual
 import { TAG_BY_ID } from '@/engine/tags';
 import { addDays, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import { endInBedSession } from '@/state/inBed';
+import { napsOn } from '@/state/napLog';
 import { useStore } from '@/state/store';
-import { NapLogCard } from '@/ui/NapLog';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
-import { Button, Chip, Icon, Row, Screen, Section } from '@/ui/components';
+import { Button, Chip, Fold, Hero, Icon, Link, ListCard, ListRow, Row, Screen, Section } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
+import { AlertnessPicker, ChoiceTile } from '@/ui/learning/QuickCheckIn';
 import { EnterView } from '@/ui/motion';
-import { colors, font, radius, space } from '@/ui/theme';
+import { NapLogCard } from '@/ui/NapLog';
+import { colors, font, radius, space, touch } from '@/ui/theme';
 
-/** Karolinska Sleepiness Scale. */
-const KSS = [
-  'Extremely alert',
-  'Very alert',
-  'Alert',
-  'Rather alert',
-  'Neither alert nor sleepy',
-  'Some signs of sleepiness',
-  'Sleepy, easy to stay awake',
-  'Sleepy, effort to stay awake',
-  'Fighting sleep',
-];
-const KSS_COLOR = ['#5FD3A5', '#5FD3A5', '#7FD0B8', '#6CC6FF', '#9B8CFF', '#B48CF0', '#FFB86B', '#FF9E7A', '#FF7A90'];
 const ENERGY = ['Exhausted', 'Tired', 'OK', 'Good', 'Energised'];
 const QUICK_TAGS = ['alcohol', 'late-meal', 'exercise', 'stress', 'nap', 'outdoor-light', 'screens', 'late-caffeine'];
-/** The "Saved" toast fades after this; the sheet itself stays open until you tap Done. */
+/** The "Saved" message fades after this; the screen itself stays open until you tap Done. */
 const TOAST_MS = 4000;
 
 const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '').replace('Espresso shot', 'Espresso');
@@ -39,13 +37,12 @@ const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '').replace('Es
 interface Toast {
   text: string;
   undo?: () => void;
-  /** e.g. "Change time" for a drink just logged. */
+  /** e.g. "Change" for a drink just logged. */
   edit?: { label: string; run: () => void };
   n: number;
 }
 
-export default function CheckInSheet() {
-  // `up`: opened by the wake alarm's "I'm up" (alarm = the full-screen alarm, watch = the watch buzz).
+export default function CheckInScreen() {
   const { up } = useLocalSearchParams<{ up?: string }>();
   const analysis = useAnalysis();
   const now = useNow(5000);
@@ -54,6 +51,7 @@ export default function CheckInSheet() {
   const log = useStore((s) => s.dayLogs[day]);
   const checkins = useStore((s) => s.checkins);
   const doses = useStore((s) => s.caffeine);
+  const sessions = useStore((s) => s.sessions);
   const halfLife = useStore((s) => s.profile.caffeineHalfLifeH);
   const customDrinks = useStore((s) => s.settings.customDrinks);
   const addCheckIn = useStore((s) => s.addCheckIn);
@@ -64,6 +62,7 @@ export default function CheckInSheet() {
   const toggleTag = useStore((s) => s.toggleTag);
   const insets = useSafeAreaInsets();
 
+  /** The rating given on this visit: tapping another answer replaces it instead of adding one. */
   const [kssId, setKssId] = useState<string>();
   const [toast, setToast] = useState<Toast>();
   const [moreDrinks, setMoreDrinks] = useState(false);
@@ -78,7 +77,7 @@ export default function CheckInSheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [up]);
 
-  // Log several things in one go: only the toast goes away, the sheet stays until Done.
+  // Log several things in one go: only the message goes away, the screen stays until Done.
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(undefined), TOAST_MS);
@@ -92,22 +91,26 @@ export default function CheckInSheet() {
 
   const recent = checkins.filter((c) => c.time <= now && now - c.time < 3 * HOUR);
   const lastKss = kssId ? checkins.find((c) => c.id === kssId) : recent[recent.length - 1];
-  const caffeineNow = caffeineAt(doses.filter((d) => d.time > now - 36 * HOUR && d.time <= now), now, halfLife);
+  const caffeineNow = caffeineAt(
+    doses.filter((d) => d.time > now - 36 * HOUR && d.time <= now),
+    now,
+    halfLife,
+  );
 
   const pickKss = (kss: number) => {
-    // Changing your mind in the same sheet replaces the rating instead of adding another.
     const id = kssId ?? `ci-${Date.now()}`;
     setKssId(id);
     addCheckIn({ id, time: Date.now(), kss, source: 'manual' });
-    logged(`Sleepiness ${kss} logged`, () => {
-      removeCheckIn(id);
-      setKssId(undefined);
-    });
+    confirmHaptic();
+  };
+  const undoKss = () => {
+    if (kssId) removeCheckIn(kssId);
+    setKssId(undefined);
   };
   const pickEnergy = (energy: number) => {
     const prev = log?.energy;
     logDay(day, { energy });
-    logged(`Energy ${energy} (${ENERGY[energy - 1].toLowerCase()}) logged`, () => logDay(day, { energy: prev }));
+    logged(`Energy today: ${ENERGY[energy - 1].toLowerCase()}`, () => logDay(day, { energy: prev }));
   };
   const editDrink = (id: string) => ({ label: 'Change', run: () => router.replace({ pathname: '/caffeine', params: { id } }) });
   const drink = (label: string, mg: number) => {
@@ -130,145 +133,110 @@ export default function CheckInSheet() {
     toggleTag(day, id);
     logged(`${TAG_BY_ID[id].label} ${on ? 'added' : 'removed'}`, () => toggleTag(day, id));
   };
-  const go = (path: '/journal' | '/log-sleep') => router.replace(path);
 
-  // What you drink most comes first; "More…" shows everything, your own drinks included.
+  // What you drink most comes first; "More" shows everything, your own drinks included.
   const options = drinkOptions(customDrinks);
   const drinks = moreDrinks ? options : frequentDrinks(doses, now, options);
+  const napCount = napsOn(sessions, dateKey(now)).length;
+  const tagCount = QUICK_TAGS.filter((id) => log?.tags.includes(id)).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Screen>
-        <Section title="How sleepy are you right now?">
-          <View style={styles.grid}>
-            {KSS.map((label, i) => {
-              const v = i + 1;
-              const selected = lastKss?.kss === v;
-              const c = KSS_COLOR[i];
-              return (
-                <Pressable
-                  key={v}
-                  onPress={() => pickKss(v)}
-                  style={({ pressed }) => [styles.kss, { borderColor: selected ? c : colors.border, backgroundColor: selected ? c : pressed ? colors.surfaceAlt : colors.surface }]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`${v}: ${label}`}
-                >
-                  <Text style={[styles.kssNum, { color: selected ? '#140F33' : c }]}>{v}</Text>
-                  <Text style={[styles.kssLabel, { color: selected ? '#140F33' : colors.textDim }]} numberOfLines={2}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={[font.tiny, { marginTop: 6 }]}>
-            {lastKss && !kssId ? `Last rating ${lastKss.kss} at ${formatTime(lastKss.time)}. ` : ''}Each rating teaches eepy your body clock and counts for nap advice for 3 hours.
-          </Text>
-        </Section>
-
-        <Section title="Energy today">
-          <Row gap={space.sm}>
-            {ENERGY.map((label, i) => {
-              const v = i + 1;
-              const selected = log?.energy === v;
-              return (
-                <Pressable
-                  key={v}
-                  onPress={() => pickEnergy(v)}
-                  style={({ pressed }) => [styles.energy, selected ? { backgroundColor: colors.energy, borderColor: colors.energy } : pressed ? { backgroundColor: colors.surfaceAlt } : null]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Energy ${v}: ${label}`}
-                >
-                  <Text style={[font.h2, { color: selected ? '#140F33' : colors.text }]}>{v}</Text>
-                  <Text style={[font.tiny, { color: selected ? '#140F33' : colors.textDim }]} numberOfLines={1}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        <Hero
+          value="How alert are you right now?"
+          caption={
+            lastKss && !kssId
+              ? `Your last answer was ${lastKss.kss} of 9, at ${formatTime(lastKss.time)}. One tap saves a new one.`
+              : 'One tap saves it. Your energy forecast is fitted to these answers.'
+          }
+        />
+        <AlertnessPicker value={lastKss?.kss} onPick={pickKss} />
+        {kssId ? (
+          <Row gap={space.sm} style={styles.saved}>
+            <Icon name="check-circle" color={colors.good} />
+            <Text style={[font.small, { flex: 1, color: colors.text }]}>Saved. Tap another answer to change it.</Text>
+            <Link label="Undo" onPress={undoKss} />
           </Row>
-        </Section>
+        ) : null}
 
-        <Section title="Coffee & caffeine" action={<Text style={font.small}>{caffeineNow >= 1 ? `${Math.round(caffeineNow)} mg active` : ''}</Text>}>
-          {usual && !hadToday && minutesOfDay(now) >= usual.timeMin ? (
-            <Pressable onPress={logUsual} style={({ pressed }) => [styles.usual, pressed ? { opacity: 0.7 } : null]} accessibilityRole="button">
-              <Icon name="coffee" size={20} color={colors.caffeine} />
-              <View style={{ flex: 1 }}>
-                <Text style={[font.body, { fontWeight: '600' }]}>Had your usual?</Text>
-                <Text style={font.small}>
-                  {shortDrink(usual.label)} · {usual.mg} mg at {formatClock(usual.timeMin)} — tap to log it at that time
-                </Text>
+        <Section title="Also log">
+          <ListCard>
+            {usual && !hadToday && minutesOfDay(now) >= usual.timeMin ? (
+              <ListRow
+                icon="coffee"
+                iconColor={colors.caffeine}
+                title="Had your usual?"
+                sub={`${shortDrink(usual.label)} · ${usual.mg} mg at ${formatClock(usual.timeMin)}`}
+                onPress={logUsual}
+                right={<Text style={styles.rowAction}>Log it</Text>}
+              />
+            ) : null}
+            <Fold bare icon="coffee-outline" title="Coffee" sub="Tap a drink to log it" value={caffeineNow >= 1 ? `${Math.round(caffeineNow)} mg active` : undefined}>
+              <View style={styles.wrap}>
+                {relativeTimeOptions(now).map((o) => {
+                  const min = Math.round((now - o.time) / MINUTE);
+                  return <Chip key={o.label} label={o.label} selected={agoMin === min} onPress={() => setAgoMin(min)} />;
+                })}
               </View>
-            </Pressable>
-          ) : null}
-          <Text style={[font.tiny, { marginBottom: 6 }]}>When?</Text>
-          <View style={[styles.wrap, { marginBottom: space.sm }]}>
-            {relativeTimeOptions(now).map((o) => {
-              const min = Math.round((now - o.time) / MINUTE);
-              return <Chip key={o.label} label={o.label} selected={agoMin === min} onPress={() => setAgoMin(min)} />;
-            })}
-          </View>
-          <View style={styles.wrap}>
-            {drinks.map((p) => (
-              <Chip key={p.label} icon="coffee-outline" label={`${shortDrink(p.label)} · ${p.mg}`} color={colors.caffeine} onPress={() => drink(p.label, p.mg)} />
-            ))}
-            <Chip label={moreDrinks ? 'Fewer' : 'More…'} onPress={() => setMoreDrinks(!moreDrinks)} />
-          </View>
+              <View style={[styles.wrap, { marginTop: space.md }]}>
+                {drinks.map((p) => (
+                  <Chip key={p.label} icon="coffee-outline" label={`${shortDrink(p.label)} · ${p.mg}`} color={colors.caffeine} onPress={() => drink(p.label, p.mg)} />
+                ))}
+                <Chip label={moreDrinks ? 'Fewer' : 'More'} onPress={() => setMoreDrinks(!moreDrinks)} />
+              </View>
+            </Fold>
+            <Fold bare icon="lightning-bolt-outline" title="Energy today" sub="The day as a whole, 1 to 5" value={log?.energy ? ENERGY[log.energy - 1] : undefined}>
+              <View style={{ flexDirection: 'row', gap: space.xs }}>
+                {ENERGY.map((label, i) => (
+                  <ChoiceTile key={label} small onPanel top={String(i + 1)} label={label} selected={log?.energy === i + 1} onPress={() => pickEnergy(i + 1)} hint={`Energy ${i + 1}: ${label}`} />
+                ))}
+              </View>
+            </Fold>
+            <Fold bare icon="sleep" title="A nap you took" sub="The watch can miss short ones" value={napCount ? `${napCount} today` : undefined}>
+              <NapLogCard bare />
+            </Fold>
+            <Fold bare icon="tag-outline" title="Tags for today" sub="Things that may affect tonight" value={tagCount ? `${tagCount} on` : undefined}>
+              <View style={styles.wrap}>
+                {QUICK_TAGS.map((id) => (
+                  <Chip key={id} icon={TAG_BY_ID[id].icon} label={TAG_BY_ID[id].label} selected={log?.tags.includes(id)} onPress={() => tag(id)} />
+                ))}
+              </View>
+            </Fold>
+          </ListCard>
         </Section>
 
-        <Section title="Naps today">
-          <NapLogCard bare />
+        <Section title="More">
+          <ListCard>
+            <ListRow icon="gesture-tap" title="Reaction test" sub="One minute, objective" onPress={() => router.replace('/reaction')} />
+            <ListRow icon="notebook-edit-outline" title="Journal" sub="Notes and every tag for the day" onPress={() => router.replace('/journal')} />
+            <ListRow icon="bed-clock" title="Log sleep" sub="A night or nap the watch missed" onPress={() => router.replace('/log-sleep')} />
+          </ListCard>
         </Section>
 
-        <Section title="Tag today">
-          <View style={styles.wrap}>
-            {QUICK_TAGS.map((id) => (
-              <Chip key={id} icon={TAG_BY_ID[id].icon} label={TAG_BY_ID[id].label} selected={log?.tags.includes(id)} onPress={() => tag(id)} />
-            ))}
-          </View>
-        </Section>
-
-        <Row gap={space.sm} style={{ marginTop: space.xl }}>
-          <View style={{ flex: 1 }}>
-            <Button kind="secondary" icon="notebook-edit-outline" label="Journal" onPress={() => go('/journal')} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button kind="secondary" icon="bed-clock" label="Log sleep" onPress={() => go('/log-sleep')} />
-          </View>
-        </Row>
-        <View style={{ marginTop: space.sm }}>
-          <Button kind="ghost" label="Done" onPress={close} />
-        </View>
-        <View style={{ height: 72 }} />
+        <Button kind="ghost" label="Done" onPress={close} />
+        {/* Room for the "Saved" message, which floats over the end of the page. */}
+        <View style={{ height: space.xxl * 2 }} />
       </Screen>
 
       {toast ? (
-        <EnterView key={toast.n} style={[styles.toast, { bottom: insets.bottom + 16 }]}>
-          <Icon name="check-circle" size={20} color={colors.good} />
+        <EnterView key={toast.n} style={[styles.toast, { bottom: insets.bottom + space.lg }]}>
+          <Icon name="check-circle" color={colors.good} />
           <View style={{ flex: 1 }}>
             <Text style={[font.body, { fontWeight: '600' }]} numberOfLines={toast.edit ? 2 : 1}>
               {toast.text}
             </Text>
             <Text style={font.tiny}>Saved · log more or tap Done</Text>
           </View>
-          {toast.edit ? (
-            <Pressable onPress={toast.edit.run} hitSlop={8} accessibilityRole="button">
-              <Text style={[font.small, { color: colors.accent, fontWeight: '700' }]}>{toast.edit.label}</Text>
-            </Pressable>
-          ) : null}
+          {toast.edit ? <Link label={toast.edit.label} onPress={toast.edit.run} /> : null}
           {toast.undo ? (
-            <Pressable
+            <Link
+              label="Undo"
               onPress={() => {
                 toast.undo?.();
                 setToast(undefined);
               }}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={[font.small, { color: colors.accent, fontWeight: '700' }]}>Undo</Text>
-            </Pressable>
+            />
           ) : null}
         </EnterView>
       ) : null}
@@ -277,40 +245,9 @@ export default function CheckInSheet() {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  kss: {
-    flexBasis: '31%',
-    flexGrow: 1,
-    minHeight: 76,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    justifyContent: 'space-between',
-  },
-  kssNum: { fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  kssLabel: { fontSize: 11, lineHeight: 14, fontWeight: '600' },
-  energy: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
+  saved: { minHeight: touch.min, marginTop: space.xs, paddingHorizontal: space.xs },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  usual: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.md,
-    marginBottom: space.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.caffeine,
-    backgroundColor: colors.surface,
-  },
+  rowAction: { color: colors.accent, fontWeight: '700', fontSize: font.small.fontSize },
   toast: {
     position: 'absolute',
     left: space.lg,
@@ -319,15 +256,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
     backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
     borderRadius: radius.lg,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     elevation: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
   },
 });

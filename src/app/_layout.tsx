@@ -103,7 +103,9 @@ export default function RootLayout() {
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700' },
           headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: colors.bg },
         }}
       >
@@ -128,7 +130,10 @@ export default function RootLayout() {
         <Stack.Screen name="tonight" options={{ title: 'Adjust tonight', presentation: 'modal' }} />
         <Stack.Screen name="calendar" options={{ title: 'Month view' }} />
         <Stack.Screen name="simulate" options={{ title: 'What if?' }} />
-        <Stack.Screen name="learning" options={{ title: 'Your body clock' }} />
+        <Stack.Screen name="learning" options={{ headerShown: false }} />
+        <Stack.Screen name="energy" options={{ title: 'Energy' }} />
+        <Stack.Screen name="reaction" options={{ title: 'Reaction test' }} />
+        <Stack.Screen name="nap" options={{ title: 'Nap' }} />
         <Stack.Screen name="experiments/index" options={{ title: 'Experiments' }} />
         <Stack.Screen name="experiments/[id]" options={{ title: 'Experiment' }} />
         <Stack.Screen name="goals" options={{ title: 'Goals' }} />

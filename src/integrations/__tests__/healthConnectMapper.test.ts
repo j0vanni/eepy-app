@@ -4,6 +4,7 @@ import { generateDemoData } from '../../engine/demo';
 import {
   buildDailyStats,
   flattenHeartRate,
+  hourlyBins,
   instantSamples,
   mapSleepRecord,
   mapSpo2Samples,
@@ -14,7 +15,7 @@ import {
   toHealthConnectSleep,
 } from '../healthConnectMapper';
 
-jest.mock('expo-file-system', () => ({ File: class {}, Paths: {} }));
+jest.mock('expo-file-system', () => ({ File: class {}, Directory: class {}, Paths: {} }));
 jest.mock('expo-sharing', () => ({}));
 jest.mock('expo-document-picker', () => ({}));
 
@@ -150,5 +151,48 @@ describe('backup', () => {
     expect(restored.sessions).toHaveLength(data.sessions.length);
     expect(() => parseBackup('{"hello":1}')).toThrow(/not an eepy backup/);
     expect(() => parseBackup('nope')).toThrow(/not valid JSON/);
+  });
+});
+
+describe('hourly heart rate and steps', () => {
+  const at = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).getTime();
+  const iso = (t: number) => new Date(t).toISOString();
+
+  it('keeps a low heart rate and the steps of every clock hour, for days the window covers from their start', () => {
+    const hr = [
+      // 14:00 on the 21st: mostly ~70 with a burst of activity.
+      ...[68, 70, 72, 110, 120].map((value, i) => ({ time: at(21, 14, i * 10), value })),
+      // One reading only: not enough for the hour.
+      { time: at(21, 16, 5), value: 80 },
+      // The 20th is cut off at the front of the window.
+      { time: at(20, 20), value: 60 },
+      { time: at(20, 20, 30), value: 62 },
+    ];
+    const steps = [
+      { startTime: iso(at(21, 14, 30)), endTime: iso(at(21, 15, 30)), count: 600 },
+      { startTime: iso(at(21, 9)), endTime: iso(at(21, 9, 10)), count: 250 },
+    ];
+    const out = hourlyBins(hr, steps, at(20, 12), at(21, 18));
+    expect(Object.keys(out)).toEqual(['2026-10-21']);
+    const day = out['2026-10-21'];
+    expect(day.hr).toHaveLength(24);
+    expect(day.hr[14]).toBe(70); // 25th percentile: the burst doesn't count
+    expect(day.hr[16]).toBeNull();
+    expect(day.steps[9]).toBe(250);
+    expect(day.steps[14]).toBe(300);
+    expect(day.steps[15]).toBe(300);
+  });
+
+  it('attaches the hours to the daily stats and survives a backup round trip with check-ins', () => {
+    const hours = hourlyBins([{ time: at(21, 10), value: 61 }, { time: at(21, 10, 20), value: 63 }], [], at(21, 0), at(21, 12));
+    const daily = buildDailyStats({ '2026-10-21': 4000 }, [], [], hours);
+    expect(daily['2026-10-21'].hours!.hr[10]).toBe(62);
+    const demo = generateDemoData(new Date(2026, 10, 11, 15).getTime());
+    demo.reactions = [{ id: 'r1', time: 1, rts: [300, 310, 320, 305, 298], falseStarts: 0, misses: 0 }];
+    const back = parseBackup(serializeBackup(demo));
+    expect(back.checkins).toHaveLength(demo.checkins!.length);
+    expect(back.workouts).toHaveLength(demo.workouts!.length);
+    expect(back.reactions).toEqual(demo.reactions);
+    expect(Object.values(back.daily).some((d) => d.hours?.hr.length === 24)).toBe(true);
   });
 });

@@ -2,8 +2,9 @@
  * Pure mapping from Health Connect records (as returned by react-native-health-connect) to eepy's
  * model. Kept free of native imports so it can be unit tested.
  */
-import type { DailyStats, SleepSession, Stage, StageSegment, VitalSample, Workout } from '../engine/types';
-import { dateKey, MINUTE } from '../engine/time';
+import type { DailyStats, DayHours, SleepSession, Stage, StageSegment, VitalSample, Workout } from '../engine/types';
+import { quantile } from '../engine/stats';
+import { dateKey, HOUR, MINUTE, startOfDateKey } from '../engine/time';
 
 /** Health Connect SleepSessionRecord.STAGE_TYPE_* constants. */
 export const HC_STAGE: Record<number, Stage> = {
@@ -190,11 +191,58 @@ export function stepCurve(records: HCStepsRecord[], start: number, end: number, 
     .filter(([, v]) => v > 0);
 }
 
-/** Folds steps / resting HR / HRV samples into per-day stats. */
+/**
+ * Heart rate and steps per clock hour for every local day that the window [from, to] covers from its
+ * start (a day cut off at the front would overwrite a complete one stored earlier; today is kept, so
+ * far). Heart rate is the hour's 25th percentile — close to resting, whatever else happened in the
+ * hour. Step records are spread over the hours they cover.
+ */
+export function hourlyBins(hr: VitalSample[], stepRecords: HCStepsRecord[], from: number, to: number): Record<string, DayHours> {
+  const hrByHour = new Map<number, number[]>();
+  for (const s of hr) {
+    if (s.time < from || s.time > to || !(s.value > 20 && s.value < 250)) continue;
+    const key = Math.floor(s.time / HOUR);
+    let list = hrByHour.get(key);
+    if (!list) hrByHour.set(key, (list = []));
+    list.push(s.value);
+  }
+  const stepsByHour = new Map<number, number>();
+  for (const r of stepRecords) {
+    const a = ms(r.startTime);
+    const b = Math.max(a + 1, ms(r.endTime));
+    if (b <= from || a >= to || !(r.count > 0)) continue;
+    for (let h = Math.floor(a / HOUR); h * HOUR < b; h++) {
+      const o = Math.min(b, (h + 1) * HOUR) - Math.max(a, h * HOUR);
+      if (o > 0) stepsByHour.set(h, (stepsByHour.get(h) ?? 0) + (r.count * o) / (b - a));
+    }
+  }
+  const out: Record<string, DayHours> = {};
+  let date = dateKey(from);
+  if (startOfDateKey(date) < from) date = dateKey(startOfDateKey(date) + 36 * HOUR);
+  for (; startOfDateKey(date) <= to; date = dateKey(startOfDateKey(date) + 36 * HOUR)) {
+    const day: DayHours = { hr: [], steps: [] };
+    const [y, m, d] = date.split('-').map(Number);
+    let any = false;
+    for (let h = 0; h < 24; h++) {
+      // Hours are epoch-aligned (every zone eepy runs in has whole- or half-hour offsets; the half-hour
+      // ones just bin on the half hour).
+      const key = Math.floor(new Date(y, m - 1, d, h).getTime() / HOUR);
+      const values = hrByHour.get(key);
+      day.hr.push(values && values.length >= 2 ? Math.round(quantile(values, 0.25)) : null);
+      day.steps.push(Math.round(stepsByHour.get(key) ?? 0));
+      if (values?.length || stepsByHour.has(key)) any = true;
+    }
+    if (any) out[date] = day;
+  }
+  return out;
+}
+
+/** Folds steps / resting HR / HRV samples (and the hourly bins) into per-day stats. */
 export function buildDailyStats(
   steps: Record<string, number>,
   restingHr: VitalSample[],
   hrv: VitalSample[],
+  hours: Record<string, DayHours> = {},
 ): Record<string, DailyStats> {
   const out: Record<string, DailyStats> = {};
   const get = (date: string) => (out[date] ??= { date });
@@ -206,6 +254,7 @@ export function buildDailyStats(
   };
   for (const [date, vals] of Object.entries(group(restingHr))) get(date).restingHr = Math.round(Math.min(...vals));
   for (const [date, vals] of Object.entries(group(hrv))) get(date).hrv = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  for (const [date, h] of Object.entries(hours)) get(date).hours = h;
   return out;
 }
 

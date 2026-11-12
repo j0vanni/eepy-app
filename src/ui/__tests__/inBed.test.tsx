@@ -1,6 +1,6 @@
 /**
  * Render tests for the sleep session's buttons and states: "I'm in bed" from wind-down (Today's quick
- * actions and the night view), the confirmation with Undo, "In bed since … · End session / Cancel",
+ * actions and the night view), the confirmation with Undo, "In bed since …" with I'm up / Cancel,
  * the morning's "I'm up" with Undo, and "Save last night from your taps".
  */
 // Icons load their font asynchronously, which Jest's asset registry can't serve.
@@ -29,7 +29,8 @@ import { atMinutes, MINUTE } from '../../engine/time';
 import { analyzeOptionsFor } from '../../state/analysisOptions';
 import { startInBedSession } from '../../state/inBed';
 import { selectDataset, useStore } from '../../state/store';
-import { InBedButton, TapsNightCard, UpCard } from '../today/InBed';
+import { colors } from '../theme';
+import { InBedButton, SessionHeader, TapsNightCard, UpCard } from '../today/InBed';
 import { NightView } from '../today/heroes';
 import { QuickActions } from '../today/QuickActions';
 
@@ -119,7 +120,7 @@ describe("I'm in bed", () => {
     expect(soundPlayer.getState().status).toBe('idle');
   });
 
-  it('night view: the button, then the confirmation with Undo, then "In bed since" with End session / Cancel', async () => {
+  it('night view: the button, then the confirmation with Undo, then "In bed since" with I\'m up / Cancel', async () => {
     const lateNight = atMinutes(DAY, 23 * 60 + 42);
     clock = lateNight;
     await render(nightView(lateNight));
@@ -129,26 +130,63 @@ describe("I'm in bed", () => {
 
     await render(nightView(lateNight));
     const t = text();
-    expect(t).toContain('Sleep session started 23:42');
+    expect(t).toContain('Sleep session started');
+    expect(t).toContain('In bed since 23:42');
     expect(t).toMatch(/Alarm 0[67]:\d\d/);
     expect(t).toContain('Brown noise · 45 min');
     expect(t).toContain("Tonight's reminders are off. Sleep well.");
     expect(t).not.toContain('Time to sleep');
     expect(button('Undo')).toBeDefined();
-    expect(button('End session')).toBeUndefined();
+    expect(button("I'm up")).toBeUndefined();
 
     clock = lateNight + 3 * MINUTE;
     await remount();
     await render(nightView(clock));
     expect(text()).toContain('In bed since 23:42');
+    expect(text()).not.toContain('Sleep session started');
     expect(button('Undo')).toBeUndefined();
-    expect(button('End session')).toBeDefined();
+    expect(button("I'm up")).toBeDefined();
     await press('Cancel');
     expect(useStore.getState().settings.session).toBeUndefined();
     expect(useStore.getState().settings.tonight).toBeUndefined();
     await render(nightView(clock));
     expect(text()).toContain('Time to sleep');
     expect(button("I'm in bed")).toBeDefined();
+  });
+
+  it('on the night view the button is not a filled amber block (the kit\'s primary), elsewhere it is', async () => {
+    const background = (): unknown => {
+      // The pressable's own style, flattened: its background colour.
+      const style = button("I'm in bed")!.props.style;
+      return Object.assign({}, ...[style].flat(Infinity).filter(Boolean)).backgroundColor;
+    };
+    await render(<InBedButton a={analysisAt(WINDING)} />);
+    const day = background();
+    expect(day).toBe(colors.accent);
+    await remount();
+    await render(<InBedButton a={analysisAt(WINDING)} night />);
+    expect(background()).not.toBe(day);
+    await press("I'm in bed");
+    expect(useStore.getState().settings.session).toMatchObject({ inBedAt: WINDING });
+  });
+
+  it('"I\'m up" in the header ends the session, with Undo; before the alarm it says "End session"', async () => {
+    await startInBedSession(analysisAt(WINDING), WINDING);
+    // 01:10: nothing else on screen says "I'm up".
+    clock = atMinutes('2026-11-03', 70);
+    await render(<SessionHeader a={analysisAt(clock)} />);
+    expect(button('End session')).toBeUndefined();
+    // 04:30: the early "I'm up" (which also turns the alarms off) is offered above it.
+    clock = atMinutes('2026-11-03', 4 * 60 + 30);
+    await remount();
+    await render(<SessionHeader a={analysisAt(clock)} />);
+    expect(button("I'm up")).toBeUndefined();
+    await press('End session');
+    expect(useStore.getState().settings.session).toMatchObject({ closed: 'up', upAt: clock });
+    await render(<SessionHeader a={analysisAt(clock)} />);
+    expect(text()).toContain('Up at 04:30');
+    await press('Undo');
+    expect(useStore.getState().settings.session?.closed).toBeUndefined();
   });
 
   it('Undo right after the tap puts the plan back', async () => {

@@ -1,18 +1,19 @@
-// Today-screen slot: evening-only nudge into the wind-down routine, with one-tap sleep sounds.
+/**
+ * An evening nudge into the wind-down routine with one-tap sleep sounds: shown from two hours before
+ * wind-down until lights-out, and for as long as a sound is playing.
+ */
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { showWindDownCard, windDownStatus } from '@/audio/windDown';
-import { soundInfo } from '@/audio/sounds';
-import { PlaybackStatus, PlayButton } from '@/audio/ui/SoundControls';
+import { PlaybackStatus, PlayButton, soundName } from '@/audio/ui/SoundControls';
 import { useSoundPlayer } from '@/audio/useSoundPlayer';
+import { showWindDownCard, windDownStatus } from '@/audio/windDown';
 import type { Analysis } from '@/engine/analysis';
 import { formatDuration, formatTime } from '@/engine/time';
 import { useNow } from '@/state/useAnalysis';
-import { Card, Icon } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { Card, ListRow } from '@/ui/components';
+import { colors, space } from '@/ui/theme';
 
-/** Shown from ~2h before wind-down until lights-out: "Wind-down starts 22:20 · open your routine". */
 export function WindDownCard({ analysis }: { analysis: Analysis }) {
   const now = useNow();
   const sound = useSoundPlayer();
@@ -21,49 +22,23 @@ export function WindDownCard({ analysis }: { analysis: Analysis }) {
 
   const s = windDownStatus(now, t);
   const title = s.phase === 'before' ? `Wind-down starts ${formatTime(t.windDownStart)}` : s.phase === 'during' ? 'Wind down now' : 'Past lights-out';
-  const sub =
-    s.phase === 'before'
-      ? `in ${formatDuration(s.minToWindDown)} · open your routine`
-      : s.phase === 'during'
-        ? `Lights out ${formatTime(t.bedtime)}, in ${formatDuration(s.minToBedtime)} · open your routine`
-        : 'Open your routine';
-  const name = soundInfo(sound.settings.sound).label;
+  const sub = s.phase === 'before' ? `In ${formatDuration(s.minToWindDown)}` : s.phase === 'during' ? `Lights out ${formatTime(t.bedtime)}, in ${formatDuration(s.minToBedtime)}` : 'Open your routine';
 
   return (
-    <Card accent={s.phase === 'during' ? colors.accent : undefined}>
-      <View style={styles.row}>
-        <Pressable
-          onPress={() => router.push('/winddown')}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}. Open your wind-down routine`}
-          style={({ pressed }) => [styles.main, pressed && { opacity: 0.75 }]}
-        >
-          <View style={styles.icon}>
-            <Icon name="weather-night" size={22} color={colors.light} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={font.h3}>{title}</Text>
-            <Text style={[font.small, { marginTop: 2 }]}>{sub}</Text>
-          </View>
-        </Pressable>
-        <PlayButton
-          playing={sound.playing}
-          size={44}
-          onPress={() => sound.toggle()}
-          label={sound.playing ? 'Stop sleep sound' : `Play ${name}${sound.settings.sound === 'rain' ? '' : ' noise'}`}
-        />
-      </View>
+    <Card style={{ paddingVertical: space.xs }}>
+      <ListRow
+        icon="weather-night"
+        iconColor={colors.sleep}
+        title={title}
+        sub={sub}
+        onPress={() => router.push('/winddown')}
+        right={<PlayButton playing={sound.playing} size={44} onPress={() => sound.toggle()} label={sound.playing ? 'Stop sleep sound' : `Play ${soundName(sound.settings.sound)}`} />}
+      />
       {sound.playback.status !== 'idle' ? (
-        <View style={{ marginTop: space.md }}>
+        <View style={{ paddingBottom: space.md }}>
           <PlaybackStatus controls={sound} />
         </View>
       ) : null}
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md },
-  icon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-});

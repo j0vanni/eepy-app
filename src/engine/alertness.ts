@@ -3,7 +3,10 @@
  *   alertness = S (homeostatic, drains while awake / recovers while asleep)
  *             + C (circadian rhythm, with a 12h harmonic for the post-lunch dip)
  *             + W (sleep inertia right after waking)
- * plus a penalty for chronic sleep debt, which the acute model does not capture.
+ * plus a penalty for chronic sleep debt, which the acute model does not capture, and an optional
+ * EnergyContext: what the watch and the caffeine log add (engine/watchSignals.ts) — B, an alertness
+ * boost from last night's recovery signals, today's heart rate and caffeine, and a shift of C by how
+ * far the body clock has moved (engine/bodyClock.ts).
  * Alertness is mapped onto the Karolinska Sleepiness Scale (1–9) and a 0–100 "energy" score.
  * Rates/amplitudes are tuned so a rested day reproduces the classic KSS profile: alert late morning,
  * a ~10-point early-afternoon dip, an evening "second wind", then a steep decline toward bedtime.
@@ -35,6 +38,14 @@ export interface Interval {
   end: number;
 }
 
+/** Time-varying inputs to the model beyond sleep timing (built by engine/watchSignals.ts). */
+export interface EnergyContext {
+  /** Extra alertness (model units, + = more alert) at `t`: recovery signals, daytime heart rate, caffeine. */
+  boost?: (t: number) => number;
+  /** Minutes the body clock sits later (+) or earlier (−) than its usual place at `t`. */
+  clockShiftMin?: (t: number) => number;
+}
+
 export const TPM = {
   /** Lower / upper asymptotes of process S. */
   la: 2.4,
@@ -61,6 +72,8 @@ export interface AlertnessPoint {
   S: number;
   C: number;
   W: number;
+  /** Boost from the EnergyContext (0 without one, and while asleep). */
+  B?: number;
   alertness: number;
   kss: number;
   energy: number;
@@ -88,11 +101,22 @@ export function inertiaAmplitude(boutMin: number): number {
   return 2.4; // main sleep
 }
 
+/** Alertness units lost to chronic sleep debt. */
+export function debtPenaltyFor(debtMin: number): number {
+  return Math.min(TPM.debtPenaltyMax, (Math.max(0, debtMin) / 60) * TPM.debtPenaltyPerHour);
+}
+
+/** Energy points (0–100 scale) per alertness unit, away from the ends of the scale. */
+export const ENERGY_PER_ALERTNESS = 7.5;
+
 /** KSS points per alertness unit (the slope of the KSS mapping below). */
 export const KSS_PER_ALERTNESS = 0.6;
 
+/** KSS the mapping gives at alertness 0 (before clamping to 1–9). */
+export const KSS_AT_ZERO = 10.6;
+
 export function kssFromAlertness(a: number): number {
-  return clamp(10.6 - KSS_PER_ALERTNESS * a, 1, 9);
+  return clamp(KSS_AT_ZERO - KSS_PER_ALERTNESS * a, 1, 9);
 }
 
 export function energyFromKss(kss: number): number {
@@ -117,6 +141,7 @@ export interface SimulateOptions {
   stepMin?: number;
   /** Hours simulated before `from` so S converges from its unknown starting value. */
   burnInH?: number;
+  context?: EnergyContext;
 }
 
 /** Simulates alertness on a regular grid from `from` to `to` given the asleep intervals. */
@@ -125,7 +150,9 @@ export function simulateAlertness(sleeps: Interval[], from: number, to: number, 
   const dtH = step / HOUR;
   const burnIn = (opts.burnInH ?? 72) * HOUR;
   const intervals = mergeIntervals(sleeps);
-  const debtPenalty = Math.min(TPM.debtPenaltyMax, ((opts.debtMin ?? 0) / 60) * TPM.debtPenaltyPerHour);
+  const debtPenalty = debtPenaltyFor(opts.debtMin ?? 0);
+  const boost = opts.context?.boost;
+  const clockShift = opts.context?.clockShiftMin;
 
   let S = 12;
   let idx = 0;
@@ -150,11 +177,12 @@ export function simulateAlertness(sleeps: Interval[], from: number, to: number, 
     else S = TPM.la + (S - TPM.la) * Math.exp(-TPM.wakeRate * dtH);
 
     if (t < from) continue;
-    const C = circadian(t, opts.midSleepMin, opts.circadian);
+    const C = circadian(t, opts.midSleepMin + (clockShift ? clockShift(t) : 0), opts.circadian);
     const W = asleep ? 0 : -inertiaAmplitude(lastBoutMin) * Math.exp((-TPM.inertiaRate * (t - lastWake)) / HOUR);
-    const alertness = S + C + W - (asleep ? 0 : debtPenalty);
+    const B = asleep || !boost ? 0 : boost(t);
+    const alertness = S + C + W + B - (asleep ? 0 : debtPenalty);
     const kss = kssFromAlertness(alertness);
-    out.push({ t, asleep, S, C, W, alertness, kss, energy: energyFromKss(kss) });
+    out.push({ t, asleep, S, C, W, B, alertness, kss, energy: energyFromKss(kss) });
   }
   return out;
 }
@@ -182,6 +210,7 @@ export interface ForecastInput {
   debtMin: number;
   assumedLastNight?: boolean;
   circadian?: CircadianParams;
+  context?: EnergyContext;
 }
 
 export function forecastEnergy(input: ForecastInput): EnergyForecast {
@@ -189,7 +218,7 @@ export function forecastEnergy(input: ForecastInput): EnergyForecast {
   const sleeps = [...input.sleeps];
   if (bedtime > now) sleeps.push({ start: bedtime, end: nextWake });
   const to = bedtime + 90 * MINUTE;
-  const points = simulateAlertness(sleeps, wakeTime, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin, circadian: input.circadian });
+  const points = simulateAlertness(sleeps, wakeTime, to, { midSleepMin: input.midSleepMin, debtMin: input.debtMin, circadian: input.circadian, context: input.context });
 
   const awake = points.filter((p) => !p.asleep && p.t <= bedtime);
   const settled = awake.filter((p) => p.t >= wakeTime + 60 * MINUTE);

@@ -9,6 +9,7 @@ export function analyzeOptionsFor(state: AppState, extras: { now: number; firstE
     preferredOrigins: state.settings.preferredOrigins,
     upcoming: upcoming && upcoming.date === dateKey(extras.now) ? upcoming.kind : undefined,
     circadian: state.calibration?.params,
+    weights: state.calibration?.weights,
     firstEventTomorrow: extras.firstEventTomorrow,
     firstEventTitle: extras.firstEventTitle,
     firstEventPrepMin: state.settings.calendar.prepMin,

@@ -1,7 +1,6 @@
 /**
- * The Planner's occasional tools (shown folded at the bottom): the bedtime calculator, moving your
- * schedule for good, and caffeine in your system. Each renders its content without a card so it
- * can sit inside a Disclosure.
+ * The Plan tab's occasional tools, each the content of a folded row: the bedtime calculator, moving
+ * your schedule for good, caffeine in your system, and your body clock tonight.
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -13,9 +12,11 @@ import { bedtimesForWake, shiftSchedule, wakesForBedtime } from '@/engine/schedu
 import { addDays, atMinutes, formatClock, formatDuration, formatTime, HOUR, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { LineChart } from '@/ui/charts';
-import { Button, Icon, Note, Row, Segmented, Stepper } from '@/ui/components';
+import { Button, Icon, KeyValue, styles as kit, Row, Segmented, Stepper } from '@/ui/components';
 import { dayLabel } from '@/ui/format';
-import { colors, font, space } from '@/ui/theme';
+import { colors, font, iconSize, space } from '@/ui/theme';
+
+import { Bullet, Caption } from './parts';
 
 type CalcMode = 'wake' | 'bed' | 'now';
 
@@ -44,7 +45,6 @@ export function BedtimeCalculator({ a }: { a: Analysis }) {
 
   return (
     <View>
-      <Text style={[font.small, { marginBottom: space.sm }]}>Waking at the end of a sleep cycle feels less groggy. Pick what you know, and see the best times around it.</Text>
       <Segmented<CalcMode>
         value={mode}
         onChange={setMode}
@@ -61,18 +61,24 @@ export function BedtimeCalculator({ a }: { a: Analysis }) {
       ) : (
         <Text style={[font.small, { marginVertical: space.md }]}>If you lie down now ({formatTime(a.now)}), wake up at:</Text>
       )}
-      <Text style={[font.tiny, { marginBottom: 4 }]}>{mode === 'wake' ? 'GO TO BED AT' : 'WAKE UP AT'}</Text>
-      {options.map((o) => (
-        <Row key={o.cycles} gap={space.md} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <Text style={[font.h3, { minWidth: 76, color: o.recommended ? colors.accent : colors.text }]}>{formatTime(mode === 'wake' ? o.bedtime : o.wake)}</Text>
-          <Text style={[font.small, { flex: 1 }]}>
-            {o.cycles} cycles · {formatDuration(o.sleepMin)} asleep
-          </Text>
-          {o.recommended ? <Text style={[font.label, { color: colors.accent }]}>BEST FIT</Text> : o.meetsNeed ? <Icon name="check" color={colors.good} size={16} /> : null}
-        </Row>
-      ))}
+      <Caption>{mode === 'wake' ? 'Go to bed at' : 'Wake up at'}</Caption>
+      <View style={{ marginTop: space.xs }}>
+        {options.map((o, i) => (
+          <View key={o.cycles}>
+            {i ? <View style={kit.listSep} /> : null}
+            <Row gap={space.md} style={{ paddingVertical: space.sm }}>
+              <Text style={[font.h3, { minWidth: 84, fontVariant: ['tabular-nums'], color: o.recommended ? colors.sleep : colors.text }]}>{formatTime(mode === 'wake' ? o.bedtime : o.wake)}</Text>
+              <Text style={[font.small, { flex: 1 }]}>
+                {o.cycles} cycles · {formatDuration(o.sleepMin)} asleep
+              </Text>
+              {o.recommended ? <Caption color={colors.sleep}>Best fit</Caption> : o.meetsNeed ? <Icon name="check" color={colors.good} size={iconSize.sm} /> : null}
+            </Row>
+          </View>
+        ))}
+      </View>
       <Text style={[font.tiny, { marginTop: space.sm }]}>
-        Uses your own sleep cycle ({cyc} min), {Math.round(latency)} min to fall asleep and your {formatDuration(a.need.needMin)} sleep need. ✓ = enough sleep.
+        Waking at the end of a sleep cycle feels less groggy. Uses your own cycle ({cyc} min), {Math.round(latency)} min to fall asleep and your {formatDuration(a.need.needMin)} sleep need. A
+        tick means enough sleep.
       </Text>
     </View>
   );
@@ -87,10 +93,6 @@ export function ScheduleShift({ a }: { a: Analysis }) {
   const shift = shiftSchedule(Math.round(habitualWake), target, a.tonight.inBedMin, a.day);
   return (
     <View>
-      <Text style={font.small}>
-        Want to wake earlier or later for good? Move gradually — your body clock shifts about 20 min a day earlier or 30 min a day later. Light at the right time does the
-        heavy lifting.
-      </Text>
       <Stepper
         label="New wake-up time"
         sub={`You usually wake around ${formatClock(habitualWake)}`}
@@ -101,21 +103,27 @@ export function ScheduleShift({ a }: { a: Analysis }) {
       {shift.direction === 'none' ? (
         <Text style={font.small}>That's already your schedule.</Text>
       ) : (
-        shift.days.map((d) => (
-          <View key={d.date} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
-            <Row>
-              <Text style={[font.h3, { flex: 1 }]}>{dayLabel(d.date)}</Text>
-              <Text style={font.small}>
-                bed {formatClock(d.bedtimeMin)} · wake {formatClock(d.wakeMin)}
-              </Text>
-            </Row>
-            <Text style={font.tiny}>
-              ☀️ get bright light {formatClock(d.seekLight.startMin)}–{formatClock(d.seekLight.endMin)} · 🕶 avoid it {formatClock(d.avoidLight.startMin)}–
-              {formatClock(d.avoidLight.endMin)}
-            </Text>
+        shift.days.map((d, i) => (
+          <View key={d.date}>
+            {i ? <View style={kit.listSep} /> : null}
+            <View style={{ paddingVertical: space.sm, gap: space.xs }}>
+              <Row>
+                <Text style={[font.body, { flex: 1 }]}>{dayLabel(d.date)}</Text>
+                <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>
+                  bed {formatClock(d.bedtimeMin)} · wake {formatClock(d.wakeMin)}
+                </Text>
+              </Row>
+              <Bullet icon="white-balance-sunny" color={colors.energy}>
+                Bright light {formatClock(d.seekLight.startMin)}–{formatClock(d.seekLight.endMin)}
+              </Bullet>
+              <Bullet icon="sunglasses">
+                Avoid it {formatClock(d.avoidLight.startMin)}–{formatClock(d.avoidLight.endMin)}
+              </Bullet>
+            </View>
           </View>
         ))
       )}
+      <Text style={[font.tiny, { marginTop: space.sm }]}>Your body clock moves about 20 min a day earlier or 30 min a day later. Light at the right time does most of the work.</Text>
     </View>
   );
 }
@@ -134,10 +142,7 @@ export function CaffeineCurve({ a }: { a: Analysis }) {
   );
   return (
     <View>
-      <Row style={{ marginBottom: space.sm }}>
-        <Text style={[font.small, { flex: 1 }]}>Active now</Text>
-        <Text style={[font.h3, { color: colors.caffeine }]}>{Math.round(a.caffeine.nowMg)} mg</Text>
-      </Row>
+      <KeyValue label="Active now" value={`${Math.round(a.caffeine.nowMg)} mg`} color={colors.caffeine} />
       <LineChart
         values={curve.map((p) => p.mg)}
         labels={curve.map((p) => formatTime(p.t))}
@@ -148,12 +153,12 @@ export function CaffeineCurve({ a }: { a: Analysis }) {
       />
       <Text style={[font.small, { marginTop: space.sm }]}>
         {a.caffeine.cutoff.cutoff
-          ? `Latest coffee (${a.caffeine.cutoff.doseMg} mg) that wears off enough by lights-out (${formatTime(a.tonight.bedtime)}): ${formatTime(a.caffeine.cutoff.cutoff)}.`
+          ? `Last coffee (${a.caffeine.cutoff.doseMg} mg) by ${formatTime(a.caffeine.cutoff.cutoff)}, so enough has worn off by lights-out at ${formatTime(a.tonight.bedtime)}.`
           : a.caffeine.cutoff.overLimit
-            ? `About ${Math.round(a.caffeine.cutoff.atBedtimeMg)} mg will still be active in early sleep — no more caffeine today.`
+            ? `About ${Math.round(a.caffeine.cutoff.atBedtimeMg)} mg will still be active in early sleep. No more caffeine today.`
             : 'Log your drinks to see your curve.'}
       </Text>
-      <Text style={[font.tiny, { marginTop: 4 }]}>Half of the caffeine wears off every {halfLife} h for you (change it in Settings → Caffeine & drinks).</Text>
+      <Text style={[font.tiny, { marginTop: space.xs }]}>Half of the caffeine wears off every {halfLife} h for you.</Text>
       <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
         <Button small kind="secondary" icon="plus" label="Log a drink" onPress={() => router.push('/caffeine')} />
         <Button small kind="ghost" label="Caffeine settings" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'caffeine' } })} />
@@ -162,14 +167,21 @@ export function CaffeineCurve({ a }: { a: Analysis }) {
   );
 }
 
-/** When melatonin rises and the hardest time to fall asleep is, if eepy knows your body clock. */
-export function BodyClockNote({ a }: { a: Analysis }) {
+/** Whether eepy knows enough about your body clock for `BodyClockRows`. */
+export function hasBodyClock(a: Analysis): boolean {
+  const c = a.chronotype;
+  return c.dlmoMin !== undefined && !!c.wakeMaintenanceZone && c.cbtMinMin !== undefined;
+}
+
+/** When melatonin rises, when it is hardest to fall asleep and when your body is coolest. */
+export function BodyClockRows({ a }: { a: Analysis }) {
   const c = a.chronotype;
   if (c.dlmoMin === undefined || !c.wakeMaintenanceZone || c.cbtMinMin === undefined) return null;
   return (
-    <Note tone="info" icon="clock-outline">
-      Your body clock tonight: melatonin (the sleep hormone) usually starts rising around {formatClock(c.dlmoMin)}. The hardest time to fall asleep is about{' '}
-      {formatClock(c.wakeMaintenanceZone.startMin)}–{formatClock(c.wakeMaintenanceZone.endMin)}, and your body is coolest near {formatClock(c.cbtMinMin)}.
-    </Note>
+    <View>
+      <KeyValue label="Melatonin starts rising" sub="The sleep hormone" value={formatClock(c.dlmoMin)} />
+      <KeyValue label="Hardest time to fall asleep" value={`${formatClock(c.wakeMaintenanceZone.startMin)}–${formatClock(c.wakeMaintenanceZone.endMin)}`} />
+      <KeyValue label="Body coolest" sub="Deepest point of the night" value={formatClock(c.cbtMinMin)} />
+    </View>
   );
 }

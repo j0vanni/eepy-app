@@ -1,41 +1,43 @@
+/**
+ * Goals: up to three small daily wins. Opens with today — how many are done — then each goal you
+ * keep as a row that opens to its streak, the last two weeks and its setting, then the list to
+ * choose from.
+ */
 import { Text, View } from 'react-native';
 
-import { defaultGoalTarget, GOAL_DEFS, GoalDef, GoalProgress, MAX_GOALS, setGoalTarget, toggleGoal } from '@/engine/goals';
+import { defaultGoalTarget, GOAL_DEFS, GoalDef, GoalProgress, MAX_GOALS, setGoalTarget, toggleGoal, WIND_DOWN_TAG } from '@/engine/goals';
 import { formatClock, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { GOAL_STATUS_TEXT, GoalDots } from '@/ui/coach/Dots';
+import { GOAL_LEGEND, GOAL_STATUS_TEXT, GoalDots } from '@/ui/coach/Dots';
 import { useGoalInput, useGoalsSummary } from '@/ui/coach/hooks';
-import { AppSwitch, Button, Card, Empty, Icon, Meter, Note, Row, Screen, Section, Stat, Stepper } from '@/ui/components';
-import { colors, font, scoreColor, space } from '@/ui/theme';
+import { Button, Card, Empty, Fold, Hero, KeyValue, ListCard, Meter, Screen, Section, Stepper } from '@/ui/components';
+import { Toggle } from '@/ui/settings/Toggle';
+import { font, scoreColor, space } from '@/ui/theme';
 
+const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
+/** The one thing a goal lets you set: a time. */
 function GoalParam({ def, progress }: { def: GoalDef; progress: GoalProgress }) {
   const goals = useStore((s) => s.goals);
   const setGoals = useStore((s) => s.setGoals);
   const profile = useStore((s) => s.profile);
   if (!def.param) return null;
   const id = def.id;
+  const step = def.param.stepMin;
   const value = progress.setting.targetMin;
   if (id === 'in-bed-on-time') {
     // Optional: a fixed lights-out time instead of each night's plan.
     if (value === undefined) {
-      return (
-        <Row style={{ paddingVertical: space.sm }}>
-          <View style={{ flex: 1 }}>
-            <Text style={font.body}>Lights-out</Text>
-            <Text style={font.small}>Follows each night's plan</Text>
-          </View>
-          <Button small kind="secondary" label="Use a fixed time" onPress={() => setGoals(setGoalTarget(goals, id, 23 * 60))} />
-        </Row>
-      );
+      return <KeyValue label="Lights-out" sub="Follows each night's plan. Tap to use a fixed time instead." value="The plan" onPress={() => setGoals(setGoalTarget(goals, id, 23 * 60))} />;
     }
     return (
       <View>
         <Stepper
           label="Fixed lights-out"
           value={formatClock(value)}
-          onDec={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(value - def.param!.stepMin)))}
-          onInc={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(value + def.param!.stepMin)))}
+          onDec={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(value - step)))}
+          onInc={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(value + step)))}
         />
         <View style={{ alignItems: 'flex-start' }}>
           <Button small kind="ghost" label="Follow the nightly plan instead" onPress={() => setGoals(setGoalTarget(goals, id, undefined))} />
@@ -48,8 +50,8 @@ function GoalParam({ def, progress }: { def: GoalDef; progress: GoalProgress }) 
     <Stepper
       label={def.param.label}
       value={formatClock(cur)}
-      onDec={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(cur - def.param!.stepMin)))}
-      onInc={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(cur + def.param!.stepMin)))}
+      onDec={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(cur - step)))}
+      onInc={() => setGoals(setGoalTarget(goals, id, normalizeMinutes(cur + step)))}
     />
   );
 }
@@ -58,6 +60,7 @@ export default function GoalsScreen() {
   const a = useAnalysis();
   const goals = useStore((s) => s.goals);
   const setGoals = useStore((s) => s.setGoals);
+  const toggleTag = useStore((s) => s.toggleTag);
   const input = useGoalInput(a);
   const summary = useGoalsSummary(a);
 
@@ -71,74 +74,68 @@ export default function GoalsScreen() {
 
   const enabled = goals.filter((g) => g.enabled).length;
   const toggle = (id: GoalDef['id'], on: boolean) => setGoals(toggleGoal(goals, id, on, a.day, defaultGoalTarget(id, input)));
+  const mine = summary.goals;
+  const met = mine.filter((g) => g.today.status === 'met').length;
+  const best = Math.max(0, ...mine.map((g) => g.currentStreak));
+  const windDown = mine.find((g) => g.setting.id === 'wind-down' && g.today.status === 'pending');
 
   return (
-    <Screen subtitle="Small daily wins that add up">
-      {summary.goals.length ? (
-        <Card>
-          <Row>
-            <Stat label="This week" value={summary.weeklyScore !== undefined ? `${summary.weeklyScore}%` : '–'} color={summary.weeklyScore !== undefined ? scoreColor(summary.weeklyScore) : undefined} sub="of goal-days met" />
-            <Stat label="Best streak" value={`${Math.max(0, ...summary.goals.map((g) => g.currentStreak))}`} sub="days, running now" />
-            <Stat label="Goals" value={`${summary.goals.length}/${MAX_GOALS}`} />
-          </Row>
+    <Screen>
+      {mine.length ? (
+        <Hero
+          label="Done today"
+          value={`${met} of ${mine.length}`}
+          caption={[summary.weeklyScore !== undefined ? `${summary.weeklyScore}% of goal-days met this week` : undefined, best ? `longest streak running: ${days(best)}` : undefined].filter(Boolean).join(' · ') || 'Streaks start with the first day you meet a goal.'}
+        >
           {summary.weeklyScore !== undefined ? (
             <View style={{ marginTop: space.md }}>
               <Meter value={summary.weeklyScore} color={scoreColor(summary.weeklyScore)} />
             </View>
           ) : null}
-        </Card>
+        </Hero>
       ) : (
-        <Note tone="info" icon="flag-outline">
-          Pick 1–{MAX_GOALS} goals. A streak grows each day you meet a goal; days without data don't break it, only a missed day does.
-        </Note>
+        <Hero label="Goals" value={`Pick up to ${MAX_GOALS}`} caption="A streak grows each day you meet a goal. Days without data don't break it; only a missed day does." />
       )}
+      {windDown ? <Button kind="secondary" icon="weather-night" label="I wound down tonight" onPress={() => toggleTag(a.day, WIND_DOWN_TAG)} style={{ marginBottom: space.md }} /> : null}
 
-      <Section title="Goals">
-        {GOAL_DEFS.map((def) => {
-          const progress = summary.goals.find((g) => g.setting.id === def.id);
-          const on = !!progress;
-          const full = !on && enabled >= MAX_GOALS;
-          const st = progress ? GOAL_STATUS_TEXT[progress.today.status] : undefined;
-          return (
-            <Card key={def.id} accent={on ? colors.accentSoft : undefined}>
-              <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
-                <Icon name={def.icon} size={22} color={on ? colors.accent : colors.textDim} />
-                <View style={{ flex: 1 }}>
-                  <Text style={font.h3}>{def.title}</Text>
-                  <Text style={[font.small, { marginTop: 2 }]}>{def.description}</Text>
-                </View>
-                <AppSwitch value={on} disabled={full} onChange={(v) => toggle(def.id, v)} label={`${def.title} goal`} />
-              </Row>
-              {progress && st ? (
-                <View style={{ marginTop: space.md }}>
-                  <Row>
-                    <Stat label="Streak" value={`${progress.currentStreak}`} sub={progress.currentStreak === 1 ? 'day' : 'days'} color={progress.currentStreak ? colors.warn : undefined} />
-                    <Stat label="Best" value={`${progress.bestStreak}`} sub="last 60 days" />
-                    <Stat label="Last 7" value={`${progress.weekMet}/${progress.weekKnown}`} sub="met" />
-                  </Row>
-                  <View style={{ marginTop: space.md }}>
-                    <GoalDots days={progress.days.slice(-14)} />
-                  </View>
-                  <Row gap={space.sm} style={{ marginTop: space.sm }}>
-                    <Icon name={st.icon} size={16} color={st.color} />
-                    <Text style={[font.small, { flex: 1 }]}>
-                      Today: {progress.today.status === 'pending' ? progress.today.detail : `${st.label.toLowerCase()} — ${progress.today.detail ?? ''}`}
-                    </Text>
-                  </Row>
+      {mine.length ? (
+        <Section title="Your goals">
+          <ListCard>
+            {mine.map((g) => {
+              const st = GOAL_STATUS_TEXT[g.today.status];
+              return (
+                <Fold
+                  bare
+                  key={g.setting.id}
+                  icon={st.icon}
+                  title={g.def.title}
+                  sub={g.today.status === 'pending' ? g.today.detail : [st.label, g.today.detail].filter(Boolean).join(' · ')}
+                  value={g.currentStreak ? days(g.currentStreak) : undefined}
+                >
+                  <GoalDots days={g.days.slice(-14)} />
                   <View style={{ marginTop: space.sm }}>
-                    <GoalParam def={def} progress={progress} />
+                    <KeyValue label="Streak" value={days(g.currentStreak)} />
+                    <KeyValue label="Best" sub="Last 60 days" value={days(g.bestStreak)} />
+                    <KeyValue label="Last 7 days" value={`${g.weekMet} of ${g.weekKnown} met`} />
+                    <GoalParam def={g.def} progress={g} />
                   </View>
-                </View>
-              ) : full ? (
-                <Text style={[font.tiny, { marginTop: space.sm }]}>Up to {MAX_GOALS} goals at a time — switch one off to pick this.</Text>
-              ) : null}
-            </Card>
-          );
-        })}
+                  <Text style={[font.tiny, { marginTop: space.sm }]}>{GOAL_LEGEND}</Text>
+                </Fold>
+              );
+            })}
+          </ListCard>
+        </Section>
+      ) : null}
+
+      <Section title={`Choose · ${enabled} of ${MAX_GOALS}`}>
+        <Card style={{ paddingVertical: space.xs }}>
+          {GOAL_DEFS.map((def) => {
+            const on = mine.some((g) => g.setting.id === def.id);
+            return <Toggle key={def.id} label={def.title} sub={def.description} value={on} disabled={!on && enabled >= MAX_GOALS} onChange={(v) => toggle(def.id, v)} />;
+          })}
+        </Card>
+        {enabled >= MAX_GOALS ? <Text style={[font.tiny, { paddingHorizontal: space.xs }]}>Up to {MAX_GOALS} goals at a time: switch one off to pick another.</Text> : null}
       </Section>
-      <Text style={[font.tiny, { textAlign: 'center', marginTop: space.sm }]}>
-        Green = met · red = missed · hollow = no data · outlined purple = today, still to come.
-      </Text>
     </Screen>
   );
 }

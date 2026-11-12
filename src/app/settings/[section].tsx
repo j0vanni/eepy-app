@@ -11,7 +11,7 @@ export default function SettingsSectionScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ title: 'Settings' }} />
-        <Empty icon="cog-outline" title="This page has moved" body="Settings are now grouped into a few short pages.">
+        <Empty icon="cog-outline" title="This page has moved" body="Settings are a few short pages now.">
           <Button label="All settings" icon="cog-outline" onPress={() => router.replace('/settings')} />
         </Empty>
       </Screen>

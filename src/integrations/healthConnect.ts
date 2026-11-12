@@ -27,6 +27,7 @@ import {
   HCInstantRecord,
   HCSleepRecord,
   HCStepsRecord,
+  hourlyBins,
   instantSamples,
   mapSleepRecord,
   mapSpo2Samples,
@@ -193,7 +194,8 @@ export async function syncHealthConnect(from: number, to: number = Date.now()): 
     to,
     sessions,
     vitals,
-    daily: buildDailyStats(stepsPerDay(stepRecs), rhr, hrv),
+    // Daytime heart rate used to be dropped here; it is kept per clock hour (with the hour's steps).
+    daily: buildDailyStats(stepsPerDay(stepRecs), rhr, hrv, hourlyBins(hr, stepRecs, vitalsFrom, to)),
     workouts: exerciseRecs.map(mapWorkout).filter((w) => w.end > w.start),
     counts: {
       sessions: sessions.length,

@@ -28,6 +28,12 @@ export interface SyncOptions {
   background?: boolean;
 }
 
+/**
+ * settings.marks key: set once the history has been re-read for heart rate and steps per hour
+ * (kept since 0.13; earlier syncs threw daytime heart rate away).
+ */
+export const HOURLY_BACKFILL_MARK = 'sync.hourlyBackfill';
+
 let inFlight: Promise<SyncOutcome> | undefined;
 
 /** Pulls new data from Health Connect into the local store. */
@@ -61,7 +67,9 @@ async function doSync({ full, background }: SyncOptions): Promise<SyncOutcome> {
     if (background && !perms.background) return fail('no-background-permission', 'Health Connect background access is off.');
 
     const now = Date.now();
-    const from = full || !settings.lastSync ? now - settings.historyDays * DAY : settings.lastSync - 2 * DAY;
+    // The first foreground sync after the update re-reads the whole history once, for the hourly data.
+    const backfill = !background && !settings.marks[HOURLY_BACKFILL_MARK];
+    const from = full || backfill || !settings.lastSync ? now - settings.historyDays * DAY : settings.lastSync - 2 * DAY;
     const result = await syncHealthConnect(from, now);
     const before = useStore.getState().sessions;
     if (background && result.sessions.length === 0) {
@@ -74,6 +82,7 @@ async function doSync({ full, background }: SyncOptions): Promise<SyncOutcome> {
     const known = new Set(before.map((s) => s.id));
     const newSessions = result.sessions.filter((s) => !known.has(s.id)).length;
     mergeSync(result);
+    if (backfill || full) useStore.getState().setMark(HOURLY_BACKFILL_MARK, now);
     if (useStore.getState().settings.preferredOrigins.length === 0) {
       const origins = summarizeOrigins(result.sessions);
       const pick = origins.find((o) => o.likelyWatch) ?? origins.find((o) => o.staged) ?? origins[0];

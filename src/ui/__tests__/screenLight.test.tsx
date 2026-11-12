@@ -44,7 +44,7 @@ afterEach(async () => {
 });
 
 const a = analyze(generateDemoData(NOW), NOW);
-const render = async (props: { full?: boolean } = {}) => {
+const render = async (props: { full?: boolean; embedded?: boolean } = {}) => {
   await act(async () => root.render(<ScreenLightCard a={a} {...props} />));
   await act(async () => {
     await Promise.resolve();
@@ -76,6 +76,21 @@ describe('Phone light card on Android', () => {
     await render();
     await press('Set to 50%');
     expect(mockScreen.setPhoneBrightness).toHaveBeenCalledWith(0.5);
+  });
+
+  it('embedded: no title of its own, the same controls under a "now" caption', async () => {
+    await render();
+    expect(text()).toContain('"Phone light"');
+    await render({ full: true, embedded: true });
+    expect(text()).not.toContain('"Phone light"');
+    expect(text()).toContain('NOW · ≤ 50% · NIGHT LIGHT ON');
+    expect(text()).toContain('Phone brightness');
+    // The full card names the rest of the evening and the Night Light times.
+    expect(text()).toContain('THIS EVENING');
+    expect(text()).toContain('Screen away');
+    expect(text()).toContain('Night Light schedule');
+    await press('Night Light schedule');
+    expect(mockScreen.openNightLightSettings).toHaveBeenCalled();
   });
 
   it('hides the slider where brightness can’t be read', async () => {

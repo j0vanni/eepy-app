@@ -1,22 +1,28 @@
+/**
+ * Journal: one day at a time — how you slept, how the day felt, what you did, what you drank.
+ * Everything saves as you tap. Param `date` opens a past day (e.g. the evening a night's story
+ * points to).
+ */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { drinkOptions } from '@/engine/caffeineHabits';
 import { TAGS } from '@/engine/tags';
 import { addDays, atMinutes, dateKey, formatClock, formatDuration, formatTime, minutesOfDay, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Card, CardTitle, Chip, Icon, IconButton, ListRow, Row, Screen, Section, Stepper } from '@/ui/components';
+import { Card, Chip, Divider, IconButton, ListCard, ListRow, Row, Screen, Section, Stepper } from '@/ui/components';
 import { dayLabel, nightLabel } from '@/ui/format';
-import { colors, font, scoreColor, space } from '@/ui/theme';
+import { Question, RatingFaces } from '@/ui/sleep/parts';
+import { colors, font, radius, space } from '@/ui/theme';
 
-const RATINGS = ['😫', '😕', '😐', '🙂', '😄'];
 const ENERGY = ['Exhausted', 'Tired', 'OK', 'Good', 'Energised'];
+
+const wrap = { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm } as const;
 
 export default function JournalScreen() {
   const today = dateKey(Date.now());
-  // `date` opens a past day directly (e.g. the evening a night story points to).
   const params = useLocalSearchParams<{ date?: string }>();
   const [date, setDate] = useState(() => (params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today ? params.date : today));
   const log = useStore((s) => s.dayLogs[date]);
@@ -29,8 +35,10 @@ export default function JournalScreen() {
   const a = useAnalysis();
   const [doseMin, setDoseMin] = useState(() => (date === today ? Math.round(minutesOfDay(Date.now()) / 5) * 5 : 9 * 60));
 
-  const night = a?.nights.find((n) => n.wakeDate === date);
+  const night = a?.nights.find((n) => n.wakeDate === date)?.main;
+  const score = night ? a?.scores[night.id] : undefined;
   const dayDoses = caffeine.filter((d) => dateKey(d.time) === date);
+  const totalMg = dayDoses.reduce((s, d) => s + d.mg, 0);
   const isToday = date === today;
 
   const changeDate = (d: string) => {
@@ -39,140 +47,106 @@ export default function JournalScreen() {
   };
 
   return (
-    <Screen subtitle="A few taps a day make every estimate personal">
+    <Screen>
+      {/* Which day: the form's first question. */}
       <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
-        <Pressable onPress={() => changeDate(addDays(date, -1))} hitSlop={10} accessibilityLabel="Previous day">
-          <Icon name="chevron-left" size={28} color={colors.text} />
-        </Pressable>
-        <Text style={font.h2}>{dayLabel(date)}</Text>
-        <Pressable onPress={() => !isToday && changeDate(addDays(date, 1))} hitSlop={10} accessibilityLabel="Next day" style={{ opacity: isToday ? 0.3 : 1 }}>
-          <Icon name="chevron-right" size={28} color={colors.text} />
-        </Pressable>
+        <IconButton icon="chevron-left" label="Previous day" color={colors.text} onPress={() => changeDate(addDays(date, -1))} />
+        <View style={{ alignItems: 'center' }}>
+          <Text style={font.h2}>{dayLabel(date)}</Text>
+          <Text style={font.tiny}>Saved as you tap</Text>
+        </View>
+        <View style={{ opacity: isToday ? 0.3 : 1 }}>
+          <IconButton icon="chevron-right" label="Next day" color={colors.text} onPress={() => !isToday && changeDate(addDays(date, 1))} />
+        </View>
       </Row>
 
-      <Card>
-        <CardTitle icon="weather-sunset-up" title="Morning" color={colors.energy} />
-        {night?.main ? (
-          <ListRow
-            icon="bed-outline"
-            title={`${nightLabel(night.wakeDate)}: ${formatDuration(night.main.totalSleepMin)}`}
-            sub={`${formatTime(night.main.sleepOnset)} → ${formatTime(night.main.finalWake)}`}
-            right={a?.scores[night.main.id] ? <Text style={[font.h3, { color: scoreColor(a.scores[night.main.id].total) }]}>{a.scores[night.main.id].total}</Text> : undefined}
-            onPress={() => router.push({ pathname: '/night/[id]', params: { id: night.main!.id } })}
-          />
-        ) : (
-          <Text style={[font.small, { marginBottom: space.sm }]}>No sleep recorded for this night yet.</Text>
-        )}
-        <Text style={[font.small, { marginTop: space.sm }]}>How well did you sleep?</Text>
-        <Row gap={space.sm} style={{ marginTop: 6 }}>
-          {RATINGS.map((r, i) => (
-            <Pressable
-              key={r}
-              onPress={() => logDay(date, { sleepRating: i + 1 })}
-              style={{ padding: 8, borderRadius: 12, backgroundColor: log?.sleepRating === i + 1 ? colors.accentSoft : 'transparent' }}
-              accessibilityLabel={`Rate ${i + 1} of 5`}
-            >
-              <Text style={{ fontSize: 26 }}>{r}</Text>
-            </Pressable>
-          ))}
-        </Row>
-        <Text style={[font.small, { marginTop: space.md }]}>Did you wake up without an alarm?</Text>
-        <Row gap={space.sm} style={{ marginTop: 6 }}>
-          <Chip label="Yes, naturally" icon="weather-sunny" selected={log?.wokeNaturally === true} onPress={() => logDay(date, { wokeNaturally: true })} />
-          <Chip label="Alarm / woken" icon="alarm" selected={log?.wokeNaturally === false} onPress={() => logDay(date, { wokeNaturally: false })} />
-        </Row>
-        <Text style={[font.tiny, { marginTop: 6 }]}>Natural wake-ups are the best evidence of how much sleep you really need.</Text>
-      </Card>
-
-      <Card>
-        <CardTitle icon="lightning-bolt-outline" title="Daytime energy" color={colors.energy} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {ENERGY.map((e, i) => (
-            <Chip key={e} label={`${i + 1} · ${e}`} selected={log?.energy === i + 1} onPress={() => logDay(date, { energy: i + 1 })} />
-          ))}
-        </View>
-        <TextInput
-          placeholder="Notes (optional)"
-          placeholderTextColor={colors.textFaint}
-          value={log?.note ?? ''}
-          onChangeText={(note) => logDay(date, { note })}
-          style={{ marginTop: space.md, color: colors.text, backgroundColor: colors.surfaceAlt, borderRadius: 12, padding: 12, fontSize: 15 }}
-          multiline
-        />
-      </Card>
-
-      <Card>
-        <CardTitle icon="tag-multiple-outline" title={isToday ? 'Today & this evening' : 'That day & evening'} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {TAGS.map((t) => (
-            <Chip key={t.id} label={t.label} icon={t.icon} selected={log?.tags.includes(t.id)} onPress={() => toggleTag(date, t.id)} />
-          ))}
-        </View>
-        <Text style={[font.tiny, { marginTop: space.sm }]}>Tags are matched to the night that follows, so eepy can learn what helps or hurts your sleep.</Text>
-      </Card>
-
-      <Card>
-        <CardTitle icon="coffee-outline" title="Caffeine" color={colors.caffeine} right={<Text style={font.small}>{dayDoses.reduce((s, d) => s + d.mg, 0)} mg</Text>} />
-        <Stepper label="Time" value={formatClock(doseMin)} onDec={() => setDoseMin(normalizeMinutes(doseMin - 15))} onInc={() => setDoseMin(normalizeMinutes(doseMin + 15))} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {drinkOptions(customDrinks).map((p) => (
-            <Chip
-              key={p.label}
-              label={`${p.label} · ${p.mg}`}
-              onPress={() => addCaffeine({ id: `c-${Date.now()}-${p.mg}`, time: atMinutes(date, doseMin), mg: p.mg, label: p.label })}
+      <Section title="Morning">
+        <Card>
+          {night ? (
+            <ListRow
+              title={`${nightLabel(date)}: ${formatDuration(night.totalSleepMin)}`}
+              sub={`${formatTime(night.sleepOnset)} → ${formatTime(night.finalWake)}${score ? ` · score ${score.total}` : ''}`}
+              onPress={() => router.push({ pathname: '/night/[id]', params: { id: night.id } })}
             />
-          ))}
-        </View>
-        {dayDoses.map((d) => (
-          <Row key={d.id} style={{ paddingVertical: 2, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6 }}>
-            <Pressable
-              onPress={() => router.push({ pathname: '/caffeine', params: { id: d.id } })}
-              style={({ pressed }) => [{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm }, pressed ? { opacity: 0.6 } : null]}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${d.label} at ${formatTime(d.time)}`}
-            >
-              <Text style={[font.body, { width: 76, fontWeight: '600', fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
-                {formatTime(d.time)}
-              </Text>
-              <Text style={[font.small, { flex: 1 }]}>
-                {d.label} · {d.mg} mg
-              </Text>
-              <Icon name="pencil-outline" size={16} color={colors.textFaint} />
-            </Pressable>
-            <IconButton icon="close" label="Remove drink" color={colors.textFaint} onPress={() => removeCaffeine(d.id)} />
+          ) : (
+            <ListRow title="No sleep recorded for this night" sub="Slept without the watch? Log it." onPress={() => router.push({ pathname: '/log-sleep', params: { date } })} />
+          )}
+          <Divider spacing={space.sm} />
+          <Question first>How did you sleep?</Question>
+          <RatingFaces value={log?.sleepRating} onChange={(r) => logDay(date, { sleepRating: r })} />
+          <Question>Did you wake up on your own?</Question>
+          <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
+            <Chip label="Yes" icon="weather-sunny" selected={log?.wokeNaturally === true} onPress={() => logDay(date, { wokeNaturally: true })} />
+            <Chip label="No, alarm or woken" icon="alarm" selected={log?.wokeNaturally === false} onPress={() => logDay(date, { wokeNaturally: false })} />
           </Row>
-        ))}
-        <Row style={{ marginTop: space.sm, justifyContent: 'space-between' }}>
-          <Text style={[font.tiny, { flex: 1 }]}>{dayDoses.length ? 'Tap a drink to change its time or amount.' : ''}</Text>
-          <Button small kind="ghost" icon="clock-edit-outline" label="Log with exact time" onPress={() => router.push({ pathname: '/caffeine', params: { date } })} />
-        </Row>
-      </Card>
+          <Text style={[font.tiny, { marginTop: space.sm }]}>Mornings without an alarm are how eepy learns how much sleep you need.</Text>
+        </Card>
+      </Section>
 
-      <Button label="Log sleep or a nap manually" icon="pencil-plus" kind="secondary" onPress={() => router.push({ pathname: '/log-sleep', params: { date } })} />
+      <Section title="Energy during the day">
+        <Card>
+          <View style={wrap}>
+            {ENERGY.map((e, i) => (
+              <Chip key={e} label={`${i + 1} · ${e}`} selected={log?.energy === i + 1} onPress={() => logDay(date, { energy: i + 1 })} />
+            ))}
+          </View>
+          <TextInput
+            placeholder="Notes (optional)"
+            placeholderTextColor={colors.textFaint}
+            value={log?.note ?? ''}
+            onChangeText={(note) => logDay(date, { note })}
+            style={[font.body, { marginTop: space.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: space.md, minHeight: 48 }]}
+            accessibilityLabel="Notes"
+            multiline
+          />
+        </Card>
+      </Section>
 
-      {a ? (
-        <Section title="Recent nights">
-          <Card>
-            {[...a.nights]
-              .filter((n) => n.main)
-              .reverse()
-              .slice(0, 14)
-              .map((n) => {
-                const s = a.scores[n.main!.id];
-                return (
-                  <ListRow
-                    key={n.wakeDate}
-                    icon="bed-outline"
-                    title={`${nightLabel(n.wakeDate)} · ${formatDuration(n.totalSleepMin)}`}
-                    sub={`${formatTime(n.main!.sleepOnset)} → ${formatTime(n.main!.finalWake)}${n.naps.length ? ` · +${n.naps.length} nap` : ''}`}
-                    right={s ? <Text style={[font.h3, { color: scoreColor(s.total) }]}>{s.total}</Text> : undefined}
-                    onPress={() => router.push({ pathname: '/night/[id]', params: { id: n.main!.id } })}
-                  />
-                );
-              })}
-          </Card>
-        </Section>
-      ) : null}
+      <Section title={isToday ? 'Today and this evening' : 'That day and evening'}>
+        <Card>
+          <View style={wrap}>
+            {TAGS.map((t) => (
+              <Chip key={t.id} label={t.label} icon={t.icon} selected={log?.tags.includes(t.id)} onPress={() => toggleTag(date, t.id)} />
+            ))}
+          </View>
+          <Text style={[font.tiny, { marginTop: space.md }]}>Tags are matched to the night that follows, so eepy can learn what helps or hurts your sleep.</Text>
+        </Card>
+      </Section>
+
+      <Section title="Caffeine" action={<Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>{`${totalMg} mg`}</Text>}>
+        <Card style={{ paddingBottom: space.xs }}>
+          <Stepper label="Had at" sub="Then tap what you had" value={formatClock(doseMin)} onDec={() => setDoseMin(normalizeMinutes(doseMin - 15))} onInc={() => setDoseMin(normalizeMinutes(doseMin + 15))} />
+          <View style={[wrap, { marginTop: space.xs, marginBottom: space.md }]}>
+            {drinkOptions(customDrinks).map((p) => (
+              <Chip
+                key={p.label}
+                label={`${p.label} · ${p.mg} mg`}
+                onPress={() => addCaffeine({ id: `c-${Date.now()}-${p.mg}`, time: atMinutes(date, doseMin), mg: p.mg, label: p.label })}
+              />
+            ))}
+          </View>
+          {dayDoses.map((d) => (
+            <View key={d.id}>
+              <Divider spacing={0} />
+              <ListRow
+                title={`${formatTime(d.time)} · ${d.label}`}
+                sub={`${d.mg} mg · tap to change`}
+                onPress={() => router.push({ pathname: '/caffeine', params: { id: d.id } })}
+                right={<IconButton icon="close" label="Remove drink" color={colors.textFaint} onPress={() => removeCaffeine(d.id)} />}
+              />
+            </View>
+          ))}
+          <Divider spacing={0} />
+          <ListRow title="Log a drink with an exact time" onPress={() => router.push({ pathname: '/caffeine', params: { date } })} />
+        </Card>
+      </Section>
+
+      <Section title="More">
+        <ListCard>
+          <ListRow icon="pencil-plus-outline" title="Log sleep or a nap yourself" sub="For sleep your watch didn't record" onPress={() => router.push({ pathname: '/log-sleep', params: { date } })} />
+          {a ? <ListRow icon="moon-waning-crescent" title="All nights" sub="Every night, newest first" onPress={() => router.navigate({ pathname: '/sleep', params: { view: 'nights' } })} /> : null}
+        </ListCard>
+      </Section>
     </Screen>
   );
 }

@@ -1,11 +1,11 @@
-/** The "Find a feature or setting…" box on More and Settings, backed by featureIndex.ts. */
+/** The search box on More and Settings, backed by featureIndex.ts: type a word, tap a result to go there. */
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Card, Icon, ListRow } from './components';
+import { Card, Icon, ListCard, ListRow } from './components';
 import { searchFeatures } from './featureIndex';
-import { colors, font, radius, space } from './theme';
+import { colors, font, radius, space, touch } from './theme';
 
 const MAX_RESULTS = 8;
 
@@ -22,7 +22,7 @@ export function FeatureSearch({ onSearchingChange, placeholder = 'Find a feature
   return (
     <View style={{ marginBottom: space.md }}>
       <View style={styles.box}>
-        <Icon name="magnify" size={20} color={colors.textFaint} />
+        <Icon name="magnify" color={colors.textFaint} />
         <TextInput
           value={query}
           onChangeText={set}
@@ -35,47 +35,41 @@ export function FeatureSearch({ onSearchingChange, placeholder = 'Find a feature
           accessibilityLabel="Search features and settings"
         />
         {searching ? (
-          <Pressable onPress={() => set('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
-            <Icon name="close-circle" size={18} color={colors.textFaint} />
+          <Pressable onPress={() => set('')} hitSlop={12} accessibilityRole="button" accessibilityLabel="Clear search">
+            <Icon name="close-circle" color={colors.textFaint} />
           </Pressable>
         ) : null}
       </View>
       {searching ? (
-        <Card style={{ marginTop: space.sm, paddingVertical: space.xs }} animate={false}>
+        <View style={{ marginTop: space.sm }}>
           {results.length ? (
-            results.map((f) => (
-              <ListRow
-                key={f.id}
-                icon={f.icon}
-                title={f.title}
-                sub={f.where}
-                onPress={() => {
-                  set('');
-                  router.push(f.href);
-                }}
-              />
-            ))
+            <ListCard>
+              {results.map((f) => (
+                <ListRow
+                  key={f.id}
+                  icon={f.icon}
+                  title={f.title}
+                  sub={f.where}
+                  onPress={() => {
+                    set('');
+                    router.push(f.href);
+                  }}
+                />
+              ))}
+            </ListCard>
           ) : (
-            <Text style={[font.small, { paddingVertical: space.md }]}>{`Nothing found for “${query.trim()}”. Try a word like “alarm”, “coffee”, “wake-up” or “sync”.`}</Text>
+            <Card animate={false}>
+              <Text style={font.small}>{`Nothing found for “${query.trim()}”. Try a word like “alarm”, “coffee”, “wake-up” or “sync”.`}</Text>
+            </Card>
           )}
-        </Card>
+        </View>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  box: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.md,
-    minHeight: 46,
-  },
-  // The pill already shows where you type; no extra browser focus box in the web preview.
-  input: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 10, minWidth: 0, outlineStyle: 'solid', outlineWidth: 0 },
+  box: { flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: touch.comfy },
+  // The box already shows where you type; no extra browser focus ring in the web preview.
+  input: { ...font.body, flex: 1, paddingVertical: space.sm, minWidth: 0, outlineStyle: 'solid', outlineWidth: 0 },
 });

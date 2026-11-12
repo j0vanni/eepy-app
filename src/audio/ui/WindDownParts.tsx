@@ -1,83 +1,50 @@
-import { ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+/**
+ * The wind-down screen's own pieces: the countdown to lights-out at the top, and the plain
+ * "before lights-out" checklist (shown when the bedtime rundown is off).
+ */
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { formatDuration, formatTime } from '@/engine/time';
-import { Card, CardTitle, Icon, Note, Ring } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { useNow } from '@/state/useAnalysis';
+import { Hero, Icon, ListCard, Meter, Note, Section } from '@/ui/components';
+import { until } from '@/ui/format';
+import { colors, font, space, touch } from '@/ui/theme';
 
-import { CARD_LEAD_MS, WIND_DOWN_CHECKLIST, windDownStatus } from '../windDown';
+import { WIND_DOWN_CHECKLIST, windDownStatus } from '../windDown';
 
-/** Big countdown to wind-down / lights-out from tonight's plan. */
-export function CountdownHero({ analysis, now }: { analysis: Analysis | undefined; now: number }) {
+/** The one thing the screen is about: how long until lights-out (and, before wind-down, when it starts). */
+export function CountdownHero({ analysis }: { analysis: Analysis | undefined }) {
+  // Its own clock: the last ten minutes count down by the second.
+  const now = useNow(1000);
   if (!analysis) {
-    return (
-      <Card style={styles.hero}>
-        <Row icon="weather-night" ring={0}>
-          <Text style={font.label}>WIND DOWN</Text>
-          <Text style={styles.big}>Tonight</Text>
-          <Text style={font.small}>Sync a few nights from your watch for a personal lights-out time. Everything below works already.</Text>
-        </Row>
-      </Card>
-    );
+    return <Hero label="Wind-down" value="Tonight" caption="Sync a few nights from your watch for your own lights-out time. Everything below works already." />;
   }
   const t = analysis.tonight;
   const s = windDownStatus(now, t);
-  if (s.phase === 'before') {
-    const lead = Math.min(1, Math.max(0, 1 - (t.windDownStart - now) / CARD_LEAD_MS));
+  if (s.phase === 'after') {
     return (
-      <Card style={styles.hero}>
-        <Row icon="weather-sunset-down" ring={lead} color={colors.light}>
-          <Text style={font.label}>WIND-DOWN STARTS IN</Text>
-          <Text style={styles.big}>{formatDuration(s.minToWindDown)}</Text>
-          <Text style={font.small}>at {formatTime(t.windDownStart)}</Text>
-          <Text style={font.small}>
-            lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
-          </Text>
-        </Row>
-      </Card>
+      <Hero
+        label="Past lights-out"
+        value="Time to sleep"
+        caption={`Lights out was ${formatTime(t.bedtime)}, ${formatDuration(-s.minToBedtime)} ago · wake ${formatTime(t.wake)}. Phone face down. Sounds keep playing.`}
+      />
     );
   }
-  if (s.phase === 'during') {
-    return (
-      <Card style={styles.hero} accent={colors.accent}>
-        <Row icon="weather-night" ring={s.progress} color={colors.accent}>
-          <Text style={[font.label, { color: colors.accent }]}>LIGHTS OUT IN</Text>
-          <Text style={styles.big}>{formatDuration(s.minToBedtime)}</Text>
-          <Text style={font.small}>
-            Lights out {formatTime(t.bedtime)} · wake {formatTime(t.wake)}
-          </Text>
-        </Row>
-      </Card>
-    );
-  }
+  const winding = s.phase === 'during';
   return (
-    <Card style={styles.hero} accent={colors.deep}>
-      <Row icon="sleep" ring={1} color={colors.deep}>
-        <Text style={font.label}>PAST LIGHTS-OUT</Text>
-        <Text style={styles.big}>Time to sleep</Text>
-        <Text style={font.small}>
-          Lights out was {formatTime(t.bedtime)} ({formatDuration(-s.minToBedtime)} ago) · wake {formatTime(t.wake)}. Put the phone face down — sounds keep playing.
-        </Text>
-      </Row>
-    </Card>
-  );
-}
-
-function Row({ icon, ring, color = colors.accent, children }: { icon: string; ring: number; color?: string; children: ReactNode }) {
-  return (
-    <View style={styles.row}>
-      {ring > 0.01 ? (
-        <Ring value={ring} max={1} size={76} stroke={6} color={color}>
-          <Icon name={icon} size={28} color={color} />
-        </Ring>
-      ) : (
-        <View style={styles.ringIdle}>
-          <Icon name={icon} size={28} color={color} />
+    <Hero
+      label={winding ? 'Winding down · lights out in' : 'Lights out in'}
+      value={until(t.bedtime - now)}
+      caption={winding ? `At ${formatTime(t.bedtime)} · wake ${formatTime(t.wake)}` : `At ${formatTime(t.bedtime)} · wind-down starts ${formatTime(t.windDownStart)}, in ${formatDuration(s.minToWindDown)}`}
+    >
+      {winding ? (
+        <View style={{ marginTop: space.md }}>
+          <Meter value={s.progress} max={1} color={colors.sleep} />
         </View>
-      )}
-      <View style={{ flex: 1, gap: 2 }}>{children}</View>
-    </View>
+      ) : null}
+    </Hero>
   );
 }
 
@@ -93,49 +60,32 @@ export function Checklist({ nightKey }: { nightKey: string }) {
   };
   const all = done.length === WIND_DOWN_CHECKLIST.length;
   return (
-    <Card>
-      <CardTitle
-        icon="clipboard-check-outline"
-        title="Before lights-out"
-        color={colors.good}
-        right={<Text style={[font.small, { color: all ? colors.good : colors.textDim }]}>{`${done.length} of ${WIND_DOWN_CHECKLIST.length}`}</Text>}
-      />
-      {WIND_DOWN_CHECKLIST.map((item, i) => {
-        const checked = done.includes(item.id);
-        return (
-          <Pressable
-            key={item.id}
-            onPress={() => toggle(item.id)}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked }}
-            style={({ pressed }) => [styles.item, i > 0 && styles.itemBorder, pressed && { opacity: 0.7 }]}
-          >
-            <Icon name={checked ? 'check-circle' : 'checkbox-blank-circle-outline'} size={24} color={checked ? colors.good : colors.textFaint} />
-            <View style={{ flex: 1 }}>
-              <Text style={[font.body, checked && styles.checkedText]}>{item.title}</Text>
-              <Text style={font.small}>{item.sub}</Text>
-            </View>
-            <Icon name={item.icon} size={20} color={checked ? colors.textFaint : colors.textDim} />
-          </Pressable>
-        );
-      })}
+    <Section title="Before lights-out" action={<Text style={[font.small, all ? { color: colors.good } : null]}>{`${done.length} of ${WIND_DOWN_CHECKLIST.length}`}</Text>}>
+      <ListCard>
+        {WIND_DOWN_CHECKLIST.map((item) => {
+          const checked = done.includes(item.id);
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => toggle(item.id)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked }}
+              style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: touch.comfy + space.xs }, pressed ? { opacity: 0.65 } : null]}
+            >
+              <Icon name={checked ? 'check-circle' : 'checkbox-blank-circle-outline'} size={24} color={checked ? colors.good : colors.textFaint} />
+              <View style={{ flex: 1 }}>
+                <Text style={[font.body, checked ? { color: colors.textFaint, textDecorationLine: 'line-through' } : null]}>{item.title}</Text>
+                <Text style={font.small}>{item.sub}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ListCard>
       {all ? (
-        <View style={{ marginTop: space.sm }}>
-          <Note tone="good" icon="weather-night">
-            All set. Keep the lights low from here.
-          </Note>
-        </View>
+        <Note tone="good" icon="weather-night">
+          All set. Keep the lights low from here.
+        </Note>
       ) : null}
-    </Card>
+    </Section>
   );
 }
-
-const styles = StyleSheet.create({
-  hero: { paddingVertical: space.xl },
-  ringIdle: { width: 76, height: 76, borderRadius: 38, borderWidth: 6, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
-  big: { fontSize: 34, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-  item: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
-  itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  checkedText: { color: colors.textDim, textDecorationLine: 'line-through' },
-});

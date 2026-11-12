@@ -1,33 +1,57 @@
+/**
+ * Log a drink, or change one already logged: what it was, when you had it, and what that means for
+ * tonight — then one button.
+ *
+ * Params: `id` edits that drink (and can delete it); `usual=1` starts from the usual morning drink
+ * at its usual time; `date` starts a new drink on that day.
+ */
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { caffeineAt, CAFFEINE_PRESETS } from '@/engine/caffeine';
+import { caffeineAt, caffeineCutoff, CAFFEINE_PRESETS } from '@/engine/caffeine';
 import { drinkOptions, relativeTimeOptions, usualCaffeine, usualDose, usualDoseId } from '@/engine/caffeineHabits';
 import { addDays, atMinutes, dateKey, formatClock, formatTime, HOUR, MINUTE, minutesOfDay } from '@/engine/time';
 import type { CaffeineDose } from '@/engine/types';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Card, CardTitle, Chip, Empty, Note, Row, Screen, Stepper } from '@/ui/components';
+import { Button, Card, CardTitle, Chip, Empty, Note, Screen, Segmented, Stepper } from '@/ui/components';
 import { dayLabel } from '@/ui/format';
-import { confirmHaptic } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { confirmHaptic, selectionTick } from '@/ui/haptics';
+import { colors, font, radius, space, touch } from '@/ui/theme';
 
 const DEFAULT_DRINK = CAFFEINE_PRESETS[1];
 const round5 = (t: number) => Math.round(t / (5 * MINUTE)) * 5 * MINUTE;
 const shortDrink = (label: string) => label.replace(/\s*\(.*\)/, '');
+
 const SHIFTS = [
-  { label: '−1 h', ms: -HOUR },
-  { label: '−15 m', ms: -15 * MINUTE },
-  { label: '+15 m', ms: 15 * MINUTE },
-  { label: '+1 h', ms: HOUR },
+  { label: '−1 h', ms: -HOUR, say: 'One hour earlier' },
+  { label: '−5 m', ms: -5 * MINUTE, say: 'Five minutes earlier' },
+  { label: '+5 m', ms: 5 * MINUTE, say: 'Five minutes later' },
+  { label: '+1 h', ms: HOUR, say: 'One hour later' },
 ];
 
-/**
- * Log a drink after the fact, or change the time / amount of one already logged.
- * Params: `id` edits that drink; `usual=1` starts from the usual morning drink at its usual time;
- * `date` starts a new drink on that day.
- */
+/** The time in the middle, an hour and five minutes either way on each side. */
+function TimeStepper({ time, day, onShift }: { time: number; day: string; onShift: (ms: number) => void }) {
+  const button = (s: (typeof SHIFTS)[number]) => (
+    <Pressable key={s.label} onPress={() => onShift(s.ms)} hitSlop={4} accessibilityRole="button" accessibilityLabel={s.say} style={({ pressed }) => [styles.shift, pressed ? { backgroundColor: colors.border } : null]}>
+      <Text style={[font.small, { color: colors.text, fontWeight: '700' }]}>{s.label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={styles.timeRow}>
+      {SHIFTS.slice(0, 2).map(button)}
+      <View style={{ flex: 1, alignItems: 'center' }}>
+        <Text style={[font.h2, { fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
+          {formatTime(time)}
+        </Text>
+        <Text style={font.tiny}>{dayLabel(day)}</Text>
+      </View>
+      {SHIFTS.slice(2).map(button)}
+    </View>
+  );
+}
+
 export default function DrinkEditor() {
   const params = useLocalSearchParams<{ id?: string; date?: string; usual?: string }>();
   const doses = useStore((s) => s.caffeine);
@@ -54,6 +78,8 @@ export default function DrinkEditor() {
   const [time, setTimeRaw] = useState(initial.time);
   const [mg, setMg] = useState(initial.mg);
   const [label, setLabel] = useState(initial.label);
+  /** "Earlier" shows the time controls; a drink that already has its own time starts there. */
+  const [earlier, setEarlier] = useState(() => !!existing || now - initial.time > 5 * MINUTE);
   const [closing, setClosing] = useState(false);
 
   if (params.id && !existing && !closing) {
@@ -68,10 +94,13 @@ export default function DrinkEditor() {
   // Logged drinks are in the past: anything later than now snaps back to now.
   const setTime = (t: number) => setTimeRaw(Math.min(t, Date.now()));
   const day = dateKey(time);
-  const shift = (ms: number) => setTime(time + ms);
+  const shift = (ms: number) => {
+    selectionTick();
+    setTime(time + ms);
+  };
   const usualToday = usual ? atMinutes(day, usual.timeMin) : undefined;
   const quick = [
-    ...(day === dateKey(now) ? relativeTimeOptions(Date.now()) : []),
+    ...(day === dateKey(now) ? relativeTimeOptions(Date.now()).filter((o) => o.label !== 'Now') : []),
     ...(usual && usualToday !== undefined && usualToday <= Date.now() ? [{ label: `Usual · ${formatClock(usual.timeMin)}`, time: usualToday }] : []),
     ...(existing ? [{ label: `Was ${formatTime(existing.time)}`, time: existing.time }] : []),
   ];
@@ -81,6 +110,8 @@ export default function DrinkEditor() {
   const others = doses.filter((d) => d.id !== initial.id && bedtime !== undefined && d.time > bedtime - 36 * HOUR);
   const atBed = bedtime !== undefined ? caffeineAt([...others, { id: 'x', time, mg, label }], bedtime, halfLife) : undefined;
   const wasAtBed = existing && bedtime !== undefined ? caffeineAt([...others, existing], bedtime, halfLife) : undefined;
+  // The latest a standard drink still fits under the limit, this one aside.
+  const cutoff = bedtime !== undefined ? caffeineCutoff(others, bedtime, halfLife, limit).cutoff : undefined;
 
   const done = () => {
     setClosing(true);
@@ -102,41 +133,21 @@ export default function DrinkEditor() {
     if (existing) removeCaffeine(existing.id);
     done();
   };
+  const saveOwnDrink = () => {
+    const name = newName?.trim();
+    if (!name) return;
+    setSettings({ customDrinks: [{ label: name, mg }, ...customDrinks.filter((c) => c.label !== name)] });
+    setLabel(name);
+    setNewName(undefined);
+  };
 
   return (
-    <Screen subtitle={existing ? 'Forgot to log it on time? Move it to when you actually drank it.' : 'Log a drink at the time you actually had it.'}>
+    <Screen>
       <Stack.Screen options={{ title: existing ? 'Edit drink' : 'Log a drink' }} />
 
       <Card>
-        <CardTitle icon="clock-outline" title="When" color={colors.caffeine} />
-        <View style={{ alignItems: 'center', marginBottom: space.sm }}>
-          <Text style={[font.stat, { color: colors.caffeine, fontVariant: ['tabular-nums'] }]}>{formatTime(time)}</Text>
-          <Text style={font.small}>{dayLabel(day)}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {quick.map((q) => (
-            <Chip key={q.label} label={q.label} selected={Math.abs(q.time - time) < MINUTE} onPress={() => setTime(q.time)} />
-          ))}
-        </View>
-        <Stepper label="Fine-tune" sub="5-minute steps" value={formatTime(time)} onDec={() => shift(-5 * MINUTE)} onInc={() => shift(5 * MINUTE)} />
-        <Row gap={space.sm}>
-          {SHIFTS.map((s) => (
-            <View key={s.label} style={{ flex: 1 }}>
-              <Button small kind="secondary" label={s.label} onPress={() => shift(s.ms)} />
-            </View>
-          ))}
-        </Row>
-        <Stepper
-          label="Day"
-          value={dayLabel(day)}
-          onDec={() => setTime(atMinutes(addDays(day, -1), minutesOfDay(time)))}
-          onInc={() => day < dateKey(Date.now()) && setTime(atMinutes(addDays(day, 1), minutesOfDay(time)))}
-        />
-      </Card>
-
-      <Card>
-        <CardTitle icon="coffee-outline" title="What" color={colors.caffeine} right={<Text style={font.h3}>{mg} mg</Text>} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+        <CardTitle title="What" right={<Text style={[font.h3, { color: colors.caffeine, fontVariant: ['tabular-nums'] }]}>{mg} mg</Text>} />
+        <View style={styles.wrap}>
           {drinkOptions(customDrinks).map((p) => (
             <Chip
               key={p.label}
@@ -150,55 +161,82 @@ export default function DrinkEditor() {
               }}
             />
           ))}
-          <Chip icon="plus" label="Your own drink" selected={newName !== undefined} onPress={() => setNewName(newName === undefined ? '' : undefined)} />
+          <Chip icon="plus" label="Your own" selected={newName !== undefined} onPress={() => setNewName(newName === undefined ? '' : undefined)} />
         </View>
-        <Stepper label="Amount" sub="Stronger or weaker than usual?" value={`${mg} mg`} onDec={() => setMg(Math.max(5, mg - 5))} onInc={() => setMg(Math.min(600, mg + 5))} />
+        <View style={{ marginTop: space.sm }}>
+          <Stepper label="Amount" sub="Stronger or weaker than usual?" value={`${mg} mg`} onDec={() => setMg(Math.max(5, mg - 5))} onInc={() => setMg(Math.min(600, mg + 5))} />
+        </View>
         {newName !== undefined ? (
           <View style={{ gap: space.sm, marginTop: space.sm }}>
-            <Text style={font.small}>Name it, set the amount above, and it's saved as one of your drinks (they show first everywhere).</Text>
             <TextInput
               autoFocus
               value={newName}
               onChangeText={setNewName}
-              placeholder="e.g. Instant coffee, 2 tsp"
+              placeholder="Name it, e.g. Instant coffee, 2 tsp"
               placeholderTextColor={colors.textFaint}
               maxLength={40}
-              style={{ color: colors.text, backgroundColor: colors.surfaceAlt, borderRadius: 12, padding: 12, fontSize: 15 }}
+              accessibilityLabel="Name of your drink"
+              style={styles.input}
             />
-            <Button
-              small
-              icon="star-plus-outline"
-              label={`Save "${newName.trim() || '…'}" · ${mg} mg`}
-              onPress={() => {
-                const name = newName.trim();
-                if (!name) return;
-                setSettings({ customDrinks: [{ label: name, mg }, ...customDrinks.filter((c) => c.label !== name)] });
-                setLabel(name);
-                setNewName(undefined);
-              }}
-            />
+            <Button small kind="secondary" icon="star-plus-outline" label={`Save "${newName.trim() || '…'}" · ${mg} mg`} disabled={!newName.trim()} onPress={saveOwnDrink} />
+            <Text style={font.tiny}>Your own drinks come first everywhere.</Text>
           </View>
+        ) : null}
+      </Card>
+
+      <Card>
+        <CardTitle title="When" right={<Text style={[font.h3, { fontVariant: ['tabular-nums'] }]}>{earlier ? `${dayLabel(day)} ${formatTime(time)}` : formatTime(time)}</Text>} />
+        <Segmented
+          options={[
+            { label: 'Now', value: 'now' },
+            { label: 'Earlier', value: 'earlier' },
+          ]}
+          value={earlier ? 'earlier' : 'now'}
+          onChange={(v) => {
+            setEarlier(v === 'earlier');
+            if (v === 'now') setTime(Date.now());
+          }}
+        />
+        {earlier ? (
+          <>
+            {quick.length ? (
+              <View style={[styles.wrap, { marginTop: space.md }]}>
+                {quick.map((q) => (
+                  <Chip key={q.label} label={q.label} selected={Math.abs(q.time - time) < MINUTE} onPress={() => setTime(q.time)} />
+                ))}
+              </View>
+            ) : null}
+            <TimeStepper time={time} day={day} onShift={shift} />
+            <Stepper
+              label="Day"
+              value={dayLabel(day)}
+              onDec={() => setTime(atMinutes(addDays(day, -1), minutesOfDay(time)))}
+              onInc={() => day < dateKey(Date.now()) && setTime(atMinutes(addDays(day, 1), minutesOfDay(time)))}
+            />
+          </>
         ) : null}
       </Card>
 
       {atBed !== undefined && bedtime !== undefined ? (
         <Note tone={atBed > limit ? 'warn' : 'info'} icon="weather-night">
-          {`At lights-out (${formatTime(bedtime)}) about ${Math.round(atBed)} mg will still be active`}
-          {wasAtBed !== undefined && Math.round(wasAtBed) !== Math.round(atBed) ? ` (was ${Math.round(wasAtBed)} mg)` : ''}
-          {atBed > limit ? ` — over your ${limit} mg bedtime limit.` : ` · your limit is ${limit} mg.`}
+          {`Tonight: about ${Math.round(atBed)} mg still active at lights-out (${formatTime(bedtime)})`}
+          {wasAtBed !== undefined && Math.round(wasAtBed) !== Math.round(atBed) ? `, was ${Math.round(wasAtBed)} mg` : ''}
+          {atBed > limit ? `. Over your ${limit} mg limit.` : `. Your limit is ${limit} mg.`}
+          {cutoff !== undefined ? ` Cut-off for a coffee: ${formatTime(cutoff)}.` : ''}
         </Note>
       ) : null}
 
-      <Row gap={space.sm} style={{ marginTop: space.lg }}>
-        {existing ? (
-          <View style={{ flex: 1 }}>
-            <Button kind="secondary" icon="delete-outline" label="Delete" onPress={remove} />
-          </View>
-        ) : null}
-        <View style={{ flex: 2 }}>
-          <Button icon="check" label={existing ? 'Save' : 'Log drink'} onPress={save} />
-        </View>
-      </Row>
+      <View style={{ gap: space.sm, marginTop: space.md }}>
+        <Button icon="check" label={existing ? 'Save' : 'Log it'} onPress={save} />
+        {existing ? <Button kind="danger" icon="delete-outline" label="Delete" onPress={remove} /> : null}
+      </View>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  input: { color: colors.text, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: space.md, fontSize: font.body.fontSize },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md, marginBottom: space.xs },
+  shift: { width: touch.comfy, height: touch.min, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+});

@@ -1,25 +1,22 @@
 /**
- * More: everything that isn't on the other tabs, grouped under plain headings, with a search box
- * that also finds single settings ("Find a feature or setting…").
+ * More: every tool and setting in one list under plain headings, with a search box that also finds
+ * single settings.
  */
 import { Href, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
 
 import { cbtiStatus, CBTI_WEEKS } from '@/engine/cbti';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { IconButton, ListCard, ListRow, Screen, Section } from '@/ui/components';
+import { ListCard, ListRow, Screen, Section } from '@/ui/components';
 import { FeatureSearch } from '@/ui/FeatureSearch';
 import { SelfChecksCard } from '@/ui/settings/SelfChecks';
-import { colors, space } from '@/ui/theme';
 
 interface Item {
   icon: string;
   title: string;
-  sub: string;
+  sub?: string;
   href: Href;
-  color?: string;
 }
 
 function Group({ title, items }: { title: string; items: Item[] }) {
@@ -27,7 +24,7 @@ function Group({ title, items }: { title: string; items: Item[] }) {
     <Section title={title}>
       <ListCard>
         {items.map((i) => (
-          <ListRow key={i.title} icon={i.icon} iconColor={i.color} title={i.title} sub={i.sub} onPress={() => router.push(i.href)} />
+          <ListRow key={i.title} icon={i.icon} title={i.title} sub={i.sub} onPress={() => router.push(i.href)} />
         ))}
       </ListCard>
     </Section>
@@ -37,77 +34,62 @@ function Group({ title, items }: { title: string; items: Item[] }) {
 export default function MoreScreen() {
   const a = useAnalysis();
   const program = useStore((s) => s.cbti);
+  const calibration = useStore((s) => s.calibration);
   const [searching, setSearching] = useState(false);
   const cbti = useMemo(() => (a && program?.active ? cbtiStatus(program, a.nights, a.day) : undefined), [a, program]);
 
-  const settingsButton = (
-    <View style={{ marginRight: -space.sm }}>
-      <IconButton icon="cog-outline" label="Settings" onPress={() => router.push('/settings')} />
-    </View>
-  );
-
   return (
-    <Screen title="More" subtitle="Everything else, in one place" right={settingsButton}>
+    <Screen title="More">
       <FeatureSearch onSearchingChange={setSearching} />
       {searching ? null : (
         <>
           <Group
-            title="Coach"
+            title="Energy"
             items={[
-              { icon: 'account-heart-outline', title: 'Coach', sub: 'Your experiment, goals and this week in one place', href: '/coach' },
-              { icon: 'flask-outline', title: 'Experiments', sub: 'Test what really changes your sleep', href: '/experiments' },
-              { icon: 'flag-checkered', title: 'Goals & streaks', sub: 'Small daily wins, one day at a time', href: '/goals', color: colors.good },
-              { icon: 'calendar-week', title: 'Weekly review', sub: 'Your week in sleep, every Sunday', href: '/review', color: colors.info },
+              { icon: 'lightning-bolt-outline', title: 'Energy', sub: calibration?.accuracy !== undefined ? `Why the number is what it is · ${calibration.accuracy}% accurate` : 'Why the number is what it is, and what your watch adds', href: '/energy' },
+              { icon: 'gesture-tap', title: 'Reaction test', sub: 'One minute, an objective check on your alertness', href: '/reaction' },
+              { icon: 'emoticon-happy-outline', title: 'Check in', sub: 'How alert you feel, plus tags for the day', href: '/checkin' },
+              { icon: 'sleep', title: 'Nap', sub: 'Should you nap, when, and for how long', href: '/nap' },
+              { icon: 'coffee-outline', title: 'Caffeine', sub: 'Log a drink at the time you had it', href: '/caffeine' },
             ]}
           />
           <Group
-            title="Learn"
+            title="Sleep"
             items={[
-              { icon: 'clock-time-four-outline', title: 'Your body clock', sub: 'When your energy peaks and dips — and how eepy learns it', href: '/learning', color: colors.energy },
-              { icon: 'battery-charging-high', title: 'Your sleep need', sub: 'How much sleep you really need, and how sure eepy is', href: '/need', color: colors.good },
-              { icon: 'tune-variant', title: 'What if?', sub: 'Try a bedtime, nap or coffee and see tomorrow change', href: '/simulate', color: colors.rem },
+              { icon: 'scale-balance', title: 'Sleep need and debt', sub: 'How much you need, and how sure eepy is', href: '/need' },
+              { icon: 'weather-night', title: 'Wind-down', sub: 'Your evening steps, breathing and sleep sounds', href: '/winddown' },
+              { icon: 'tune-variant', title: 'What if?', sub: 'Try a bedtime, nap or coffee and see tomorrow', href: '/simulate' },
+              { icon: 'notebook-outline', title: 'Journal', sub: 'Tags, ratings and drinks, day by day', href: '/journal' },
+              { icon: 'pencil-plus-outline', title: 'Log a night yourself', sub: 'For nights without the watch', href: '/log-sleep' },
+            ]}
+          />
+          <Group
+            title="Coach"
+            items={[
+              { icon: 'account-heart-outline', title: 'Coach', sub: 'Your experiment, goals and this week', href: '/coach' },
+              { icon: 'flask-outline', title: 'Experiments', sub: 'Test what really changes your sleep', href: '/experiments' },
+              { icon: 'flag-checkered', title: 'Goals', sub: 'Small daily wins, one day at a time', href: '/goals' },
+              { icon: 'calendar-week', title: 'Weekly review', sub: 'Your week in sleep, every Sunday', href: '/review' },
+              {
+                icon: 'bed-clock',
+                title: 'Insomnia programme',
+                sub: cbti ? `Week ${cbti.week}${cbti.maintenance ? ', maintenance' : ` of ${CBTI_WEEKS}`}` : 'Six weeks for trouble sleeping',
+                href: '/cbti',
+              },
+              { icon: 'airplane-clock', title: 'Jet lag', sub: 'A day-by-day plan for crossing time zones', href: '/jetlag' },
             ]}
           />
           <Section title="Self-checks">
             <SelfChecksCard />
           </Section>
           <Group
-            title="Wind-down"
-            items={[
-              { icon: 'weather-night', title: 'Wind-down routine', sub: 'Countdown, checklist, breathing and sleep sounds', href: '/winddown', color: colors.light },
-              { icon: 'music-note-outline', title: 'Sounds & bedtime autopilot', sub: 'Default sound and timer, screens off, phone sleep mode', href: { pathname: '/settings/[section]', params: { section: 'winddown' } }, color: colors.rem },
-              { icon: 'brightness-6', title: 'Phone light', sub: 'How bright your screen should be this evening', href: { pathname: '/planner', params: { show: 'light' } }, color: colors.light },
-            ]}
-          />
-          <Group
-            title="Programmes"
-            items={[
-              {
-                icon: 'account-heart',
-                title: 'Insomnia programme',
-                sub: cbti ? `Week ${cbti.week}${cbti.maintenance ? ', maintenance' : ` of ${CBTI_WEEKS}`}` : '6-week programme for trouble sleeping (CBT-I)',
-                href: '/cbti',
-                color: colors.bad,
-              },
-              { icon: 'airplane-clock', title: 'Jet lag planner', sub: 'A day-by-day plan for crossing time zones', href: '/jetlag', color: colors.info },
-            ]}
-          />
-          <Group
-            title="Your data"
-            items={[
-              { icon: 'notebook-outline', title: 'Journal', sub: 'Tags, ratings and drinks, day by day', href: '/journal', color: colors.warn },
-              { icon: 'pencil-plus', title: 'Log a night yourself', sub: 'Slept without the watch? Add it here', href: '/log-sleep' },
-              { icon: 'coffee', title: 'Log a drink', sub: 'Coffee, tea or energy drink, at the time you had it', href: '/caffeine', color: colors.caffeine },
-              { icon: 'file-chart-outline', title: 'Reports & export', sub: 'PDF for you or your doctor, CSV of every night', href: '/export', color: colors.textDim },
-              { icon: 'link-variant', title: 'Connect your CMF Watch', sub: 'Health Connect setup, step by step', href: '/connect' },
-            ]}
-          />
-          <Group
             title="App"
             items={[
-              { icon: 'cog-outline', title: 'Settings', sub: 'Alarms, reminders, sounds, caffeine, sync and more', href: '/settings', color: colors.textDim },
-              { icon: 'cellphone-arrow-down', title: 'App updates', sub: 'Get the newest version of eepy', href: '/updates', color: colors.textDim },
-              { icon: 'gift-outline', title: "What's new", sub: 'The new tabs and where things moved', href: '/whats-new', color: colors.accent },
+              { icon: 'cog-outline', title: 'Settings', sub: 'Alarms, reminders, sounds, caffeine, your schedule', href: '/settings' },
+              { icon: 'watch-variant', title: 'Watch and data', sub: 'Sync, backup, export', href: { pathname: '/settings/[section]', params: { section: 'data' } } },
+              { icon: 'file-chart-outline', title: 'Reports', sub: 'A PDF for you or your doctor, a CSV of every night', href: '/export' },
+              { icon: 'cellphone-arrow-down', title: 'App updates', href: '/updates' },
+              { icon: 'gift-outline', title: "What's new", href: '/whats-new' },
             ]}
           />
         </>

@@ -1,17 +1,20 @@
+/**
+ * Log a night (or a nap) yourself, for sleep the watch didn't record: what it was, when, how it
+ * went, then Save. Param `date` preselects the morning you woke up.
+ */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { addDays, atMinutes, dateKey, formatClock, formatDuration, MINUTE, normalizeMinutes } from '@/engine/time';
 import type { SleepSession } from '@/engine/types';
 import { writeSleepToHealthConnect } from '@/integrations/healthConnect';
 import { useStore } from '@/state/store';
-import { Button, Card, Row, Screen, Segmented, Stepper } from '@/ui/components';
-import { Toggle } from '@/ui/settings/Toggle';
+import { Button, Card, Chip, Row, Screen, Section, Segmented, Stepper } from '@/ui/components';
 import { dayLabel } from '@/ui/format';
+import { Toggle } from '@/ui/settings/Toggle';
+import { Question, RatingFaces } from '@/ui/sleep/parts';
 import { colors, font, space } from '@/ui/theme';
-
-const RATINGS = ['😫', '😕', '😐', '🙂', '😄'];
 
 export default function LogSleepScreen() {
   const params = useLocalSearchParams<{ date?: string }>();
@@ -60,69 +63,70 @@ export default function LogSleepScreen() {
     router.back();
   };
 
+  const step = (value: number, set: (v: number) => void, by: number) => () => set(normalizeMinutes(value + by));
+
   return (
-    <Screen>
+    <Screen subtitle="For sleep your watch didn't record.">
       <Segmented
         value={kind}
         onChange={setKind}
         options={[
-          { label: 'Night sleep', value: 'main' },
-          { label: 'Nap', value: 'nap' },
+          { label: 'A night', value: 'main' },
+          { label: 'A nap', value: 'nap' },
         ]}
       />
-      <Card style={{ marginTop: space.md }}>
-        <Stepper
-          label={kind === 'main' ? 'Woke up on' : 'Date'}
-          value={dayLabel(wakeDate)}
-          onDec={() => setWakeDate(addDays(wakeDate, -1))}
-          onInc={() => wakeDate < dateKey(Date.now()) && setWakeDate(addDays(wakeDate, 1))}
-        />
-        {kind === 'main' ? (
-          <>
-            <Stepper label="Went to bed" value={formatClock(bedMin)} onDec={() => setBedMin(normalizeMinutes(bedMin - 15))} onInc={() => setBedMin(normalizeMinutes(bedMin + 15))} />
-            <Stepper label="Got up" value={formatClock(wakeMin)} onDec={() => setWakeMin(normalizeMinutes(wakeMin - 15))} onInc={() => setWakeMin(normalizeMinutes(wakeMin + 15))} />
-          </>
-        ) : (
-          <>
-            <Stepper label="Lay down at" value={formatClock(napStart)} onDec={() => setNapStart(normalizeMinutes(napStart - 15))} onInc={() => setNapStart(normalizeMinutes(napStart + 15))} />
-            <Stepper label="Length" value={`${napLen} min`} onDec={() => setNapLen(Math.max(10, napLen - 5))} onInc={() => setNapLen(Math.min(180, napLen + 5))} />
-          </>
-        )}
-        <Stepper label="Time to fall asleep" value={`${latency} min`} onDec={() => setLatency(Math.max(0, latency - 5))} onInc={() => setLatency(Math.min(120, latency + 5))} />
-        <Text style={[font.small, { marginTop: space.sm }]}>
-          {valid ? `≈ ${formatDuration((end - start) / MINUTE - lat)} asleep` : 'Check the times — that does not look like a sleep period.'}
-        </Text>
-      </Card>
+
+      <Section title="When">
+        <Card>
+          <Stepper
+            label={kind === 'main' ? 'Woke up on' : 'Day'}
+            value={dayLabel(wakeDate)}
+            onDec={() => setWakeDate(addDays(wakeDate, -1))}
+            onInc={() => wakeDate < dateKey(Date.now()) && setWakeDate(addDays(wakeDate, 1))}
+          />
+          {kind === 'main' ? (
+            <>
+              <Stepper label="Went to bed" value={formatClock(bedMin)} onDec={step(bedMin, setBedMin, -15)} onInc={step(bedMin, setBedMin, 15)} />
+              <Stepper label="Got up" value={formatClock(wakeMin)} onDec={step(wakeMin, setWakeMin, -15)} onInc={step(wakeMin, setWakeMin, 15)} />
+            </>
+          ) : (
+            <>
+              <Stepper label="Lay down at" value={formatClock(napStart)} onDec={step(napStart, setNapStart, -15)} onInc={step(napStart, setNapStart, 15)} />
+              <Stepper label="For how long" value={`${napLen} min`} onDec={() => setNapLen(Math.max(10, napLen - 5))} onInc={() => setNapLen(Math.min(180, napLen + 5))} />
+            </>
+          )}
+          <Stepper label="Time to fall asleep" value={`${latency} min`} onDec={() => setLatency(Math.max(0, latency - 5))} onInc={() => setLatency(Math.min(120, latency + 5))} />
+          <Text style={[valid ? font.h3 : font.small, { marginTop: space.sm, color: valid ? colors.text : colors.warn }]}>
+            {valid ? `About ${formatDuration((end - start) / MINUTE - lat)} asleep` : 'Check the times: that does not look like a sleep period.'}
+          </Text>
+        </Card>
+      </Section>
 
       {kind === 'main' ? (
-        <Card>
-          <Text style={font.body}>How was it?</Text>
-          <Row gap={space.sm} style={{ marginTop: 6 }}>
-            {RATINGS.map((r, i) => (
-              <Pressable key={r} onPress={() => setRating(i + 1)} style={{ padding: 8, borderRadius: 12, backgroundColor: rating === i + 1 ? colors.accentSoft : 'transparent' }}>
-                <Text style={{ fontSize: 26 }}>{r}</Text>
-              </Pressable>
-            ))}
-          </Row>
-          <Segmented
-            value={natural === undefined ? 'unset' : natural ? 'yes' : 'no'}
-            onChange={(v) => setNatural(v === 'unset' ? undefined : v === 'yes')}
-            options={[
-              { label: 'Woke naturally', value: 'yes' },
-              { label: 'Alarm', value: 'no' },
-              { label: 'Not sure', value: 'unset' },
-            ]}
-          />
-        </Card>
+        <Section title="How it went">
+          <Card>
+            <Question first>How did you sleep?</Question>
+            <RatingFaces value={rating} onChange={setRating} />
+            <Question>Did you wake up on your own?</Question>
+            <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
+              {/* Tapping the chosen answer again clears it ("not sure"). */}
+              <Chip label="Yes" icon="weather-sunny" selected={natural === true} onPress={() => setNatural(natural === true ? undefined : true)} />
+              <Chip label="No, alarm or woken" icon="alarm" selected={natural === false} onPress={() => setNatural(natural === false ? undefined : false)} />
+            </Row>
+            <Text style={[font.tiny, { marginTop: space.sm }]}>Leave it empty if you're not sure.</Text>
+          </Card>
+        </Section>
       ) : null}
 
       {Platform.OS === 'android' ? (
-        <Card>
-          <Toggle label="Also save to Health Connect" sub="So other health apps see it too." value={toHc} onChange={setToHc} />
-        </Card>
+        <Section title="Also">
+          <Card style={{ paddingVertical: space.xs }}>
+            <Toggle label="Save to Health Connect too" sub="So other health apps see it." value={toHc} onChange={setToHc} />
+          </Card>
+        </Section>
       ) : null}
 
-      <Button label="Save" icon="check" disabled={!valid} onPress={save} />
+      <Button label={kind === 'main' ? 'Save night' : 'Save nap'} icon="check" disabled={!valid} onPress={save} style={{ marginTop: space.md }} />
     </Screen>
   );
 }

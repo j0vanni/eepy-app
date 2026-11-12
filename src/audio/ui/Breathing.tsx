@@ -1,15 +1,19 @@
+/**
+ * Paced breathing as it opens in place on the wind-down screen: box (4-4-4-4) or 4-7-8, a circle
+ * that grows and shrinks with the breath, a countdown and a haptic cue at every phase.
+ */
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { Button, Card, CardTitle, Chip, Note, Segmented } from '@/ui/components';
+import { Button, Chip, Note, Segmented } from '@/ui/components';
 import { colors, font, space } from '@/ui/theme';
 
 import { BREATH_PATTERNS, BreathPatternId, BreathPhaseKind, breathStateAt, MIN_SCALE, phaseTargetScale, SESSION_MINUTES, sessionCycles } from '../breathing';
 import { formatRemaining } from '../envelope';
 
-const SIZE = 232;
+const SIZE = 216;
 
 function cue(kind: BreathPhaseKind | 'done') {
   if (Platform.OS === 'web') return;
@@ -20,8 +24,7 @@ function cue(kind: BreathPhaseKind | 'done') {
   run.catch(() => undefined);
 }
 
-/** Box (4-4-4-4) or 4-7-8 breathing with a growing/shrinking circle, countdown and haptic cues. */
-export function BreathingCard() {
+export function Breathing() {
   const [patternId, setPatternId] = useState<BreathPatternId>('box');
   const [minutes, setMinutes] = useState<number>(5);
   const [startedAt, setStartedAt] = useState<number | undefined>(undefined);
@@ -61,12 +64,8 @@ export function BreathingCard() {
 
   const core = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
   const halo = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.get() * 1.12 }],
-    opacity: interpolate(scale.get(), [MIN_SCALE, 1], [0.12, 0.32]),
-  }));
-  const outerHalo = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.get() * 1.26 }],
-    opacity: interpolate(scale.get(), [MIN_SCALE, 1], [0.04, 0.14]),
+    transform: [{ scale: scale.get() * 1.14 }],
+    opacity: interpolate(scale.get(), [MIN_SCALE, 1], [0.08, 0.22]),
   }));
 
   const start = () => {
@@ -82,8 +81,7 @@ export function BreathingCard() {
   const cycles = sessionCycles(pattern, minutes);
 
   return (
-    <Card>
-      <CardTitle icon="meditation" title="Breathe" color={colors.light} />
+    <View>
       <Segmented
         options={[
           { label: 'Box 4·4·4·4', value: 'box' as BreathPatternId },
@@ -98,21 +96,18 @@ export function BreathingCard() {
       <Text style={[font.small, { marginTop: space.sm }]}>{pattern.blurb}</Text>
 
       <View style={styles.stage} accessibilityLiveRegion="polite" accessibilityLabel={showing ? `${showing.phase.label}, ${showing.phaseSecondsLeft}` : 'Breathing pacer'}>
-        <View style={[styles.guide, { width: SIZE, height: SIZE, borderRadius: SIZE / 2 }]} />
-        <View style={[styles.guide, { width: SIZE * MIN_SCALE, height: SIZE * MIN_SCALE, borderRadius: (SIZE * MIN_SCALE) / 2, borderStyle: 'dashed' }]} />
-        <Animated.View style={[styles.circle, { backgroundColor: colors.light }, outerHalo]} />
-        <Animated.View style={[styles.circle, { backgroundColor: colors.light }, halo]} />
+        <Animated.View style={[styles.circle, styles.halo, halo]} />
         <Animated.View style={[styles.circle, styles.core, core]} />
         <View style={styles.center}>
           {showing ? (
             <>
-              <Text style={styles.phase}>{showing.phase.label}</Text>
+              <Text style={font.h3}>{showing.phase.label}</Text>
               <Text style={styles.count}>{showing.phaseSecondsLeft}</Text>
             </>
           ) : (
             <>
-              <Text style={styles.phase}>{finished ? 'Well done' : 'Ready'}</Text>
-              <Text style={styles.pattern}>{pattern.phases.map((p) => p.seconds).join(' · ')}</Text>
+              <Text style={font.h3}>{finished ? 'Well done' : 'Ready'}</Text>
+              <Text style={font.small}>{pattern.phases.map((p) => p.seconds).join(' · ')}</Text>
             </>
           )}
         </View>
@@ -132,30 +127,26 @@ export function BreathingCard() {
         </View>
       ) : null}
 
-      <Button label={running ? 'Stop' : finished ? 'Again' : 'Start breathing'} icon={running ? 'stop' : 'play'} kind={running ? 'secondary' : 'primary'} onPress={running ? () => setStartedAt(undefined) : start} />
+      <Button label={running ? 'Stop' : finished ? 'Again' : 'Start breathing'} icon={running ? 'stop' : 'play'} kind="secondary" onPress={running ? () => setStartedAt(undefined) : start} />
 
       {finished && !running ? (
         <View style={{ marginTop: space.md }}>
-          <Note tone="good" icon="check-circle-outline">
-            {finished} slow breaths done. Your heart rate is already easing — carry the calm into lights-out.
-          </Note>
+          <Note tone="good">{finished} slow breaths done. Carry the calm into lights-out.</Note>
         </View>
       ) : null}
-      {patternId === '478' && !running && !finished ? (
-        <Text style={[font.tiny, { marginTop: space.md, textAlign: 'center' }]}>New to 4-7-8? Start with 2 minutes; light-headedness fades with practice.</Text>
-      ) : null}
-    </Card>
+      {patternId === '478' && !running && !finished ? <Text style={[font.tiny, { marginTop: space.md, textAlign: 'center' }]}>New to 4-7-8? Start with 2 minutes. Light-headedness fades with practice.</Text> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stage: { height: SIZE * 1.3, alignItems: 'center', justifyContent: 'center', marginVertical: space.md },
-  guide: { position: 'absolute', borderWidth: 1, borderColor: colors.border },
+  stage: { height: SIZE * 1.2, alignItems: 'center', justifyContent: 'center', marginVertical: space.md },
   circle: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
-  core: { backgroundColor: colors.accentSoft, borderWidth: 2, borderColor: colors.accent },
+  // Blue is sleep's colour; the circle is the only thing moving on the screen.
+  halo: { backgroundColor: colors.sleep },
+  core: { backgroundColor: colors.sleepSoft },
   center: { alignItems: 'center', justifyContent: 'center' },
-  phase: { ...font.h3, color: colors.text, letterSpacing: 0.5 },
-  count: { fontSize: 44, fontWeight: '300', color: colors.text, marginTop: 2, fontVariant: ['tabular-nums'] },
-  pattern: { ...font.small, marginTop: 4, letterSpacing: 1 },
+  // The one number of the exercise: between h1 and display.
+  count: { ...font.display, fontSize: 44, lineHeight: 50, letterSpacing: -1 },
   chips: { flexDirection: 'row', justifyContent: 'center', gap: space.sm, marginBottom: space.md },
 });

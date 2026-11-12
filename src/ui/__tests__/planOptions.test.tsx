@@ -1,6 +1,9 @@
 /**
- * Render tests for "Options for tonight" (Planner → Tonight) and Today's "Still up?" card, on nights
- * like the user's: up at 6:00 with a 5:00 routine, ~3½ h of debt, usually asleep around 2 AM.
+ * Render tests for "Options for tonight" (Plan tab) and Today's "Still up?" card, on nights like the
+ * user's: up at 6:00 with a 5:00 routine, ~3½ h of debt, usually asleep around 2 AM.
+ *
+ * The "Still up?" card and the night view belong to Today: those tests find things by the engine's
+ * own words (an option's headline and title) and check what a tap did, not Today's copy.
  */
 // Icons load their font asynchronously, which Jest's asset registry can't serve.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
@@ -87,6 +90,13 @@ const click = async (n: TestInstance | undefined, what: string) => {
   await act(async () => undefined);
 };
 const press = (label: string) => click(clickableOf(root.container.queryAll((i) => i.type === 'Text' && i.children.join('') === label)[0]), label);
+/** The first thing you can tap after the text `after` (reading order): the button that belongs to it. */
+const pressAfter = (after: string) => {
+  const all = root.container.queryAll(() => true);
+  const at = all.findIndex((i) => i.type === 'Text' && i.children.join('').includes(after));
+  const button = at < 0 ? undefined : all.slice(at + 1).find((i) => typeof i.props.onClick === 'function' && !i.queryAll((c) => c === all[at]).length);
+  return click(button, `the button after "${after}"`);
+};
 /** The button `label` inside the option row whose accessibility label starts with `row`. */
 const pressInRow = (row: string, label: string) => {
   const r = root.container.queryAll((i) => typeof i.props.accessibilityLabel === 'string' && i.props.accessibilityLabel.startsWith(row))[0];
@@ -95,36 +105,52 @@ const pressInRow = (row: string, label: string) => {
 };
 
 describe('Options for tonight', () => {
-  it("lists the options with eepy's pick first, its details open, and how eepy decided folded", async () => {
+  it("lists the options one line each with eepy's pick first, details on tap, and how eepy decided folded", async () => {
     await render(<PlanOptionsCard a={analysisAt(EVENING)} />);
+    const useThis = () => root.container.queryAll((i) => i.type === 'Text' && i.children.join('') === 'Use this');
     const t = text();
     expect(t).toContain('Options for tonight');
-    expect(t).toContain("EEPY'S PICK");
+    expect(t).toContain("eepy's pick");
     expect(t).toContain("eepy's plan");
     expect(t).toContain('Lights out 23:52 · routine 05:00 · up 06:00');
-    // Durations never break across lines (no-break spaces).
-    expect(t).toMatch(/5h\u00A0\d\dm sleep · debt in a week \dh\u00A0\d\dm/);
     for (const title of ['Skip the routine', 'Full catch-up', 'Plan + nap tomorrow']) expect(t).toContain(title);
-    expect(t).toMatch(/5h\u00A0\d\dm sleep \(\+30m\) · debt in a week/);
-    // eepy's plan is in use (no "Use this" on it), the others can be used.
-    expect(t).toContain('IN USE');
-    expect(root.container.queryAll((i) => i.type === 'Text' && i.children.join('') === 'Use this')).toHaveLength(3);
-    // The pick's pros and cons are open.
-    expect(t).toContain('Keeps your routine at 05:00');
-    expect(t).toContain("You've been going to bed ~35 min after the plan lately");
+    // eepy's pick comes first.
+    const rows = root.container.queryAll((i) => typeof i.props.accessibilityLabel === 'string' && i.props.accessibilityLabel.includes('debt in a week'));
+    expect(rows).toHaveLength(4);
+    expect(rows[0].props.accessibilityLabel).toMatch(/^eepy's plan, eepy's pick, in use\. Lights out 23:52/);
+    // The pick is already in use, so nothing is open: one line each.
+    expect(t).toContain('In use');
+    expect(t).not.toContain('Keeps your routine at 05:00');
     expect(t).toContain("Planning earlier won't help while bedtime keeps slipping ~35 min");
-    expect(t).not.toContain('You have 3h 38m of sleep debt.');
+    // Its numbers, pros and cons on tap. Durations never break across lines (no-break spaces). Nothing to use on it.
+    await press("eepy's plan");
+    expect(text()).toMatch(/5h\u00A0\d\dm sleep · debt in a week \dh\u00A0\d\dm/);
+    expect(text()).toContain('Keeps your routine at 05:00');
+    expect(text()).toContain("You've been going to bed ~35 min after the plan lately");
+    expect(useThis()).toHaveLength(0);
+    expect(text()).not.toContain('You have 3h 38m of sleep debt.');
     await press('How eepy decided');
     expect(text()).toContain('You have 3h 38m of sleep debt.');
     expect(text()).toContain('Last 3 nights you went to bed ~35 min after the plan.');
     expect(text()).toContain("So: keep eepy's plan — lights out 23:52, routine alarm 05:00.");
-    // Another option's details on tap.
-    await press('Pros, cons and the week');
+    // Another option's details on tap: its numbers against the plan, and "Use this".
+    expect(text()).not.toMatch(/Tomorrow: energy \d+ \(plan \d+\)/);
+    await press('Skip the routine');
+    expect(text()).toMatch(/5h\u00A0\d\dm sleep \(\+30m\) · debt in a week/);
     expect(text()).toMatch(/Tomorrow: energy \d+ \(plan \d+\)/);
+    expect(useThis()).toHaveLength(1);
+    // One option open at a time.
+    expect(text()).not.toContain('Keeps your routine at 05:00');
+    // Every other option can be used.
+    for (const title of ['Full catch-up', 'Plan + nap tomorrow']) {
+      await press(title);
+      expect(useThis()).toHaveLength(1);
+    }
   });
 
   it('"Use this" skips the routine for that morning; then it shows as in use, with the way back', async () => {
     await render(<PlanOptionsCard a={analysisAt(EVENING)} />);
+    await press('Skip the routine');
     await pressInRow('Skip the routine.', 'Use this');
     expect(useStore.getState().profile.wakePlan?.[TUE]).toEqual({ twoStep: false });
     expect(useStore.getState().settings.tonight).toEqual({ wakeDate: TUE, choice: { id: 'skip-routine', title: 'Skip the routine', routineBefore: null } });
@@ -132,10 +158,25 @@ describe('Options for tonight', () => {
     expect(a.tonight.twoStep).toBeUndefined();
     await remount(<PlanOptionsCard a={a} />);
     expect(text()).toContain("Using “Skip the routine” tonight. eepy's plan: lights out 23:52, routine 05:00, up 06:00.");
+    const inUse = root.container.queryAll((i) => typeof i.props.accessibilityLabel === 'string' && i.props.accessibilityLabel.includes(', in use.')).map((i) => i.props.accessibilityLabel);
+    expect(inUse.join('|')).toMatch(/^Skip the routine\b[^.|]*, in use\./);
     await press("Back to eepy's plan");
     expect(useStore.getState().profile.wakePlan?.[TUE]).toBeUndefined();
     expect(useStore.getState().settings.tonight).toBeUndefined();
     expect(analysisAt(EVENING).tonight.twoStep).toBeDefined();
+  });
+
+  it("past lights-out: eepy's pick from now is open, ready to use", async () => {
+    clock = STILL_UP;
+    await render(<PlanOptionsCard a={analysisAt(STILL_UP)} />);
+    const t = text();
+    expect(t).toContain('Lights out was 23:52.');
+    expect(t).toContain("eepy's pick");
+    expect(t).not.toContain('In use');
+    // The pick's details are open, with the one button that uses it.
+    expect(t).toMatch(/Tomorrow: energy \d+/);
+    await press('Use this');
+    expect(useStore.getState().settings.tonight).toMatchObject({ wakeDate: TUE, bedtime: atMinutes(USER_MON, 24 * 60 + 20), choice: { id: 'now-skip' } });
   });
 
   it('shows 12-hour times', async () => {
@@ -146,17 +187,19 @@ describe('Options for tonight', () => {
 });
 
 describe('Still up?', () => {
+  // The engine's words for the best plan from 00:05 and for two of the alternatives.
+  const BEST = 'Lights out by 00:20, skip the routine';
+  const shown = () => text().includes(BEST);
+
   it('past lights-out: the best plan from now in one tap, and a few alternatives', async () => {
     clock = STILL_UP;
     await render(<StillUpCard a={analysisAt(STILL_UP)} now={STILL_UP} />);
     const t = text();
-    expect(t).toContain('STILL UP?');
-    expect(t).toContain('Lights out by 00:20, skip the routine → 5h 25m');
+    expect(t).toContain(BEST);
     expect(t).toContain('Lights out by 00:20 · alarm 06:00');
-    expect(t).toContain('OR');
     expect(t).toContain('Bed now');
     expect(t).toContain('Another 30 min up');
-    await press('Use this');
+    await pressAfter(BEST);
     expect(useStore.getState().settings.tonight).toMatchObject({ wakeDate: TUE, bedtime: atMinutes(USER_MON, 24 * 60 + 20), choice: { id: 'now-skip' } });
     expect(useStore.getState().profile.wakePlan?.[TUE]).toEqual({ twoStep: false });
     // Re-planned: lights-out is ahead again, the alarm follows (one alarm, no routine) — no "Still up?".
@@ -164,16 +207,14 @@ describe('Still up?', () => {
     expect(a.tonight.bedtime).toBe(atMinutes(USER_MON, 24 * 60 + 20));
     expect(a.tonight.twoStep).toBeUndefined();
     await remount(<StillUpCard a={a} now={STILL_UP} />);
-    expect(text()).not.toContain('STILL UP?');
+    expect(shown()).toBe(false);
+    expect(root.container.queryAll((i) => i.type === 'Text')).toHaveLength(0);
   });
 
   it('an alternative is one tap too', async () => {
     clock = STILL_UP;
     await render(<StillUpCard a={analysisAt(STILL_UP)} now={STILL_UP} />);
-    const bedNow = root.container.queryAll((i) => i.type === 'Text' && i.children.join('') === 'Bed now')[0];
-    let row: TestInstance | null | undefined = bedNow;
-    while (row && !row.queryAll((i) => i.type === 'Text' && i.children.join('') === 'Use').length) row = row.parent;
-    await click(clickableOf(row!.queryAll((i) => i.type === 'Text' && i.children.join('') === 'Use')[0]), 'Use');
+    await pressAfter('Bed now');
     expect(useStore.getState().settings.tonight).toMatchObject({ bedtime: atMinutes(USER_MON, 24 * 60 + 20), choice: { id: 'now' } });
     // Bed now keeps the routine.
     expect(useStore.getState().profile.wakePlan?.[TUE]).toBeUndefined();
@@ -183,12 +224,11 @@ describe('Still up?', () => {
     clock = STILL_UP;
     const a = analysisAt(STILL_UP);
     await render(<NightView a={a} now={STILL_UP} input={phaseInputFor(a, useStore.getState().profile)} />);
-    expect(text()).toContain('STILL UP?');
-    expect(text()).not.toContain('Still up? Re-plan the rest of the night');
+    expect(shown()).toBe(true);
     await remount(<StillUpCard a={analysisAt(EVENING)} now={EVENING} />);
-    expect(text()).not.toContain('STILL UP?');
+    expect(root.container.queryAll((i) => i.type === 'Text')).toHaveLength(0);
     await act(async () => useStore.getState().setSettings({ session: { inBedAt: STILL_UP, wakeDate: TUE, wakeAt: atMinutes(TUE, 6 * 60), retimed: false } }));
     await remount(<StillUpCard a={a} now={STILL_UP} />);
-    expect(text()).not.toContain('STILL UP?');
+    expect(root.container.queryAll((i) => i.type === 'Text')).toHaveLength(0);
   });
 });

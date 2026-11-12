@@ -1,13 +1,13 @@
 /** What each Settings page (/settings/<id>, listed in sections.ts) shows, built from the section components. */
-import { CalendarSection } from './CalendarSection';
+import { Section } from '../components';
 import { AboutSection } from './AboutSection';
 import { CaffeineSection } from './CaffeineSection';
+import { CalendarSection } from './CalendarSection';
 import { DataSourcesSection, YourDataSection } from './DataSection';
 import { EReaderSection } from './EReaderSection';
 import { LearningSection } from './LearningSection';
 import { BackgroundSection, NotificationsSection, WakeAlarmSection } from './NotificationsSection';
 import { AboutYouSection, SleepNeedSection } from './ProfileSection';
-import { ProgramsSection } from './ProgramsSection';
 import { RundownSection } from './RundownSection';
 import type { SettingsSectionId } from './sections';
 import { SelfChecksCard } from './SelfChecks';
@@ -15,8 +15,7 @@ import { ShortcutsSection } from './ShortcutsSection';
 import { SleepModeSection } from './SleepModeSection';
 import { UpdatesSection } from './UpdatesSection';
 import { WatchSection } from './WatchSection';
-import { WindDownLengthSection, WindDownSection } from './WindDownSection';
-import { Section } from '../components';
+import { ScreensSection, SleepSoundsSection, WindDownLengthSection } from './WindDownSection';
 
 export function SettingsPage({ id }: { id: SettingsSectionId }) {
   switch (id) {
@@ -29,7 +28,6 @@ export function SettingsPage({ id }: { id: SettingsSectionId }) {
           <Section title="Self-checks">
             <SelfChecksCard />
           </Section>
-          <ProgramsSection />
         </>
       );
     case 'alarms':
@@ -52,10 +50,11 @@ export function SettingsPage({ id }: { id: SettingsSectionId }) {
       return (
         <>
           <WindDownLengthSection />
-          <RundownSection />
-          <WindDownSection />
-          <EReaderSection />
+          <ScreensSection />
+          <SleepSoundsSection />
           <SleepModeSection />
+          <EReaderSection />
+          <RundownSection />
         </>
       );
     case 'caffeine':

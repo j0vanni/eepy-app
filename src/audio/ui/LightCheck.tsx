@@ -1,52 +1,57 @@
+/**
+ * Light check: live ambient light from the phone's sensor (Android), against what is good before
+ * bed or in the morning. `useLightSensorAvailable` tells a screen whether to offer it at all (no
+ * sensor on web, iOS and some phones); `LightCheck` reads the sensor only while it is on screen.
+ */
 import { LightSensor } from 'expo-sensors';
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { Card, CardTitle, Note, Segmented } from '@/ui/components';
+import { Note, Segmented } from '@/ui/components';
 import { colors, font, radius, space } from '@/ui/theme';
 
 import { formatLux, LightContext, lightAdvice, LUX, luxMeterPosition, smoothLux } from '../light';
 
-type Availability = 'checking' | 'yes' | 'no';
-
-/**
- * Live ambient light from the phone's sensor (Android). Subscribes only while mounted and renders
- * nothing where there's no light sensor (web, iOS, some phones).
- */
-export function LightCheckCard({ context }: { context: LightContext }) {
-  const [available, setAvailable] = useState<Availability>(Platform.OS === 'android' ? 'checking' : 'no');
-  const [lux, setLux] = useState<number | undefined>(undefined);
-  const [mode, setMode] = useState<'evening' | 'morning'>(context === 'morning' ? 'morning' : 'evening');
-
+/** Whether this phone has a light sensor eepy can read. False until known. */
+export function useLightSensorAvailable(): boolean {
+  const [available, setAvailable] = useState(false);
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     let cancelled = false;
-    let sub: { remove(): void } | undefined;
     LightSensor.isAvailableAsync()
       .then((ok) => {
-        if (cancelled) return;
-        setAvailable(ok ? 'yes' : 'no');
-        if (!ok) return;
-        LightSensor.setUpdateInterval(500);
-        sub = LightSensor.addListener(({ illuminance }) => setLux((prev) => smoothLux(prev, illuminance)));
+        if (!cancelled) setAvailable(ok);
       })
-      .catch(() => {
-        if (!cancelled) setAvailable('no');
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
-      sub?.remove();
     };
   }, []);
+  return available;
+}
 
-  if (available !== 'yes') return null;
+/** The smoothed reading, while mounted. */
+function useLux(): number | undefined {
+  const [lux, setLux] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    LightSensor.setUpdateInterval(500);
+    const sub = LightSensor.addListener(({ illuminance }) => setLux((prev) => smoothLux(prev, illuminance)));
+    return () => sub.remove();
+  }, []);
+  return lux;
+}
 
+const TONE_COLOR = { good: colors.good, info: colors.info, warn: colors.warn, bad: colors.bad };
+
+export function LightCheck({ context }: { context: LightContext }) {
+  const lux = useLux();
+  const [mode, setMode] = useState<'evening' | 'morning'>(context === 'morning' ? 'morning' : 'evening');
   const advice = lux === undefined ? undefined : lightAdvice(lux, mode);
   const markers = mode === 'evening' ? [LUX.eveningIdeal, LUX.eveningBright] : [LUX.indoorBright, LUX.outdoor];
 
   return (
-    <Card>
-      <CardTitle icon="brightness-6" title="Light check" color={colors.energy} />
+    <View>
       <Segmented
         options={[
           { label: 'Before bed', value: 'evening' as const },
@@ -56,11 +61,11 @@ export function LightCheckCard({ context }: { context: LightContext }) {
         onChange={setMode}
       />
       <View style={styles.reading}>
-        <Text style={styles.lux}>{lux === undefined ? '—' : formatLux(lux)}</Text>
-        <Text style={[font.small, { marginLeft: 6, marginBottom: 8 }]}>lux</Text>
+        <Text style={styles.lux}>{lux === undefined ? '–' : formatLux(lux)}</Text>
+        <Text style={styles.unit}>lux</Text>
       </View>
       <View style={styles.meter}>
-        <View style={[styles.meterFill, { width: `${luxMeterPosition(lux ?? 0) * 100}%`, backgroundColor: advice ? toneColor(advice.tone) : colors.border }]} />
+        <View style={[styles.meterFill, { width: `${luxMeterPosition(lux ?? 0) * 100}%`, backgroundColor: advice ? TONE_COLOR[advice.tone] : colors.border }]} />
         {markers.map((m) => (
           <View key={m} style={[styles.marker, { left: `${luxMeterPosition(m) * 100}%` }]} />
         ))}
@@ -81,23 +86,19 @@ export function LightCheckCard({ context }: { context: LightContext }) {
         <Text style={font.small}>Reading the light sensor…</Text>
       )}
       <Text style={[font.tiny, { marginTop: space.xs }]}>
-        {mode === 'evening'
-          ? 'Hold the phone at eye level, screen facing you, where you sit. The sensor is near the front camera.'
-          : 'Step outside or face a window, holding the phone at eye level.'}
+        {mode === 'evening' ? 'Hold the phone at eye level where you sit, screen facing you. The sensor is near the front camera.' : 'Step outside or face a window, holding the phone at eye level.'}
       </Text>
-    </Card>
+    </View>
   );
-}
-
-function toneColor(tone: 'good' | 'info' | 'warn' | 'bad'): string {
-  return { good: colors.good, info: colors.info, warn: colors.warn, bad: colors.bad }[tone];
 }
 
 const styles = StyleSheet.create({
   reading: { flexDirection: 'row', alignItems: 'flex-end', marginTop: space.lg },
-  lux: { fontSize: 44, fontWeight: '300', color: colors.text, fontVariant: ['tabular-nums'] },
-  meter: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, marginTop: space.sm, overflow: 'hidden' },
+  // The one number of the check: between h1 and display.
+  lux: { ...font.display, fontSize: 44, lineHeight: 50, letterSpacing: -1 },
+  unit: { ...font.small, marginLeft: space.sm, marginBottom: space.sm },
+  meter: { height: 8, borderRadius: radius.pill, backgroundColor: colors.border, marginTop: space.sm, overflow: 'hidden' },
   meterFill: { height: 8, borderRadius: radius.pill },
   marker: { position: 'absolute', top: 0, bottom: 0, width: 2, marginLeft: -1, backgroundColor: colors.textFaint },
-  scale: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, marginBottom: space.md },
+  scale: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xs, marginBottom: space.md },
 });

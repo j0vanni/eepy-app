@@ -12,20 +12,39 @@
  *   A handful of ratings can only nudge the rhythm; around 20–30 the data dominates.
  * - Search: a coarse grid over phase × amplitude × dip (the KSS offset is solved in closed form at
  *   each grid point), then a pattern search that refines all four parameters.
+ * - With watch signals (watchSignals.ts) the same fit also learns how much last night's recovery
+ *   signals, today's heart rate, caffeine and the watch's body-clock shift count for this person:
+ *   priors centred on the population defaults, and for a fixed clock shape the offset and the weights
+ *   are a ridge regression solved in closed form.
  * - Accuracy is measured out of sample: leave-one-out (small n) or 5-fold cross-validation. The
- *   number shown is the share of held-out check-ins predicted within ±1 KSS point. The personal fit
- *   is applied only if, on held-out check-ins, neither its mean error nor that share is worse than
- *   the population model's (within small tie bands).
+ *   number shown is the share of held-out check-ins predicted within ±1 KSS point. Up to four
+ *   models are scored that way (CalibrationTier) and the one in effect is whichever predicted
+ *   held-out check-ins best — a model that uses the watch only wins when it is at least as good.
  */
-import { CircadianParams, DEFAULT_CIRCADIAN, Interval, KSS_PER_ALERTNESS, kssFromAlertness, simulateAlertness, TPM } from './alertness';
+import { CircadianParams, DEFAULT_CIRCADIAN, ENERGY_PER_ALERTNESS, Interval, KSS_AT_ZERO, KSS_PER_ALERTNESS, kssFromAlertness, simulateAlertness, TPM } from './alertness';
+import { solve } from './bodyClock';
 import { analyzeChronotype } from './chronotype';
 import { wakeTargetFor } from './schedule';
 import { buildNights } from './sessions';
 import { debtOnDate } from './sleepDebt';
 import { estimateSleepNeed } from './sleepNeed';
-import { addDays, clamp, DAY, dateKey, HOUR, MINUTE, minutesOfDay, normalizeMinutes } from './time';
+import { clamp, DAY, dateKey, HOUR, livingDay, MINUTE, minutesOfDay, normalizeMinutes } from './time';
 import { AlertnessCheckIn, isSleepStage, SleepDataset } from './types';
+import {
+  boostFrom,
+  buildSignalSource,
+  DEFAULT_WEIGHTS,
+  EnergyWeights,
+  NO_WEIGHTS,
+  SIGNAL_KEYS,
+  SignalKey,
+  SignalSource,
+  WEIGHT_BOUNDS,
+  WEIGHT_PRIOR_SD,
+} from './watchSignals';
 import { correctedMetrics } from './wakeDetect';
+
+export { livingDay };
 
 export const LEARNING = {
   /** Fewest usable check-ins before a personal fit is attempted. */
@@ -41,7 +60,23 @@ export const LEARNING = {
 };
 
 /** Bump when the model or fit changes so stored results are refitted. */
-export const CALIBRATION_VERSION = 1;
+export const CALIBRATION_VERSION = 2;
+
+/**
+ * Which model is in effect:
+ * - population       sleep timing only, population body clock (the forecast before any learning)
+ * - personal         sleep timing only, body clock fitted to the check-ins
+ * - watch            population body clock + the watch signals at their default weights
+ * - personal+watch   body clock and signal weights fitted together
+ */
+export type CalibrationTier = 'population' | 'personal' | 'watch' | 'personal+watch';
+
+export interface TierScore {
+  /** Mean absolute KSS error on held-out check-ins. */
+  mae: number;
+  /** Share of held-out check-ins predicted within one KSS point (0–1). */
+  withinOne: number;
+}
 
 /** Search bounds for each parameter. */
 export const PARAM_BOUNDS = {
@@ -90,6 +125,15 @@ export interface CalibrationResult {
   /** Signature of the inputs (set by the state layer) so it only refits when something changed. */
   key?: string;
   version?: number;
+  /** The model in effect (only when the fit had watch signals to work with). */
+  tier?: CalibrationTier;
+  /** Weights of the watch signals in effect, and the personal estimate even when it isn't applied. */
+  weights?: EnergyWeights;
+  fittedWeights?: EnergyWeights;
+  /** How each model did on held-out check-ins. */
+  tiers?: Record<CalibrationTier, TierScore>;
+  /** How much each signal moved the predictions (SD, energy points) under the weights in effect. */
+  signalUse?: Partial<Record<SignalKey | 'clock', number>>;
 }
 
 export interface CalibrationInput {
@@ -104,6 +148,8 @@ export interface CalibrationInput {
   debtByDate?: Record<string, number>;
   /** Ignore check-ins before this time (after "Reset learned rhythm"). */
   since?: number;
+  /** What the watch adds (watchSignals.ts). Without it the fit is sleep timing only. */
+  signals?: SignalSource;
 }
 
 type FullParams = Required<CircadianParams>;
@@ -112,11 +158,6 @@ const POPULATION: FullParams = { ...DEFAULT_CIRCADIAN, kssOffset: 0 };
 /** Switches C off, leaving S + W − debt penalty. */
 const NO_CIRCADIAN: CircadianParams = { phaseShiftMin: 0, ampScale: 0, dipScale: 0, kssOffset: 0 };
 const STEP = 5 * MINUTE;
-
-/** The calendar day a moment belongs to (before 4am counts as the previous day), as in analysis.ts. */
-export function livingDay(t: number): string {
-  return minutesOfDay(t) < 240 ? addDays(dateKey(t), -1) : dateKey(t);
-}
 
 export function timeOfDay(t: number): TimeOfDay {
   const m = minutesOfDay(t);
@@ -143,11 +184,18 @@ interface Sample {
   kss: number;
   /** S + W − debt penalty at the check-in. */
   base: number;
-  c24: number;
-  s24: number;
-  c12: number;
-  s12: number;
+  /** Angles of the 24h and 12h circadian terms at the check-in, before any phase shift. */
+  a24: number;
+  a12: number;
+  /** Watch signals at the check-in (SIGNAL_KEYS order) and the body-clock shift (minutes). */
+  x: number[];
+  shift: number;
 }
+
+/** Radians of 24h / 12h rhythm per minute of phase shift. */
+const K24 = (2 * Math.PI) / (60 * 24);
+const K12 = (2 * Math.PI) / (60 * 12);
+const NO_SIGNALS = SIGNAL_KEYS.map(() => 0);
 
 function sortedIntervals(list: Interval[]): Interval[] {
   return list.filter((i) => i.end > i.start).sort((a, b) => a.start - b.start);
@@ -168,10 +216,11 @@ function hasSleepData(sleeps: Interval[], t: number): boolean {
 }
 
 /**
- * Builds a predictor of KSS at arbitrary times from recorded sleep. Returns undefined at times the
- * model can't speak to (asleep, or the preceding sleep wasn't recorded).
+ * Builds a predictor of KSS at arbitrary times from recorded sleep (and, with `signals`, what the
+ * watch adds). Returns undefined at times the model can't speak to (asleep, or the preceding sleep
+ * wasn't recorded).
  */
-export function createKssPredictor(sleeps: Interval[], midSleepMin: number, debtAt: (t: number) => number) {
+export function createKssPredictor(sleeps: Interval[], midSleepMin: number, debtAt: (t: number) => number, signals?: SignalSource) {
   const sorted = sortedIntervals(sleeps);
   const acro0 = midSleepMin / 60 + TPM.acrophaseOffsetH;
   const dip0 = midSleepMin / 60 + TPM.dipOffsetH;
@@ -183,17 +232,23 @@ export function createKssPredictor(sleeps: Interval[], midSleepMin: number, debt
     const [p] = simulateAlertness(near, t, t, { midSleepMin, debtMin: debtAt(time), circadian: NO_CIRCADIAN });
     if (!p || p.asleep) return undefined;
     const h = minutesOfDay(t) / 60;
-    const x24 = (2 * Math.PI * (h - acro0)) / 24;
-    const x12 = (2 * Math.PI * (h - dip0)) / 12;
-    return { t, kss, base: p.alertness, c24: Math.cos(x24), s24: Math.sin(x24), c12: Math.cos(x12), s12: Math.sin(x12) };
+    return {
+      t,
+      kss,
+      base: p.alertness,
+      a24: (2 * Math.PI * (h - acro0)) / 24,
+      a12: (2 * Math.PI * (h - dip0)) / 12,
+      x: signals ? signals.features(t) : NO_SIGNALS,
+      shift: signals ? signals.clockShiftMin(t) : 0,
+    };
   };
 
   return {
     sample,
-    /** Model KSS at `time` with the given parameters. */
-    kssAt(time: number, params: CircadianParams = DEFAULT_CIRCADIAN): number | undefined {
+    /** Model KSS at `time` with the given parameters (and weights for the watch signals). */
+    kssAt(time: number, params: CircadianParams = DEFAULT_CIRCADIAN, weights: EnergyWeights = NO_WEIGHTS): number | undefined {
       const s = sample(time, NaN);
-      return s ? predict(s, full(params), trig(params.phaseShiftMin)) : undefined;
+      return s ? predict(s, { p: full(params), w: weights }) : undefined;
     },
   };
 }
@@ -202,103 +257,156 @@ function full(p: CircadianParams): FullParams {
   return { phaseShiftMin: p.phaseShiftMin, ampScale: p.ampScale, dipScale: p.dipScale, kssOffset: p.kssOffset ?? 0 };
 }
 
-interface Trig {
-  c24: number;
-  s24: number;
-  c12: number;
-  s12: number;
+/** Everything a fit can move: the body-clock shape and the weights of the watch signals. */
+interface Model {
+  p: FullParams;
+  w: EnergyWeights;
 }
 
-function trig(phaseShiftMin: number): Trig {
-  const d24 = (2 * Math.PI * (phaseShiftMin / 60)) / 24;
-  const d12 = (2 * Math.PI * (phaseShiftMin / 60)) / 12;
-  return { c24: Math.cos(d24), s24: Math.sin(d24), c12: Math.cos(d12), s12: Math.sin(d12) };
+/** Circadian term without the KSS offset: same formula as alertness.circadian(). */
+function circ(s: Sample, m: Model): number {
+  const phase = m.p.phaseShiftMin + m.w.clockTrust * s.shift;
+  return TPM.circAmp * m.p.ampScale * Math.cos(s.a24 - phase * K24) - TPM.dipAmp * m.p.dipScale * Math.cos(s.a12 - phase * K12);
 }
 
-/** Circadian term without the KSS offset: same formula as alertness.circadian(), rotated by the phase shift. */
-function circ(s: Sample, p: FullParams, g: Trig): number {
-  const cos24 = s.c24 * g.c24 + s.s24 * g.s24;
-  const cos12 = s.c12 * g.c12 + s.s12 * g.s12;
-  return TPM.circAmp * p.ampScale * cos24 - TPM.dipAmp * p.dipScale * cos12;
-}
-
-function predict(s: Sample, p: FullParams, g: Trig): number {
-  return kssFromAlertness(s.base + circ(s, p, g) - p.kssOffset / KSS_PER_ALERTNESS);
+function predict(s: Sample, m: Model): number {
+  return kssFromAlertness(s.base + circ(s, m) + boostFrom(s.x, m.w) - m.p.kssOffset / KSS_PER_ALERTNESS);
 }
 
 // ---------------------------------------------------------------------------
 // MAP fit
 // ---------------------------------------------------------------------------
 
-function priorCost(p: FullParams): number {
-  return (
+const WEIGHT_KEYS = [...SIGNAL_KEYS, 'clockTrust'] as const;
+
+function priorCost(m: Model, learnWeights: boolean): number {
+  const { p, w } = m;
+  let c =
     (p.phaseShiftMin / PRIOR.phaseSdMin) ** 2 +
     ((p.ampScale - 1) / PRIOR.ampSd) ** 2 +
     ((p.dipScale - 1) / PRIOR.dipSd) ** 2 +
-    (p.kssOffset / PRIOR.offsetSd) ** 2
-  );
+    (p.kssOffset / PRIOR.offsetSd) ** 2;
+  if (learnWeights) for (const k of WEIGHT_KEYS) c += ((w[k] - DEFAULT_WEIGHTS[k]) / WEIGHT_PRIOR_SD[k]) ** 2;
+  return c;
 }
 
-function cost(samples: Sample[], p: FullParams): number {
-  const g = trig(p.phaseShiftMin);
+function cost(samples: Sample[], m: Model, learnWeights: boolean): number {
   let sse = 0;
-  for (const s of samples) sse += (predict(s, p, g) - s.kss) ** 2;
-  return sse / NOISE_SD ** 2 + priorCost(p);
+  for (const s of samples) sse += (predict(s, m) - s.kss) ** 2;
+  return sse / NOISE_SD ** 2 + priorCost(m, learnWeights);
 }
 
-/** Best KSS offset for fixed phase/amplitude/dip (closed form, ignoring the 1–9 clamp). */
-function bestOffset(samples: Sample[], p: FullParams, g: Trig): number {
-  let sum = 0;
-  for (const s of samples) sum += s.kss - kssFromAlertness(s.base + circ(s, p, g));
-  const o = sum / (samples.length + (NOISE_SD / PRIOR.offsetSd) ** 2);
-  return clamp(o, PARAM_BOUNDS.kssOffset[0], PARAM_BOUNDS.kssOffset[1]);
-}
+/** Phase shifts tried before the refinement (minutes). */
+const PHASES: number[] = [];
+for (let v = PARAM_BOUNDS.phaseShiftMin[0]; v <= PARAM_BOUNDS.phaseShiftMin[1]; v += 15) PHASES.push(v);
 
-function range(lo: number, hi: number, step: number): number[] {
-  const out: number[] = [];
-  for (let v = lo; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1000) / 1000);
-  return out;
+/**
+ * For a fixed phase the rating is linear in everything else (ignoring the 1–9 clamp):
+ *   kss = [10.6 − 0.6·base] − 0.6·2.5·amp·cos24 + 0.6·1.4·dip·cos12 + offset − 0.6·Σ wₖxₖ
+ * so amplitude, dip, offset — and the signal weights when they are learned — come from one ridge
+ * regression with the priors as the penalty. Returns the best such model over the phase grid.
+ */
+function ridgeStart(samples: Sample[], weights: EnergyWeights, learnWeights: boolean): { model: Model; cost: number } {
+  const K = KSS_PER_ALERTNESS;
+  const P = 3 + (learnWeights ? SIGNAL_KEYS.length : 0);
+  const prior0 = [1, 1, 0, ...(learnWeights ? SIGNAL_KEYS.map((k) => DEFAULT_WEIGHTS[k]) : [])];
+  const penalty = [1 / PRIOR.ampSd ** 2, 1 / PRIOR.dipSd ** 2, 1 / PRIOR.offsetSd ** 2, ...(learnWeights ? SIGNAL_KEYS.map((k) => 1 / WEIGHT_PRIOR_SD[k] ** 2) : [])];
+  // What the rating leaves once sleep pressure (and weights that stay fixed) are accounted for.
+  const target = samples.map((s) => s.kss - (KSS_AT_ZERO - K * (s.base + (learnWeights ? 0 : boostFrom(s.x, weights)))));
+  const inv = 1 / NOISE_SD ** 2;
+  let best: { model: Model; cost: number } = { model: { p: { ...POPULATION }, w: { ...weights } }, cost: Infinity };
+  best.cost = cost(samples, best.model, learnWeights);
+  const z = new Array<number>(P).fill(0);
+  for (const phase of PHASES) {
+    const M = Array.from({ length: P }, (_, i) => Array.from({ length: P }, (_, j) => (i === j ? penalty[i] : 0)));
+    const rhs = penalty.map((pen, i) => pen * prior0[i]);
+    for (let n = 0; n < samples.length; n++) {
+      const s = samples[n];
+      const ph = phase + weights.clockTrust * s.shift;
+      z[0] = -K * TPM.circAmp * Math.cos(s.a24 - ph * K24);
+      z[1] = K * TPM.dipAmp * Math.cos(s.a12 - ph * K12);
+      z[2] = 1;
+      if (learnWeights) for (let k = 0; k < s.x.length; k++) z[3 + k] = -K * s.x[k];
+      for (let i = 0; i < P; i++) {
+        rhs[i] += z[i] * target[n] * inv;
+        for (let j = i; j < P; j++) M[i][j] += z[i] * z[j] * inv;
+      }
+    }
+    for (let i = 0; i < P; i++) for (let j = 0; j < i; j++) M[i][j] = M[j][i];
+    const beta = solve(M, rhs);
+    if (!beta) continue;
+    const m: Model = {
+      p: {
+        phaseShiftMin: phase,
+        ampScale: clamp(beta[0], PARAM_BOUNDS.ampScale[0], PARAM_BOUNDS.ampScale[1]),
+        dipScale: clamp(beta[1], PARAM_BOUNDS.dipScale[0], PARAM_BOUNDS.dipScale[1]),
+        kssOffset: clamp(beta[2], PARAM_BOUNDS.kssOffset[0], PARAM_BOUNDS.kssOffset[1]),
+      },
+      w: { ...weights },
+    };
+    if (learnWeights) {
+      SIGNAL_KEYS.forEach((k, i) => {
+        m.w[k] = clamp(beta[3 + i], WEIGHT_BOUNDS[k][0], WEIGHT_BOUNDS[k][1]);
+      });
+    }
+    const c = cost(samples, m, learnWeights);
+    if (c < best.cost) best = { model: m, cost: c };
+  }
+  return best;
 }
-
-const GRID = {
-  phase: range(PARAM_BOUNDS.phaseShiftMin[0], PARAM_BOUNDS.phaseShiftMin[1], 30),
-  amp: range(PARAM_BOUNDS.ampScale[0], PARAM_BOUNDS.ampScale[1], 0.1),
-  dip: range(PARAM_BOUNDS.dipScale[0], PARAM_BOUNDS.dipScale[1], 0.25),
-};
 
 type Key = keyof FullParams;
 const KEYS: Key[] = ['phaseShiftMin', 'ampScale', 'dipScale', 'kssOffset'];
 const START_STEP: FullParams = { phaseShiftMin: 15, ampScale: 0.05, dipScale: 0.125, kssOffset: 0.25 };
 const MIN_STEP: FullParams = { phaseShiftMin: 1, ampScale: 0.005, dipScale: 0.01, kssOffset: 0.01 };
+const W_START_STEP: EnergyWeights = { hrv: 0.1, rhr: 0.1, resp: 0.1, deep: 0.1, waso: 0.1, dayHr: 0.1, caffeine: 0.5, clockTrust: 0.25 };
+const W_MIN_STEP: EnergyWeights = { hrv: 0.01, rhr: 0.01, resp: 0.01, deep: 0.01, waso: 0.01, dayHr: 0.01, caffeine: 0.05, clockTrust: 0.05 };
 
-function fitParams(samples: Sample[]): FullParams {
-  // Coarse grid (offset solved per point).
-  let best: FullParams = { ...POPULATION };
-  let bestCost = cost(samples, best);
-  for (const phase of GRID.phase) {
-    const g = trig(phase);
-    for (const amp of GRID.amp) {
-      for (const dip of GRID.dip) {
-        const p: FullParams = { phaseShiftMin: phase, ampScale: amp, dipScale: dip, kssOffset: 0 };
-        p.kssOffset = bestOffset(samples, p, g);
-        const c = cost(samples, p);
-        if (c < bestCost) {
-          bestCost = c;
-          best = p;
-        }
-      }
-    }
-  }
-  // Pattern search over all four.
+/**
+ * Fits the body-clock shape — and, with `learnWeights`, the weights of the watch signals — to the
+ * samples. Without it the weights stay at `weights` (NO_WEIGHTS = the fit as it was before the watch
+ * signals existed).
+ */
+function fitModel(samples: Sample[], weights: EnergyWeights, learnWeights: boolean): Model {
+  // Closed-form start for each phase on a grid, then a pattern search over everything that may move
+  // (it also picks up what the closed form ignores: the 1–9 clamp, the bounds and the clock trust).
+  const start = ridgeStart(samples, weights, learnWeights);
+  let best = start.model;
+  let bestCost = start.cost;
   const step = { ...START_STEP };
-  for (let iter = 0; iter < 400; iter++) {
+  const wStep = { ...W_START_STEP };
+  const moves: { get: () => number; set: (m: Model, v: number) => void; step: () => number; lo: number; hi: number }[] = [
+    ...KEYS.map((k) => ({
+      get: () => best.p[k],
+      set: (m: Model, v: number) => {
+        m.p[k] = v;
+      },
+      step: () => step[k],
+      lo: PARAM_BOUNDS[k][0],
+      hi: PARAM_BOUNDS[k][1],
+    })),
+    ...(learnWeights
+      ? WEIGHT_KEYS.map((k) => ({
+          get: () => best.w[k],
+          set: (m: Model, v: number) => {
+            m.w[k] = v;
+          },
+          step: () => wStep[k],
+          lo: WEIGHT_BOUNDS[k][0],
+          hi: WEIGHT_BOUNDS[k][1],
+        }))
+      : []),
+  ];
+  for (let iter = 0; iter < 600; iter++) {
     let improved = false;
-    for (const k of KEYS) {
+    for (const mv of moves) {
       for (const dir of [1, -1]) {
-        const v = clamp(best[k] + dir * step[k], PARAM_BOUNDS[k][0], PARAM_BOUNDS[k][1]);
-        if (v === best[k]) continue;
-        const cand = { ...best, [k]: v };
-        const c = cost(samples, cand);
+        const cur = mv.get();
+        const v = clamp(cur + dir * mv.step(), mv.lo, mv.hi);
+        if (v === cur) continue;
+        const cand: Model = { p: { ...best.p }, w: { ...best.w } };
+        mv.set(cand, v);
+        const c = cost(samples, cand, learnWeights);
         if (c < bestCost - 1e-12) {
           bestCost = c;
           best = cand;
@@ -308,29 +416,35 @@ function fitParams(samples: Sample[]): FullParams {
       }
     }
     if (!improved) {
-      if (KEYS.every((k) => step[k] <= MIN_STEP[k])) break;
+      const done = KEYS.every((k) => step[k] <= MIN_STEP[k]) && (!learnWeights || WEIGHT_KEYS.every((k) => wStep[k] <= W_MIN_STEP[k]));
+      if (done) break;
       for (const k of KEYS) step[k] = Math.max(MIN_STEP[k], step[k] / 2);
+      for (const k of WEIGHT_KEYS) wStep[k] = Math.max(W_MIN_STEP[k], wStep[k] / 2);
     }
   }
+  const round = (v: number, d: number) => Math.round(v * 10 ** d) / 10 ** d;
+  const w = { ...best.w };
+  if (learnWeights) for (const k of WEIGHT_KEYS) w[k] = round(w[k], 3);
   return {
-    phaseShiftMin: Math.round(best.phaseShiftMin),
-    ampScale: Math.round(best.ampScale * 1000) / 1000,
-    dipScale: Math.round(best.dipScale * 1000) / 1000,
-    kssOffset: Math.round(best.kssOffset * 100) / 100,
+    p: {
+      phaseShiftMin: Math.round(best.p.phaseShiftMin),
+      ampScale: round(best.p.ampScale, 3),
+      dipScale: round(best.p.dipScale, 3),
+      kssOffset: round(best.p.kssOffset, 2),
+    },
+    w,
   };
 }
 
 /** Held-out absolute errors: leave-one-out for small n, otherwise 5 interleaved folds. */
-function crossValidatedErrors(samples: Sample[]): number[] {
+function crossValidatedErrors(samples: Sample[], fit: (train: Sample[]) => Model): number[] {
   const n = samples.length;
   const k = n <= 20 ? n : 5;
   const errors = new Array<number>(n);
   for (let f = 0; f < k; f++) {
-    const train = samples.filter((_, i) => i % k !== f);
-    const p = fitParams(train);
-    const g = trig(p.phaseShiftMin);
+    const m = fit(samples.filter((_, i) => i % k !== f));
     samples.forEach((s, i) => {
-      if (i % k === f) errors[i] = Math.abs(predict(s, p, g) - s.kss);
+      if (i % k === f) errors[i] = Math.abs(predict(s, m) - s.kss);
     });
   }
   return errors;
@@ -343,7 +457,7 @@ const withinOne = (errors: number[]) => errors.filter((e) => e <= 1 + 1e-9).leng
 /** Converts check-ins into model samples (dropping those the model can't evaluate). */
 function prepareSamples(input: CalibrationInput): { samples: Sample[]; skipped: number } {
   const checkins = eligibleCheckins(input.checkins, input.now, input.since);
-  const predictor = createKssPredictor(input.sleeps, input.midSleepMin, (t) => input.debtByDate?.[livingDay(t)] ?? input.debtMin);
+  const predictor = createKssPredictor(input.sleeps, input.midSleepMin, (t) => input.debtByDate?.[livingDay(t)] ?? input.debtMin, input.signals);
   const samples: Sample[] = [];
   for (const c of checkins) {
     const s = predictor.sample(c.time, c.kss);
@@ -352,46 +466,110 @@ function prepareSamples(input: CalibrationInput): { samples: Sample[]; skipped: 
   return { samples, skipped: checkins.length - samples.length };
 }
 
+interface Candidate {
+  tier: CalibrationTier;
+  model: Model;
+  /** Held-out absolute errors (models without fitted parts: plain errors). */
+  errors: number[];
+}
+
+/** Lowest held-out error wins; within a hair of each other, the earlier candidate in `order` does. */
+function pickCandidate(order: Candidate[]): Candidate {
+  const maes = order.map((c) => meanOf(c.errors));
+  const hits = order.map((c) => withinOne(c.errors));
+  const bestMae = Math.min(...maes);
+  const bestHits = Math.max(...hits);
+  const i = order.findIndex((_, k) => maes[k] <= bestMae + 0.02 && hits[k] >= bestHits - 0.02);
+  // No model is best on both measures: stay with the last (simplest) one.
+  return order[i >= 0 ? i : order.length - 1];
+}
+
 export function fitCircadian(input: CalibrationInput): CalibrationResult | undefined {
   const { samples, skipped } = prepareSamples(input);
   const n = samples.length;
   if (n < LEARNING.minCheckins) return undefined;
+  const errorsOf = (m: Model) => samples.map((s) => Math.abs(predict(s, m) - s.kss));
+  const useWatch = !!input.signals;
 
-  const fitted = fitParams(samples);
-  const g0 = trig(0);
-  const popErrors = samples.map((s) => Math.abs(predict(s, POPULATION, g0) - s.kss));
-  const cvErrors = crossValidatedErrors(samples);
-  const maeBefore = meanOf(popErrors);
-  const maeAfter = meanOf(cvErrors);
-  // Apply only if held-out check-ins got no worse on either measure (small tie bands: the fit is shrunk
-  // toward the defaults anyway), so switching the personal model on never visibly lowers the accuracy.
-  const applied = maeAfter <= maeBefore + 0.02 && withinOne(cvErrors) >= withinOne(popErrors) - 0.02;
+  // Sleep timing only: the population model, and the personal body-clock fit.
+  const population: Candidate = { tier: 'population', model: { p: POPULATION, w: NO_WEIGHTS }, errors: [] };
+  population.errors = errorsOf(population.model);
+  const personal: Candidate = {
+    tier: 'personal',
+    model: fitModel(samples, NO_WEIGHTS, false),
+    errors: crossValidatedErrors(samples, (train) => fitModel(train, NO_WEIGHTS, false)),
+  };
+  // With the watch: default weights on the population clock, and everything fitted together.
+  let watch: Candidate | undefined;
+  let personalWatch: Candidate | undefined;
+  if (useWatch) {
+    watch = { tier: 'watch', model: { p: POPULATION, w: DEFAULT_WEIGHTS }, errors: [] };
+    watch.errors = errorsOf(watch.model);
+    personalWatch = {
+      tier: 'personal+watch',
+      model: fitModel(samples, DEFAULT_WEIGHTS, true),
+      errors: crossValidatedErrors(samples, (train) => fitModel(train, DEFAULT_WEIGHTS, true)),
+    };
+  }
+  // A model that uses the watch is preferred when it predicts held-out check-ins as well.
+  const chosen = pickCandidate([personalWatch, watch, personal, population].filter((c): c is Candidate => !!c));
+  // The personal estimate shown even while it isn't applied.
+  const bestPersonal = personalWatch ? pickCandidate([personalWatch, personal]) : personal;
+  const applied = chosen.tier === 'personal' || chosen.tier === 'personal+watch';
 
   const coverage: Record<TimeOfDay, number> = { morning: 0, afternoon: 0, evening: 0 };
   for (const s of samples) coverage[timeOfDay(s.t)]++;
   const days = new Set(samples.map((s) => livingDay(s.t))).size;
   const confidence = n >= LEARNING.confidentCheckins && days >= 7 ? 'high' : n >= 12 ? 'medium' : 'low';
   const round2 = (x: number) => Math.round(x * 100) / 100;
-  const inEffect = applied ? cvErrors : popErrors;
+  const score = (c: Candidate): TierScore => ({ mae: round2(meanOf(c.errors)), withinOne: round2(withinOne(c.errors)) });
 
   return {
-    params: applied ? fitted : { ...DEFAULT_CIRCADIAN },
-    fitted,
+    params: applied ? chosen.model.p : { ...DEFAULT_CIRCADIAN },
+    fitted: bestPersonal.model.p,
     applied,
     n,
-    maeBefore: round2(maeBefore),
-    maeAfter: round2(maeAfter),
-    accuracy: Math.round(100 * withinOne(inEffect)),
-    accuracyBefore: Math.round(100 * withinOne(popErrors)),
-    withinOne: round2(withinOne(inEffect)),
-    withinOneBefore: round2(withinOne(popErrors)),
+    maeBefore: round2(meanOf(population.errors)),
+    maeAfter: round2(meanOf(bestPersonal.errors)),
+    accuracy: Math.round(100 * withinOne(chosen.errors)),
+    accuracyBefore: Math.round(100 * withinOne(population.errors)),
+    withinOne: round2(withinOne(chosen.errors)),
+    withinOneBefore: round2(withinOne(population.errors)),
     days,
     confidence,
     coverage,
     skipped,
     fittedAt: input.now,
     version: CALIBRATION_VERSION,
+    ...(useWatch
+      ? {
+          tier: chosen.tier,
+          weights: { ...chosen.model.w },
+          fittedWeights: { ...personalWatch!.model.w },
+          tiers: { population: score(population), personal: score(personal), watch: score(watch!), 'personal+watch': score(personalWatch!) },
+          signalUse: signalUse(samples, chosen.model.w),
+        }
+      : {}),
   };
+}
+
+/**
+ * How much each signal moved the predictions over these check-ins: the spread (SD) of weight × signal,
+ * in energy points. A signal that never varied, or has no weight, shows 0.
+ */
+function signalUse(samples: Sample[], w: EnergyWeights): Partial<Record<SignalKey | 'clock', number>> {
+  const out: Partial<Record<SignalKey | 'clock', number>> = {};
+  const spread = (xs: number[]) => {
+    const m = meanOf(xs);
+    return Math.sqrt(meanOf(xs.map((x) => (x - m) ** 2)));
+  };
+  SIGNAL_KEYS.forEach((k, i) => {
+    out[k] = Math.round(spread(samples.map((s) => w[k] * s.x[i])) * ENERGY_PER_ALERTNESS * 10) / 10;
+  });
+  const none: Model = { p: POPULATION, w: NO_WEIGHTS };
+  const shifted: Model = { p: POPULATION, w: { ...NO_WEIGHTS, clockTrust: w.clockTrust } };
+  out.clock = Math.round(spread(samples.map((s) => circ(s, shifted) - circ(s, none))) * ENERGY_PER_ALERTNESS * 10) / 10;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -408,6 +586,8 @@ export interface CalibrationContext {
   needMin: number;
   /** Sleep debt as of the morning of a date key. */
   debtOn(date: string): number;
+  /** What the watch adds over the same period. */
+  signals: SignalSource;
 }
 
 /** Sleep, phase anchor and debt as the forecast sees them (same pipeline as analysis.ts). */
@@ -437,7 +617,20 @@ export function calibrationContext(data: SleepDataset, now: number, opts: { pref
     }
     return d;
   };
-  return { sleeps, midSleepMin, needMin, debtOn };
+  const defaultWake = wakeTargetFor(profile, day).wakeMin;
+  const signals = buildSignalSource({
+    nights,
+    vitals: data.vitals,
+    daily: data.daily,
+    caffeine: data.caffeine,
+    halfLifeH: profile.caffeineHalfLifeH,
+    sleeps,
+    now,
+    habitualOnsetMin: chronotype.habitual?.onsetMin ?? normalizeMinutes(defaultWake - needMin),
+    habitualWakeMin: chronotype.habitual?.wakeMin ?? defaultWake,
+    clockDays: LEARNING.maxAgeDays,
+  });
+  return { sleeps, midSleepMin, needMin, debtOn, signals };
 }
 
 export function calibrationInputFromDataset(
@@ -453,7 +646,7 @@ export function calibrationInputFromDataset(
     const d = livingDay(c.time);
     debtByDate[d] ??= ctx.debtOn(d);
   }
-  return { checkins, sleeps: ctx.sleeps, midSleepMin: ctx.midSleepMin, debtMin: ctx.debtOn(livingDay(now)), now, debtByDate, since: opts.since };
+  return { checkins, sleeps: ctx.sleeps, midSleepMin: ctx.midSleepMin, debtMin: ctx.debtOn(livingDay(now)), now, debtByDate, since: opts.since, signals: ctx.signals };
 }
 
 // ---------------------------------------------------------------------------

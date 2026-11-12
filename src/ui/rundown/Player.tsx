@@ -1,10 +1,11 @@
 /**
  * "Start my rundown": the bedtime rundown one step at a time (engine/rundown.ts, state/rundown.ts).
- * Each step with what to do and why, a timer for timed steps (reading: how long until lights-out),
- * Done / Skip / Back and a progress bar; eepy's own screen stays dim. Once the phone is down the
- * screen-free steps move on by the clock, so nobody has to pick it up again before lights-out. The
- * last step is the big "I'm in bed" (state/inBed.ts startInBedSession). Progress is kept for
- * tonight (`settings.rundownProgress`): leave and come back, and it resumes.
+ * One step on a black screen: what it is, a timer for timed steps (reading: how long until
+ * lights-out), what to do and why, then Done with Back and Skip under it, and a thin progress bar
+ * on top. eepy's own screen stays dim. Once the phone is down the screen-free steps move on by the
+ * clock, so nobody has to pick it up again before lights-out. The last step is the big "I'm in bed"
+ * (state/inBed.ts startInBedSession). Progress is kept for tonight (`settings.rundownProgress`):
+ * leave and come back, and it resumes.
  */
 import { router } from 'expo-router';
 import { useEffect } from 'react';
@@ -15,34 +16,35 @@ import { usePlayback } from '@/audio/useSoundPlayer';
 import type { Analysis } from '@/engine/analysis';
 import { isOpen } from '@/engine/inBed';
 import { canPickUp, playerPosition, Rundown, rundownGlance, RundownStep } from '@/engine/rundown';
-import { screenTargetAt } from '@/engine/screenLight';
+import { EEPY_DIM as DIM, screenTargetAt } from '@/engine/screenLight';
 import { formatDuration, formatTime, MINUTE } from '@/engine/time';
-import { EEPY_DIM as DIM } from '@/engine/screenLight';
 import { dimEepy, getScreenBrightness, setEepyBrightness, undimEepy } from '@/integrations/screen';
-import { eepyDimOn, eepyWindowMode } from '@/state/screenDim';
 import { sleepSoundsLabel } from '@/notifications/sleepMode';
 import { sessionFor } from '@/state/inBed';
 import { backRundown, markRundown, resetRundownProgress, startRundown, useRundown } from '@/state/rundown';
+import { eepyDimOn, eepyWindowMode } from '@/state/screenDim';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { screenPlanFor } from '@/ui/cards/ScreenLightCard';
-import { Button, Card, Empty, Icon, Meter, Note, Row } from '@/ui/components';
+import { Button, Empty, Hero, Icon, Meter, Row, Timeline } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { colors, font, night, space } from '@/ui/theme';
 import { InBedButton, SessionHeader } from '@/ui/today/InBed';
-
-const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
-/** eepy's own brightness while the player is open: wind-down level, then night level once the phone is down. */
+import { Caption, NightButton } from '@/ui/today/nightParts';
 
 const clock = (ms: number) => {
   const total = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
 const until = (ms: number) => formatDuration(Math.max(1, Math.ceil(ms / MINUTE)));
+const openSettings = () => router.push({ pathname: '/settings/[section]', params: { section: 'winddown' } });
 
-/** Dims eepy's window while the player is open (only if the phone is brighter); on leaving, back to what the evening dimming wants. */
-function useDim(a: Analysis, night: boolean) {
-  const dimTo = night ? DIM.night : DIM.winddown;
+/**
+ * eepy's own brightness while the player is open: wind-down level, then night level once the phone
+ * is down (only if the phone is brighter); on leaving, back to what the evening dimming wants.
+ */
+function useDim(a: Analysis, late: boolean) {
+  const dimTo = late ? DIM.night : DIM.winddown;
   useEffect(() => {
     if (Platform.OS === 'web') return;
     // "Brighter" (or the setting off) wins here too.
@@ -74,20 +76,23 @@ function when(s: RundownStep): string {
 }
 
 const PHASE_LABEL: Record<RundownStep['phase'], string> = {
-  evening: 'EVENING',
-  winddown: 'WIND-DOWN',
-  'phone-down': 'PHONE DOWN',
-  'screen-free': 'SCREEN-FREE',
-  'lights-out': 'LIGHTS OUT',
+  evening: 'Evening',
+  winddown: 'Wind-down',
+  'phone-down': 'Phone down',
+  'screen-free': 'Screen-free',
+  'lights-out': 'Lights out',
 };
 
+/** The step's big number: its time left (reading: time to lights-out). Nothing for a moment. */
 function Timer({ step, since, now, lightsOut }: { step: RundownStep; since: number; now: number; lightsOut: number }) {
   if (step.id === 'reading') {
     return (
-      <View style={{ alignItems: 'center', marginTop: space.md }}>
-        <Text style={font.label}>LIGHTS OUT IN</Text>
-        <Text style={[font.stat, { fontSize: 44, lineHeight: 52, fontVariant: ['tabular-nums'], color: colors.text }]}>{until(lightsOut - now)}</Text>
-        <Text style={font.small}>Read until {formatTime(step.end)} · lights out {formatTime(lightsOut)}</Text>
+      <View style={{ marginTop: space.lg }}>
+        <Caption>Lights out in</Caption>
+        <Text style={[font.display, { color: night.text }]}>{until(lightsOut - now)}</Text>
+        <Text style={[font.small, { color: night.textDim }]}>
+          Read until {formatTime(step.end)} · lights out {formatTime(lightsOut)}
+        </Text>
       </View>
     );
   }
@@ -96,9 +101,9 @@ function Timer({ step, since, now, lightsOut }: { step: RundownStep; since: numb
   const end = step.phase === 'screen-free' ? step.end : since + step.min * MINUTE;
   const left = end - now;
   return (
-    <View style={{ alignItems: 'center', marginTop: space.md }}>
-      <Text style={[font.label, left < 0 ? { color: colors.warn } : null]}>{left >= 0 ? 'TIME LEFT' : "TIME'S UP"}</Text>
-      <Text style={[font.stat, { fontSize: 44, lineHeight: 52, fontVariant: ['tabular-nums'], color: left >= 0 ? colors.text : colors.warn }]} accessibilityLiveRegion="polite">
+    <View style={{ marginTop: space.lg }}>
+      <Caption color={left < 0 ? colors.warn : undefined}>{left >= 0 ? 'Time left' : "Time's up"}</Caption>
+      <Text style={[font.display, { color: left >= 0 ? night.text : colors.warn }]} accessibilityLiveRegion="polite">
         {left >= 0 ? clock(left) : `+${clock(-left)}`}
       </Text>
     </View>
@@ -109,47 +114,43 @@ function Timer({ step, since, now, lightsOut }: { step: RundownStep; since: numb
 function SoundsNow() {
   const playback = usePlayback();
   const audio = useStore((s) => s.settings.audio);
-  if (playback.status === 'playing') return <Text style={[font.tiny, { textAlign: 'center', marginTop: space.sm }]}>Sleep sounds playing</Text>;
+  if (playback.status === 'playing') return <Text style={[font.small, { color: night.textDim, marginTop: space.md }]}>Sleep sounds playing</Text>;
   return (
-    <View style={{ alignItems: 'center', marginTop: space.sm }}>
+    <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
       <Button small kind="ghost" icon="music-note-outline" label={`Start sleep sounds · ${sleepSoundsLabel(audio)}`} onPress={() => void soundPlayer.play(audio)} />
     </View>
   );
 }
 
+/** A warning about tonight (a short evening, a late start), in dim text: no bright panel on black. */
+function Warning({ text }: { text: string }) {
+  return (
+    <Row gap={space.sm} style={{ alignItems: 'flex-start', marginBottom: space.lg }}>
+      <Icon name="timer-sand" size={18} color={colors.warn} />
+      <Text style={[font.small, { flex: 1, color: night.text }]}>{text}</Text>
+    </Row>
+  );
+}
+
+/** Before starting: tonight at a glance, the one button, and the steps to come. */
 function Intro({ a, r, now }: { a: Analysis; r: Rundown; now: number }) {
-  const steps = r.routine;
   return (
     <>
-      <Card style={NIGHT_CARD}>
-        <Text style={font.label}>TONIGHT</Text>
-        <Text style={[font.h2, { marginTop: 2 }]}>{rundownGlance(r)}</Text>
-        <View style={{ marginTop: space.md, gap: 6 }}>
-          {steps.map((s) => (
-            <Row key={s.id} gap={space.sm}>
-              <Icon name={s.icon} size={18} color={colors.textDim} />
-              <Text style={[font.small, { flex: 1, color: colors.text }]}>{s.title}</Text>
-              <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>{s.kind === 'moment' || s.min === 0 ? formatTime(s.at) : `${formatTime(s.at)} · ${s.min}m`}</Text>
-            </Row>
-          ))}
-        </View>
-        {r.note ? (
-          <View style={{ marginTop: space.md }}>
-            <Note tone="warn" icon="timer-sand">
-              {r.note}
-            </Note>
-          </View>
-        ) : null}
-      </Card>
-      <Button big icon="play-circle-outline" label="Start my rundown" onPress={() => startRundown(a, Date.now())} />
+      <Hero dim label="Tonight's rundown" value={`${r.routine.length} steps · ${formatDuration(r.plannedMin)}`} caption={rundownGlance(r)} />
+      {r.note ? <Warning text={r.note} /> : null}
+      <NightButton icon="play-circle-outline" label="Start my rundown" onPress={() => startRundown(a, Date.now())} />
       {canPickUp(r, now) ? (
         <View style={{ alignItems: 'center', marginTop: space.sm }}>
-          <Button small kind="ghost" label="Pick up from now (earlier steps skipped)" onPress={() => startRundown(a, Date.now(), true)} />
+          <Button kind="ghost" label="Pick up from now (earlier steps skipped)" onPress={() => startRundown(a, Date.now(), true)} />
         </View>
       ) : null}
-      <Text style={[font.tiny, { textAlign: 'center', marginTop: space.md }]}>
-        One step at a time with a timer. Leave whenever you like — it remembers where you are tonight. Change the steps in Settings → Wind-down & phone light.
-      </Text>
+      <View style={{ marginTop: space.xl }}>
+        <Timeline dim items={r.routine.map((s) => ({ key: s.id, time: formatTime(s.at), title: s.title, sub: s.kind === 'do' && s.min > 0 ? `${s.min} min` : undefined }))} />
+      </View>
+      <Text style={[font.small, { color: night.textDim, marginTop: space.sm }]}>One step at a time. Leave whenever you like: it remembers where you are tonight.</Text>
+      <View style={{ alignItems: 'flex-start' }}>
+        <Button small kind="ghost" icon="tune-variant" label="Change the steps" onPress={openSettings} />
+      </View>
     </>
   );
 }
@@ -165,8 +166,8 @@ export function RundownPlayer({ a }: { a: Analysis }) {
 
   if (!r) {
     return (
-      <Empty icon="format-list-checks" title="Your bedtime rundown is off" body="Turn it on in Settings → Wind-down & phone light to get your evening step by step.">
-        <Button label="Open settings" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'winddown' } })} />
+      <Empty icon="format-list-checks" title="Your bedtime rundown is off" body="Turn it on in settings to get your evening step by step.">
+        <Button kind="secondary" label="Open settings" onPress={openSettings} />
       </Empty>
     );
   }
@@ -174,9 +175,7 @@ export function RundownPlayer({ a }: { a: Analysis }) {
     return (
       <>
         <SessionHeader a={a} />
-        <Card style={NIGHT_CARD}>
-          <Text style={[font.body, { color: colors.textDim, textAlign: 'center' }]}>Rundown done — sleep well.</Text>
-        </Card>
+        <Text style={[font.body, { color: night.textDim, marginBottom: space.lg }]}>Rundown done. Sleep well.</Text>
         <Button kind="secondary" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/'))} />
       </>
     );
@@ -189,69 +188,49 @@ export function RundownPlayer({ a }: { a: Analysis }) {
   };
   const next = r.routine[pos.index + 1];
   const last = step.id === 'lights-out';
-  const tint = step.phase === 'phone-down' ? colors.warn : step.phase === 'lights-out' ? colors.accent : colors.light;
-  const ahead = !last && step.at - now > 2 * MINUTE ? `Planned for ${formatTime(step.at)} — you're ${until(step.at - now)} ahead.` : '';
+  const ahead = !last && step.at - now > 2 * MINUTE ? `Planned for ${formatTime(step.at)}. You're ${until(step.at - now)} ahead.` : '';
 
   return (
     <>
-      <View style={{ marginBottom: space.md }}>
-        <Row gap={space.sm} style={{ marginBottom: 6 }}>
-          <Text style={[font.label, { flex: 1 }]}>{`STEP ${pos.index + 1} OF ${pos.total} · ${PHASE_LABEL[step.phase]}`}</Text>
-          <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>lights out {formatTime(r.lightsOut)}</Text>
-        </Row>
-        <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: pos.total, now: pos.marked }}>
-          <Meter value={pos.marked} max={pos.total} color={tint} height={6} />
-        </View>
+      <Row gap={space.sm} style={{ marginBottom: space.sm }}>
+        <Caption style={{ flex: 1 }}>{`Step ${pos.index + 1} of ${pos.total} · ${PHASE_LABEL[step.phase]}`}</Caption>
+        <Text style={[font.tiny, { fontVariant: ['tabular-nums'] }]}>lights out {formatTime(r.lightsOut)}</Text>
+      </Row>
+      <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: pos.total, now: pos.marked }} style={{ marginBottom: space.xl }}>
+        <Meter value={pos.marked} max={pos.total} color={colors.sleep} height={4} />
       </View>
-      {r.late && r.note ? (
-        <View style={{ marginBottom: space.md }}>
-          <Note tone="warn" icon="timer-sand">
-            {r.note}
-          </Note>
-        </View>
-      ) : null}
-      <Card style={NIGHT_CARD} animate={false}>
-        <View style={{ alignItems: 'center' }}>
-          <Icon name={step.icon} size={44} color={tint} />
-          <Text style={[font.h1, { textAlign: 'center', marginTop: space.sm, color: colors.text }]} accessibilityRole="header">
-            {step.title}
-          </Text>
-          <Text style={[font.small, { textAlign: 'center', marginTop: 2, fontVariant: ['tabular-nums'] }]}>{when(step)}</Text>
-        </View>
+      {r.late && r.note ? <Warning text={r.note} /> : null}
+
+      {/* The step: straight on black, nothing around it. */}
+      <View style={{ marginBottom: space.xl }}>
+        <Icon name={step.icon} size={40} color={night.textDim} />
+        <Text style={[font.h1, { color: night.text, marginTop: space.md }]} accessibilityRole="header">
+          {step.title}
+        </Text>
+        <Text style={[font.small, { color: night.textDim, marginTop: space.xxs, fontVariant: ['tabular-nums'] }]}>{when(step)}</Text>
         <Timer step={step} since={since} now={now} lightsOut={r.lightsOut} />
-        <Text style={[font.body, { color: colors.textDim, marginTop: space.md }]}>{step.detail}</Text>
+        <Text style={[font.body, { color: night.textDim, marginTop: space.lg }]}>{step.detail}</Text>
         {step.phase === 'phone-down' ? (
-          <View style={{ marginTop: space.md }}>
-            <Note tone="info" icon="clock-outline">
-              eepy keeps time from here: the screen-free steps move on by the clock, and at {formatTime(r.lightsOut)} the lights-out reminder brings you back for "I'm in bed".
-            </Note>
-          </View>
+          <Text style={[font.small, { color: night.textDim, marginTop: space.md }]}>
+            eepy keeps time from here: the screen-free steps move on by the clock, and at {formatTime(r.lightsOut)} the lights-out reminder brings you back for "I'm in bed".
+          </Text>
         ) : null}
         {step.id === 'reading' || step.id === 'relax' ? <SoundsNow /> : null}
-        {ahead ? <Text style={[font.tiny, { textAlign: 'center', marginTop: space.md }]}>{ahead}</Text> : null}
-      </Card>
+        {ahead ? <Text style={[font.tiny, { marginTop: space.md }]}>{ahead}</Text> : null}
+      </View>
 
-      {last ? (
-        <InBedButton a={a} />
-      ) : (
-        <Row gap={space.sm}>
-          <Button kind="ghost" icon="chevron-left" label="Back" disabled={pos.marked === 0} onPress={tap(() => backRundown(a, Date.now()))} />
-          <Button kind="secondary" icon="skip-next-outline" label="Skip" onPress={tap(() => markRundown(a, 'skipped', Date.now()))} />
-          <Button icon="check" label={step.phase === 'phone-down' ? 'Phone is down' : 'Done'} style={{ flex: 1 }} onPress={tap(() => markRundown(a, 'done', Date.now()))} />
-        </Row>
-      )}
-      {last && pos.marked > 0 ? (
-        <View style={{ alignItems: 'center', marginTop: space.sm }}>
-          <Button small kind="ghost" icon="chevron-left" label="Back" onPress={tap(() => backRundown(a, Date.now()))} />
-        </View>
-      ) : null}
+      {last ? <InBedButton a={a} night /> : <NightButton icon="check" label={step.phase === 'phone-down' ? 'Phone is down' : 'Done'} onPress={tap(() => markRundown(a, 'done', Date.now()))} />}
+      <Row gap={space.sm} style={{ marginTop: space.sm }}>
+        <Button kind="secondary" icon="chevron-left" label="Back" disabled={pos.marked === 0} style={{ flex: 1 }} onPress={tap(() => backRundown(a, Date.now()))} />
+        {last ? null : <Button kind="secondary" icon="skip-next-outline" label="Skip" style={{ flex: 1 }} onPress={tap(() => markRundown(a, 'skipped', Date.now()))} />}
+      </Row>
       {next ? (
-        <Text style={[font.small, { textAlign: 'center', marginTop: space.md }]}>
+        <Text style={[font.small, { color: night.textDim, textAlign: 'center', marginTop: space.lg }]}>
           Up next: {next.title}
           {next.kind === 'do' && next.min > 0 ? ` · ${next.min} min` : ''} at {formatTime(next.at)}
         </Text>
       ) : null}
-      <View style={{ alignItems: 'center', marginTop: space.lg }}>
+      <View style={{ alignItems: 'center', marginTop: space.md }}>
         <Button small kind="ghost" icon="restart" label="Start over" onPress={resetRundownProgress} />
       </View>
     </>

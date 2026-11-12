@@ -1,13 +1,18 @@
+/**
+ * A questionnaire (insomnia, sleepiness, breathing, body clock): one question at a time, the
+ * answers as large rows; then the score and what it means.
+ */
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CHRONOTYPE_LABELS, categoryFromRmeq } from '@/engine/chronotype';
 import { Quiz, QUIZZES, scoreQuiz } from '@/engine/screening';
 import { dateKey, localizeClockText } from '@/engine/time';
 import { useStore } from '@/state/store';
-import { Button, Card, Empty, Meter, Note, Row, Screen } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { Button, Empty, Hero, Meter, Note, Screen } from '@/ui/components';
+import { selectionTick } from '@/ui/haptics';
+import { colors, font, radius, space, touch } from '@/ui/theme';
 
 export default function QuizScreen() {
   const { id } = useLocalSearchParams<{ id: Quiz['id'] }>();
@@ -26,6 +31,7 @@ export default function QuizScreen() {
   const done = step >= quiz.questions.length;
 
   const choose = (value: number) => {
+    selectionTick();
     const next = [...answers];
     next[step] = value;
     setAnswers(next);
@@ -41,56 +47,74 @@ export default function QuizScreen() {
     const tone = band.level === 'alert' ? 'bad' : band.level === 'warn' ? 'warn' : band.level === 'good' ? 'good' : 'info';
     const chrono = quiz.id === 'rmeq' ? CHRONOTYPE_LABELS[categoryFromRmeq(score)] : undefined;
     const max = quiz.bands.reduce((m, b) => Math.max(m, b.max), 0);
+    const color = tone === 'bad' ? colors.bad : tone === 'warn' ? colors.warn : tone === 'good' ? colors.good : colors.text;
     return (
       <Screen>
         <Stack.Screen options={{ title: quiz.title }} />
-        <Card>
-          <Text style={font.label}>YOUR SCORE</Text>
-          <Text style={[font.stat, { marginVertical: 4 }]}>
-            {score}
-            <Text style={font.small}> / {max}</Text>
-          </Text>
-          <Meter value={score} max={max} color={tone === 'bad' ? colors.bad : tone === 'warn' ? colors.warn : colors.accent} />
-          <Text style={[font.h2, { marginTop: space.md }]}>{chrono ? chrono.label : band.label}</Text>
-          <Text style={[font.body, { marginTop: space.sm }]}>{chrono ? chrono.description : band.detail}</Text>
-        </Card>
-        {quiz.id !== 'rmeq' ? <Note tone={tone}>This is a screening aid, not a diagnosis. Share the result with a doctor if you're concerned.</Note> : null}
-        <Text style={[font.tiny, { marginVertical: space.md }]}>{quiz.source}</Text>
-        <Row gap={space.sm}>
+        <Hero
+          label="Your score"
+          value={String(score)}
+          unit={`/ ${max}`}
+          color={color}
+          caption={
+            <View style={{ marginTop: space.md }}>
+              <Meter value={score} max={max} color={tone === 'bad' ? colors.bad : tone === 'warn' ? colors.warn : colors.accent} />
+              <Text style={[font.h2, { marginTop: space.md }]}>{chrono ? chrono.label : band.label}</Text>
+              <Text style={[font.body, { color: colors.textDim, marginTop: space.xs }]}>{chrono ? chrono.description : band.detail}</Text>
+            </View>
+          }
+        />
+        <View style={{ gap: space.sm, marginBottom: space.md }}>
           <Button label="Done" onPress={() => router.back()} />
           <Button
             kind="ghost"
-            label="Retake"
+            label="Take it again"
             onPress={() => {
               setAnswers([]);
               setStep(0);
             }}
           />
-        </Row>
+        </View>
+        {quiz.id !== 'rmeq' ? <Note tone={tone}>This is a screening aid, not a diagnosis. Share the result with a doctor if you're concerned.</Note> : null}
+        <Text style={[font.tiny, { marginTop: space.sm, paddingHorizontal: space.xs }]}>{quiz.source}</Text>
       </Screen>
     );
   }
 
   const q = quiz.questions[step];
   return (
-    <Screen>
+    <Screen subtitle={step === 0 ? quiz.intro : undefined}>
       <Stack.Screen options={{ title: quiz.title }} />
-      {step === 0 ? <Text style={[font.body, { marginBottom: space.md }]}>{quiz.intro}</Text> : null}
-      <Text style={font.tiny}>
-        QUESTION {step + 1} OF {quiz.questions.length}
+      <Text style={[font.label, { textTransform: 'uppercase' }]}>
+        Question {step + 1} of {quiz.questions.length}
       </Text>
-      <View style={{ marginVertical: space.sm }}>
+      <View style={{ marginTop: space.sm }}>
         <Meter value={step} max={quiz.questions.length} height={4} />
       </View>
-      <Text style={[font.h2, { marginVertical: space.md }]}>{q.text}</Text>
-      {q.options.map((o) => (
-        <Pressable key={o.label} onPress={() => choose(o.value)} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <Card style={answers[step] === o.value ? { borderColor: colors.accent } : undefined}>
-            <Text style={font.body}>{localizeClockText(o.label)}</Text>
-          </Card>
-        </Pressable>
-      ))}
-      {step > 0 ? <Button kind="ghost" label="Back" onPress={() => setStep(step - 1)} /> : null}
+      <Text style={[font.h2, { marginTop: space.lg, marginBottom: space.lg }]} accessibilityRole="header">
+        {q.text}
+      </Text>
+      <View style={{ gap: space.sm }}>
+        {q.options.map((o) => {
+          const on = answers[step] === o.value;
+          return (
+            <Pressable
+              key={o.label}
+              onPress={() => choose(o.value)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={({ pressed }) => [styles.option, on ? { backgroundColor: colors.accentSoft } : null, pressed ? { backgroundColor: colors.surfaceAlt } : null]}
+            >
+              <Text style={[font.body, { flex: 1 }]}>{localizeClockText(o.label)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {step > 0 ? <Button kind="ghost" label="Back" onPress={() => setStep(step - 1)} style={{ marginTop: space.md }} /> : null}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  option: { flexDirection: 'row', alignItems: 'center', minHeight: touch.comfy + space.sm, paddingVertical: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
+});

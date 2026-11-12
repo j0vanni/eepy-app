@@ -1,13 +1,16 @@
-// Settings → You & schedule: about you (age, time format), your sleep need and insomnia mode.
+// Settings → You & schedule: about you (age, time format, where the schedule lives) and your sleep
+// need, insomnia mode and the insomnia programme.
 import { router } from 'expo-router';
-import { Text } from 'react-native';
+import { useMemo } from 'react';
 
-import { formatDuration } from '@/engine/time';
+import { CBTI_WEEKS, cbtiStatus } from '@/engine/cbti';
+import { formatClock, formatDuration } from '@/engine/time';
 import { systemClockFormat } from '@/state/clockFormat';
 import { useStore } from '@/state/store';
-import { Card, ListRow, Section, Segmented, Stepper } from '@/ui/components';
-import { font, space } from '@/ui/theme';
+import { useAnalysis } from '@/state/useAnalysis';
+import { ListCard, ListRow, Section, Stepper } from '@/ui/components';
 
+import { ChoiceRow } from './parts';
 import { Toggle } from './Toggle';
 
 export function AboutYouSection() {
@@ -17,17 +20,17 @@ export function AboutYouSection() {
   const setSettings = useStore((s) => s.setSettings);
   const year = new Date().getFullYear();
   return (
-    <Section title="You">
-      <Card>
+    <Section title="About you">
+      <ListCard>
         <Stepper
           label="Birth year"
-          sub={`Age ${year - profile.birthYear} — sets the starting sleep-need estimate`}
+          sub={`Age ${year - profile.birthYear}. Where your sleep-need estimate starts.`}
           value={String(profile.birthYear)}
           onDec={() => setProfile({ birthYear: profile.birthYear - 1 })}
           onInc={() => setProfile({ birthYear: Math.min(year - 10, profile.birthYear + 1) })}
         />
-        <Text style={[font.body, { marginTop: space.md, marginBottom: 6 }]}>Time format</Text>
-        <Segmented
+        <ChoiceRow
+          title="Time format"
           value={clock}
           onChange={(c) => setSettings({ clock: c })}
           options={[
@@ -35,15 +38,10 @@ export function AboutYouSection() {
             { label: '12-hour', value: '12h' },
             { label: '24-hour', value: '24h' },
           ]}
+          hint="How every time in eepy is shown: 7:00 AM or 07:00."
         />
-        <Text style={[font.tiny, { marginTop: 4 }]}>How every time in eepy is shown — 7:00 AM or 07:00.</Text>
-        <ListRow
-          icon="calendar-week"
-          title="Workdays & wake-up times"
-          sub="Moved to Planner → Your usual week"
-          onPress={() => router.navigate({ pathname: '/planner', params: { show: 'week' } })}
-        />
-      </Card>
+        <ListRow title="Workdays and wake-up times" sub="Plan › Your usual week" onPress={() => router.navigate({ pathname: '/planner', params: { show: 'week' } })} />
+      </ListCard>
     </Section>
   );
 }
@@ -51,30 +49,37 @@ export function AboutYouSection() {
 export function SleepNeedSection() {
   const profile = useStore((s) => s.profile);
   const setProfile = useStore((s) => s.setProfile);
+  const a = useAnalysis();
+  const program = useStore((s) => s.cbti);
+  const status = useMemo(() => (a && program?.active ? cbtiStatus(program, a.nights, a.day) : undefined), [a, program]);
+  const own = profile.sleepNeedOverrideMin;
+
+  const programmeSub = status
+    ? `${status.maintenance ? `Week ${status.week}, maintenance` : `Week ${status.week} of ${CBTI_WEEKS}`} · in bed ${formatClock(status.bedMin)}–${formatClock(status.wakeMin)}`
+    : program?.stoppedAt
+      ? 'Stopped. Start again any time.'
+      : 'Six weeks for trouble sleeping. Not started.';
+
   return (
-    <Section title="Sleep">
-      <Card>
-        <Toggle
-          label="Set my sleep need myself"
-          sub="Off = eepy learns how much sleep you need from your nights"
-          value={profile.sleepNeedOverrideMin !== undefined}
-          onChange={(v) => setProfile({ sleepNeedOverrideMin: v ? 480 : undefined })}
-        />
-        {profile.sleepNeedOverrideMin !== undefined ? (
+    <Section title="Sleep need">
+      <ListCard>
+        <Toggle label="Set my sleep need myself" sub="Off: eepy learns it from your nights" value={own !== undefined} onChange={(v) => setProfile({ sleepNeedOverrideMin: v ? 480 : undefined })} />
+        {own !== undefined ? (
           <Stepper
             label="Sleep need"
-            value={formatDuration(profile.sleepNeedOverrideMin)}
-            onDec={() => setProfile({ sleepNeedOverrideMin: Math.max(300, profile.sleepNeedOverrideMin! - 5) })}
-            onInc={() => setProfile({ sleepNeedOverrideMin: Math.min(720, profile.sleepNeedOverrideMin! + 5) })}
+            value={formatDuration(own)}
+            onDec={() => setProfile({ sleepNeedOverrideMin: Math.max(300, own - 5) })}
+            onInc={() => setProfile({ sleepNeedOverrideMin: Math.min(720, own + 5) })}
           />
         ) : null}
         <Toggle
           label="Insomnia mode"
-          sub="For trouble sleeping (CBT-I rules): no naps, no extra time in bed, the same times every day"
+          sub="No naps, no extra time in bed, the same times every day"
           value={profile.insomniaMode}
           onChange={(v) => setProfile({ insomniaMode: v })}
         />
-      </Card>
+        <ListRow title="Insomnia programme" sub={programmeSub} onPress={() => router.push('/cbti')} />
+      </ListCard>
     </Section>
   );
 }

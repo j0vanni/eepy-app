@@ -1,5 +1,10 @@
+/**
+ * What if?: move tonight's lights-out or alarm, add a nap or a coffee, and watch tomorrow redraw
+ * against the plan. Tomorrow's energy stays pinned at the top while you change things; every
+ * number side by side and how the model works are folded at the bottom.
+ */
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
 import type { Analysis } from '@/engine/analysis';
@@ -11,10 +16,11 @@ import type { SleepDataset } from '@/engine/types';
 import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
 import { CompareChart } from '@/ui/CompareChart';
-import { AppSwitch, Button, Card, CardTitle, Chip, Empty, Icon, Screen } from '@/ui/components';
-import { Disclosure } from '@/ui/Disclosure';
+import { Card, Chip, Empty, Fold, IconButton, styles as kit, Link, Row, Screen, Section } from '@/ui/components';
+import { Bullet, Caption } from '@/ui/planner/parts';
+import { Toggle } from '@/ui/settings/Toggle';
 import { Slider } from '@/ui/Slider';
-import { colors, font, radius, space } from '@/ui/theme';
+import { colors, font, space } from '@/ui/theme';
 
 const STEP = 5 * MINUTE;
 const ceilStep = (t: number) => Math.ceil(t / STEP) * STEP;
@@ -60,13 +66,10 @@ function useThrottled<T>(value: T, ms: number): T {
 
 const signed = (d: number, text: string) => `${d > 0 ? '+' : '−'}${text}`;
 const deltaMin = (d: number) => (Math.abs(d) < 1 ? '±0' : signed(d, formatDuration(Math.abs(d))));
-const deltaNum = (d: number, digits = 0, unit = '') =>
-  Math.abs(d) < 0.5 * 10 ** -digits ? '±0' : signed(d, `${Math.abs(d).toFixed(digits)}${unit}`);
-/** Green when the change helps, amber when it hurts, faint when it's noise. */
-const tone = (d: number, better: 'up' | 'down', noise: number) =>
-  Math.abs(d) < noise ? colors.textFaint : (d > 0) === (better === 'up') ? colors.good : colors.warn;
-const offsetLabel = (min: number, what = 'plan') =>
-  min === 0 ? `on ${what}` : `${formatDuration(Math.abs(min))} ${min < 0 ? 'earlier' : 'later'} than ${what}`;
+const deltaNum = (d: number, digits = 0, unit = '') => (Math.abs(d) < 0.5 * 10 ** -digits ? '±0' : signed(d, `${Math.abs(d).toFixed(digits)}${unit}`));
+/** Green when the change helps, orange when it hurts, faint when it's noise. */
+const tone = (d: number, better: 'up' | 'down', noise: number) => (Math.abs(d) < noise ? colors.textFaint : (d > 0) === (better === 'up') ? colors.good : colors.warn);
+const offsetLabel = (min: number, what = 'plan') => (min === 0 ? `on ${what}` : `${formatDuration(Math.abs(min))} ${min < 0 ? 'earlier' : 'later'} than ${what}`);
 
 export default function SimulateScreen() {
   const a = useAnalysis();
@@ -83,6 +86,7 @@ export default function SimulateScreen() {
 
 function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
   const [draft, setDraft] = useState<Draft>(NO_CHANGES);
+  const customDrinks = useStore((s) => s.settings.customDrinks);
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }));
   const base = useMemo(() => baselineScenario(a), [a]);
 
@@ -144,42 +148,37 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
   const d = result.delta;
   const sleep = s.sleep;
   const wakeOffsetFor = (t: number) => Math.round((t - base.wake) / MINUTE / 5) * 5;
-  const boundaryChoices = [sleep.boundaryWakes.earlier, sleep.boundaryWakes.later]
-    .map(wakeOffsetFor)
-    .filter((off) => off >= -180 && off <= 180 && off !== draft.wakeOffsetMin);
+  const boundaryChoices = [sleep.boundaryWakes.earlier, sleep.boundaryWakes.later].map(wakeOffsetFor).filter((off) => off >= -180 && off <= 180 && off !== draft.wakeOffsetMin);
   const limitMg = data.profile.caffeineBedtimeLimitMg;
   const loggedToday = data.caffeine.filter((c) => c.time >= atMinutes(a.day, 0) && c.time <= a.now).sort((x, y) => x.time - y.time);
   const changed = draft.bedOffsetMin !== 0 || draft.wakeOffsetMin !== 0 || !!draft.nap || draft.coffees.length > 0;
+  const canAddDrink = canDrink && draft.coffees.length < MAX_COFFEES;
+  const addDrink = () =>
+    patch({
+      coffees: [...draft.coffees, { id: `c${Date.now()}`, time: clampT(ceilStep(a.now + 30 * MINUTE), drinkLo, drinkHi), mg: DEFAULT_DRINK.mg, label: DEFAULT_DRINK.label }],
+    });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={styles.scroll} stickyHeaderIndices={[1]} keyboardShouldPersistTaps="handled">
-        <Text style={[font.small, { marginBottom: space.sm }]}>Change tonight and watch tomorrow redraw. The dashed line is your plan.</Text>
+      <ScrollView contentContainerStyle={kit.scroll} stickyHeaderIndices={[1]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={[font.small, { marginBottom: space.md }]}>Change tonight and watch tomorrow redraw.</Text>
 
+        {/* Pinned while the controls scroll under it. */}
         <View style={styles.sticky}>
-          <Card style={{ marginBottom: 0, paddingBottom: space.md }}>
-            <View style={[styles.row, { marginBottom: space.xs }]}>
-              <Text style={[font.label, { flex: 1 }]}>TOMORROW’S ENERGY</Text>
-              <Text style={font.tiny}>
-                wake {formatTime(s.scenario.wake)} · dip {s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'}
-              </Text>
-            </View>
-            <CompareChart
-              baseline={b.tomorrow.points}
-              scenario={s.tomorrow.points}
-              from={result.range.from}
-              to={result.range.to}
-              focusEnergy={result.focusEnergy}
-              dip={s.tomorrow.dip}
-              height={150}
-            />
-            <View style={[styles.row, { marginTop: space.md }]}>
-              <Kpi label="Energy" value={String(Math.round(s.tomorrow.avgEnergy))} delta={deltaNum(d.avgEnergy)} color={tone(d.avgEnergy, 'up', 0.5)} />
-              <Kpi label="Debt" value={formatDuration(s.debtMin)} delta={deltaMin(d.debtMin)} color={tone(d.debtMin, 'down', 5)} />
-              <Kpi label="Sleep" value={formatDuration(sleep.sleepMin)} delta={deltaMin(d.sleepMin)} color={tone(d.sleepMin, 'up', 5)} />
-              <Kpi label="Score" value={String(s.score.total)} delta={deltaNum(d.score)} color={tone(d.score, 'up', 1)} />
-            </View>
-          </Card>
+          <Caption>Tomorrow’s energy</Caption>
+          <Row gap={space.sm} style={{ alignItems: 'flex-end', marginBottom: space.sm }}>
+            <Text style={[font.stat, { color: colors.energy, fontVariant: ['tabular-nums'] }]}>{Math.round(s.tomorrow.avgEnergy)}</Text>
+            <Text style={[font.small, styles.heroDelta, { color: tone(d.avgEnergy, 'up', 0.5) }]}>{deltaNum(d.avgEnergy)} vs plan</Text>
+            <Text style={[font.tiny, styles.heroSide]} numberOfLines={1}>
+              wake {formatTime(s.scenario.wake)} · dip {s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'}
+            </Text>
+          </Row>
+          <CompareChart baseline={b.tomorrow.points} scenario={s.tomorrow.points} from={result.range.from} to={result.range.to} focusEnergy={result.focusEnergy} dip={s.tomorrow.dip} height={140} />
+          <Row style={{ marginTop: space.md }}>
+            <Kpi label="Sleep" value={formatDuration(sleep.sleepMin)} delta={deltaMin(d.sleepMin)} color={tone(d.sleepMin, 'up', 5)} />
+            <Kpi label="Debt" value={formatDuration(s.debtMin)} delta={deltaMin(d.debtMin)} color={tone(d.debtMin, 'down', 5)} />
+            <Kpi label="Score" value={String(s.score.total)} delta={deltaNum(d.score)} color={tone(d.score, 'up', 1)} />
+          </Row>
         </View>
 
         <View style={styles.presets}>
@@ -192,215 +191,172 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
           </View>
         </View>
 
-        <Card>
-          <CardTitle icon="bed-clock" title="Tonight" />
-          <Slider
-            label="Lights out"
-            value={draft.bedOffsetMin}
-            min={bedMinOff}
-            max={180}
-            step={5}
-            fillFrom={0}
-            mark={0}
-            format={(v) => formatTime(base.bedtime + v * MINUTE)}
-            sub={offsetLabel(draft.bedOffsetMin)}
-            onChange={(v) => patch({ bedOffsetMin: v })}
-          />
-          <Slider
-            label="Alarm"
-            value={draft.wakeOffsetMin}
-            min={-180}
-            max={180}
-            step={5}
-            fillFrom={0}
-            mark={0}
-            color={colors.info}
-            format={(v) => formatTime(base.wake + v * MINUTE)}
-            sub={offsetLabel(draft.wakeOffsetMin)}
-            onChange={(v) => patch({ wakeOffsetMin: v })}
-          />
-          <View style={styles.cycleBox}>
-            <Icon name={sleep.onBoundary ? 'check-circle-outline' : 'sine-wave'} size={18} color={sleep.onBoundary ? colors.good : colors.warn} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[font.small, { color: colors.text }]}>
-                {sleep.cycles.toFixed(1)} sleep cycles ·{' '}
-                {sleep.onBoundary ? 'you’d wake near the end of a cycle, in light sleep' : 'the alarm would catch you mid-cycle'}
-              </Text>
+        <Section title="Tonight">
+          <Card>
+            <Slider
+              label="Lights out"
+              value={draft.bedOffsetMin}
+              min={bedMinOff}
+              max={180}
+              step={5}
+              fillFrom={0}
+              mark={0}
+              format={(v) => formatTime(base.bedtime + v * MINUTE)}
+              sub={offsetLabel(draft.bedOffsetMin)}
+              onChange={(v) => patch({ bedOffsetMin: v })}
+            />
+            <Slider
+              label="Alarm"
+              value={draft.wakeOffsetMin}
+              min={-180}
+              max={180}
+              step={5}
+              fillFrom={0}
+              mark={0}
+              format={(v) => formatTime(base.wake + v * MINUTE)}
+              sub={offsetLabel(draft.wakeOffsetMin)}
+              onChange={(v) => patch({ wakeOffsetMin: v })}
+            />
+            <View style={{ marginTop: space.md, gap: space.xs }}>
+              <Bullet icon={sleep.onBoundary ? 'check-circle-outline' : 'sine-wave'} color={sleep.onBoundary ? colors.good : colors.warn} strong>
+                {sleep.cycles.toFixed(1)} sleep cycles · {sleep.onBoundary ? 'you’d wake near the end of a cycle, in light sleep' : 'the alarm would catch you mid-cycle'}
+              </Bullet>
               <Text style={font.tiny}>
-                Asleep ~{formatTime(sleep.onset)} after ~{Math.round(sleep.latencyMin)} min · {formatDuration(sleep.timeInBedMin)} in bed
+                Asleep about {formatTime(sleep.onset)} after about {Math.round(sleep.latencyMin)} min · {formatDuration(sleep.timeInBedMin)} in bed
               </Text>
               {!sleep.onBoundary && boundaryChoices.length ? (
-                <View style={[styles.row, { gap: space.sm, marginTop: 6, flexWrap: 'wrap' }]}>
+                <Row gap={space.sm} style={{ marginTop: space.xs, flexWrap: 'wrap' }}>
                   {boundaryChoices.map((off) => (
                     <Chip key={off} icon="alarm" label={`Wake ${formatTime(base.wake + off * MINUTE)}`} onPress={() => patch({ wakeOffsetMin: off })} />
                   ))}
-                </View>
+                </Row>
               ) : null}
             </View>
-          </View>
-        </Card>
+          </Card>
+        </Section>
 
-        <Card>
-          <CardTitle
-            icon="sleep"
-            title="Nap today"
-            right={
-              <AppSwitch
-                value={!!draft.nap}
-                disabled={!canNap}
-                onChange={(on) => patch({ nap: on ? { start: clampT(napPresetAt, napLo, napHi), minutes: 20 } : undefined })}
-                label="Add a nap"
-              />
-            }
-          />
-          {!canNap ? (
-            <Text style={font.small}>Too late for a nap today — a nap within 2 hours of bedtime mostly costs you night sleep.</Text>
-          ) : draft.nap ? (
-            <>
-              <Slider
-                label="Lie down at"
-                value={clampT(draft.nap.start, napLo, napHi)}
-                min={napLo}
-                max={napHi}
-                step={STEP}
-                format={formatTime}
-                onChange={(v) => patch({ nap: { ...draft.nap!, start: v } })}
-              />
-              <Slider
-                label="Alarm after"
-                value={draft.nap.minutes}
-                min={10}
-                max={120}
-                step={5}
-                format={(v) => `${v} min`}
-                sub={`up ${formatTime(draft.nap.start + draft.nap.minutes * MINUTE)}`}
-                onChange={(v) => patch({ nap: { ...draft.nap!, minutes: v } })}
-              />
-              <Text style={[font.small, { marginTop: space.xs }]}>
-                ~{Math.round(s.napSleepMin)} min asleep ·{' '}
-                {s.napDelayMin >= 5 ? (
-                  <Text style={{ color: s.napDelayMin > 40 ? colors.warn : colors.text }}>pushes tonight’s sleepiness back ~{Math.round(s.napDelayMin)} min</Text>
-                ) : (
-                  <Text style={{ color: colors.good }}>barely moves your bedtime — you’re carrying enough sleep pressure</Text>
-                )}
-              </Text>
-              {draft.nap.minutes > 30 && draft.nap.minutes < 80 ? (
-                <Text style={[font.tiny, { marginTop: 4, color: colors.warn }]}>Naps of 30–75 min often end in deep sleep, so expect some grogginess.</Text>
-              ) : null}
-            </>
-          ) : (
-            <Text style={font.small}>Turn on to see what a nap does to tonight’s sleep and tomorrow.</Text>
-          )}
-        </Card>
-
-        <Card>
-          <CardTitle
-            icon="coffee-outline"
-            title="Caffeine today"
-            color={colors.caffeine}
-            right={
-              <Button
-                small
-                kind="secondary"
-                icon="plus"
-                label="Add drink"
-                disabled={!canDrink || draft.coffees.length >= MAX_COFFEES}
-                onPress={() =>
-                  patch({
-                    coffees: [
-                      ...draft.coffees,
-                      { id: `c${Date.now()}`, time: clampT(ceilStep(a.now + 30 * MINUTE), drinkLo, drinkHi), mg: DEFAULT_DRINK.mg, label: DEFAULT_DRINK.label },
-                    ],
-                  })
-                }
-              />
-            }
-          />
-          {loggedToday.length ? (
-            <Text style={[font.tiny, { marginBottom: space.sm }]}>Already logged: {loggedToday.map((c) => `${formatTime(c.time)} · ${Math.round(c.mg)} mg`).join(', ')}</Text>
-          ) : null}
-          {draft.coffees.map((c, i) => (
-            <View key={c.id} style={styles.drink}>
-              <View style={styles.row}>
-                <Text style={[font.tiny, { flex: 1, fontWeight: '600' }]}>
-                  DRINK {i + 1} · {Math.round(c.mg)} MG
+        <Section title="Nap today">
+          <Card style={{ paddingVertical: space.sm }}>
+            <Toggle
+              label="Add a nap"
+              sub={!canNap ? 'Too late today: a nap within 2 hours of bedtime mostly costs you night sleep.' : draft.nap ? undefined : 'See what a nap does to tonight’s sleep and tomorrow.'}
+              value={!!draft.nap}
+              disabled={!canNap}
+              onChange={(on) => patch({ nap: on ? { start: clampT(napPresetAt, napLo, napHi), minutes: 20 } : undefined })}
+            />
+            {canNap && draft.nap ? (
+              <View style={{ paddingBottom: space.sm }}>
+                <Slider label="Lie down at" value={clampT(draft.nap.start, napLo, napHi)} min={napLo} max={napHi} step={STEP} format={formatTime} onChange={(v) => patch({ nap: { ...draft.nap!, start: v } })} />
+                <Slider
+                  label="Alarm after"
+                  value={draft.nap.minutes}
+                  min={10}
+                  max={120}
+                  step={5}
+                  format={(v) => `${v} min`}
+                  sub={`up ${formatTime(draft.nap.start + draft.nap.minutes * MINUTE)}`}
+                  onChange={(v) => patch({ nap: { ...draft.nap!, minutes: v } })}
+                />
+                <Text style={[font.small, { marginTop: space.xs }]}>
+                  About {Math.round(s.napSleepMin)} min asleep ·{' '}
+                  {s.napDelayMin >= 5 ? (
+                    <Text style={{ color: s.napDelayMin > 40 ? colors.warn : colors.text }}>pushes tonight’s sleepiness back about {Math.round(s.napDelayMin)} min</Text>
+                  ) : (
+                    <Text style={{ color: colors.good }}>barely moves your bedtime, you’re carrying enough sleep pressure</Text>
+                  )}
                 </Text>
-                <Pressable
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove drink ${i + 1}`}
-                  onPress={() => patch({ coffees: draft.coffees.filter((x) => x.id !== c.id) })}
-                >
-                  <Icon name="close" size={18} />
-                </Pressable>
+                {draft.nap.minutes > 30 && draft.nap.minutes < 80 ? (
+                  <Text style={[font.tiny, { marginTop: space.xs, color: colors.warn }]}>Naps of 30–75 min often end in deep sleep, so expect some grogginess.</Text>
+                ) : null}
               </View>
-              <Slider
-                label="Time"
-                value={clampT(c.time, drinkLo, drinkHi)}
-                min={drinkLo}
-                max={Math.max(drinkLo, drinkHi)}
-                step={STEP}
-                format={formatTime}
-                color={colors.caffeine}
-                onChange={(v) => patch({ coffees: draft.coffees.map((x) => (x.id === c.id ? { ...x, time: v } : x)) })}
-              />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingVertical: 2 }}>
-                {drinkOptions(useStore.getState().settings.customDrinks).map((p) => (
-                  <Chip
-                    key={p.label}
-                    label={`${shortLabel(p.label)} · ${p.mg}`}
-                    selected={c.label === p.label}
-                    color={colors.caffeine}
-                    onPress={() => patch({ coffees: draft.coffees.map((x) => (x.id === c.id ? { ...x, mg: p.mg, label: p.label } : x)) })}
-                  />
-                ))}
-              </ScrollView>
+            ) : null}
+          </Card>
+        </Section>
+
+        <Section title="Caffeine today" action={canAddDrink ? <Link label="Add a drink" onPress={addDrink} /> : undefined}>
+          <Card>
+            {loggedToday.length ? <Text style={[font.tiny, { marginBottom: space.sm }]}>Already logged: {loggedToday.map((c) => `${formatTime(c.time)} · ${Math.round(c.mg)} mg`).join(', ')}</Text> : null}
+            {draft.coffees.map((c, i) => (
+              <View key={c.id} style={{ marginBottom: space.md }}>
+                <Row>
+                  <View style={{ flex: 1 }}>
+                    <Caption>{`Drink ${i + 1} · ${Math.round(c.mg)} mg`}</Caption>
+                  </View>
+                  <IconButton icon="close" label={`Remove drink ${i + 1}`} onPress={() => patch({ coffees: draft.coffees.filter((x) => x.id !== c.id) })} />
+                </Row>
+                <Slider
+                  label="Time"
+                  value={clampT(c.time, drinkLo, drinkHi)}
+                  min={drinkLo}
+                  max={Math.max(drinkLo, drinkHi)}
+                  step={STEP}
+                  format={formatTime}
+                  color={colors.caffeine}
+                  onChange={(v) => patch({ coffees: draft.coffees.map((x) => (x.id === c.id ? { ...x, time: v } : x)) })}
+                />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingVertical: space.xxs }}>
+                  {drinkOptions(customDrinks).map((p) => (
+                    <Chip
+                      key={p.label}
+                      label={`${shortLabel(p.label)} · ${p.mg}`}
+                      selected={c.label === p.label}
+                      color={colors.caffeine}
+                      onPress={() => patch({ coffees: draft.coffees.map((x) => (x.id === c.id ? { ...x, mg: p.mg, label: p.label } : x)) })}
+                    />
+                  ))}
+                </ScrollView>
+                <View style={[kit.listSep, { marginTop: space.md }]} />
+              </View>
+            ))}
+            {!canDrink ? <Text style={[font.small, { marginBottom: space.sm }]}>It’s nearly bedtime: anything now is still in you while you sleep.</Text> : null}
+            <Text style={font.small}>
+              Caffeine in your first 3 h of sleep: <Text style={{ color: s.caffeineMg > limitMg ? colors.warn : colors.text, fontWeight: '700' }}>{Math.round(s.caffeineMg)} mg</Text> (your limit{' '}
+              {limitMg} mg)
+            </Text>
+          </Card>
+        </Section>
+
+        <Section title="The details">
+          <Fold icon="compare-horizontal" title="Every number, side by side" sub="Your plan next to the what-if">
+            <View style={styles.tableRow}>
+              <View style={{ flex: 1.5 }} />
+              <View style={styles.cell}>
+                <Caption>Plan</Caption>
+              </View>
+              <View style={styles.cell}>
+                <Caption>What if</Caption>
+              </View>
+              <View style={styles.deltaCell} />
             </View>
-          ))}
-          {!canDrink ? <Text style={font.small}>It’s nearly bedtime — anything now is still in you while you sleep.</Text> : null}
-          <Text style={[font.small, { marginTop: draft.coffees.length ? space.sm : 0 }]}>
-            Caffeine in your first 3 h of sleep:{' '}
-            <Text style={{ color: s.caffeineMg > limitMg ? colors.warn : colors.text, fontWeight: '600' }}>{Math.round(s.caffeineMg)} mg</Text> (your limit {limitMg} mg)
-          </Text>
-        </Card>
-
-        <Card>
-          <CardTitle icon="compare-horizontal" title="Compared with your plan" />
-          <View style={[styles.tableRow, { paddingTop: 0 }]}>
-            <Text style={[font.tiny, { flex: 1.5 }]} />
-            <Text style={[font.label, styles.cell]}>PLAN</Text>
-            <Text style={[font.label, styles.cell]}>WHAT IF</Text>
-            <View style={styles.deltaCell} />
-          </View>
-          <Group title="Tonight" />
-          <TableRow label="Sleep" plan={formatDuration(b.sleep.sleepMin)} what={formatDuration(sleep.sleepMin)} delta={deltaMin(d.sleepMin)} color={tone(d.sleepMin, 'up', 5)} />
-          <TableRow label="Falling asleep" plan={`${Math.round(b.sleep.latencyMin)} min`} what={`${Math.round(sleep.latencyMin)} min`} delta={deltaMin(d.latencyMin)} color={tone(d.latencyMin, 'down', 3)} />
-          <TableRow
-            label="Sleep cycles"
-            plan={`${b.sleep.cycles.toFixed(1)}${b.sleep.onBoundary ? ' ✓' : ''}`}
-            what={`${sleep.cycles.toFixed(1)}${sleep.onBoundary ? ' ✓' : ''}`}
-            delta={sleep.onBoundary === b.sleep.onBoundary ? deltaNum(d.cycles, 1) : sleep.onBoundary ? 'on cycle' : 'mid-cycle'}
-            color={sleep.onBoundary === b.sleep.onBoundary ? colors.textFaint : sleep.onBoundary ? colors.good : colors.warn}
-          />
-          <TableRow label="Bedtime caffeine" plan={`${Math.round(b.caffeineMg)} mg`} what={`${Math.round(s.caffeineMg)} mg`} delta={deltaNum(d.caffeineMg, 0, ' mg')} color={tone(d.caffeineMg, 'down', 3)} />
-          <TableRow label="Nap delay" plan="—" what={s.napSleepMin ? `${Math.round(s.napDelayMin)} min` : '—'} delta={deltaMin(d.napDelayMin)} color={tone(d.napDelayMin, 'down', 5)} />
-          <TableRow label="Expected score" plan={String(b.score.total)} what={String(s.score.total)} delta={deltaNum(d.score)} color={tone(d.score, 'up', 1)} />
-          <Group title="Tomorrow" />
-          <TableRow label="Sleep debt" plan={formatDuration(b.debtMin)} what={formatDuration(s.debtMin)} delta={deltaMin(d.debtMin)} color={tone(d.debtMin, 'down', 5)} />
-          <TableRow label="Average energy" plan={String(Math.round(b.tomorrow.avgEnergy))} what={String(Math.round(s.tomorrow.avgEnergy))} delta={deltaNum(d.avgEnergy)} color={tone(d.avgEnergy, 'up', 0.5)} />
-          <TableRow label="Focus zone" plan={`${b.tomorrow.focusHours.toFixed(1)} h`} what={`${s.tomorrow.focusHours.toFixed(1)} h`} delta={deltaNum(d.focusHours, 1, 'h')} color={tone(d.focusHours, 'up', 0.25)} />
-          {/* Time and depth of the dip on their own rows: together they didn't fit the column. */}
-          <TableRow label="Afternoon dip" plan={b.tomorrow.dip ? formatTime(b.tomorrow.dip.t) : '—'} what={s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'} />
-          <TableRow
-            label="Energy in the dip"
-            plan={b.tomorrow.dip ? String(Math.round(b.tomorrow.dip.energy)) : '—'}
-            what={s.tomorrow.dip ? String(Math.round(s.tomorrow.dip.energy)) : '—'}
-            delta={b.tomorrow.dip && s.tomorrow.dip ? deltaNum(s.tomorrow.dip.energy - b.tomorrow.dip.energy) : undefined}
-            color={b.tomorrow.dip && s.tomorrow.dip ? tone(s.tomorrow.dip.energy - b.tomorrow.dip.energy, 'up', 0.5) : undefined}
-          />
-        </Card>
-
-        <ModelNotes a={a} result={result} />
+            <Group title="Tonight" />
+            <TableRow label="Sleep" plan={formatDuration(b.sleep.sleepMin)} what={formatDuration(sleep.sleepMin)} delta={deltaMin(d.sleepMin)} color={tone(d.sleepMin, 'up', 5)} />
+            <TableRow label="Falling asleep" plan={`${Math.round(b.sleep.latencyMin)} min`} what={`${Math.round(sleep.latencyMin)} min`} delta={deltaMin(d.latencyMin)} color={tone(d.latencyMin, 'down', 3)} />
+            <TableRow
+              label="Sleep cycles"
+              plan={`${b.sleep.cycles.toFixed(1)}${b.sleep.onBoundary ? ' ✓' : ''}`}
+              what={`${sleep.cycles.toFixed(1)}${sleep.onBoundary ? ' ✓' : ''}`}
+              delta={sleep.onBoundary === b.sleep.onBoundary ? deltaNum(d.cycles, 1) : sleep.onBoundary ? 'on cycle' : 'mid-cycle'}
+              color={sleep.onBoundary === b.sleep.onBoundary ? colors.textFaint : sleep.onBoundary ? colors.good : colors.warn}
+            />
+            <TableRow label="Bedtime caffeine" plan={`${Math.round(b.caffeineMg)} mg`} what={`${Math.round(s.caffeineMg)} mg`} delta={deltaNum(d.caffeineMg, 0, ' mg')} color={tone(d.caffeineMg, 'down', 3)} />
+            <TableRow label="Nap delay" plan="—" what={s.napSleepMin ? `${Math.round(s.napDelayMin)} min` : '—'} delta={deltaMin(d.napDelayMin)} color={tone(d.napDelayMin, 'down', 5)} />
+            <TableRow label="Expected score" plan={String(b.score.total)} what={String(s.score.total)} delta={deltaNum(d.score)} color={tone(d.score, 'up', 1)} />
+            <Group title="Tomorrow" />
+            <TableRow label="Sleep debt" plan={formatDuration(b.debtMin)} what={formatDuration(s.debtMin)} delta={deltaMin(d.debtMin)} color={tone(d.debtMin, 'down', 5)} />
+            <TableRow label="Average energy" plan={String(Math.round(b.tomorrow.avgEnergy))} what={String(Math.round(s.tomorrow.avgEnergy))} delta={deltaNum(d.avgEnergy)} color={tone(d.avgEnergy, 'up', 0.5)} />
+            <TableRow label="Focus zone" plan={`${b.tomorrow.focusHours.toFixed(1)} h`} what={`${s.tomorrow.focusHours.toFixed(1)} h`} delta={deltaNum(d.focusHours, 1, 'h')} color={tone(d.focusHours, 'up', 0.25)} />
+            {/* Time and depth of the dip on their own rows: together they didn't fit the column. */}
+            <TableRow label="Afternoon dip" plan={b.tomorrow.dip ? formatTime(b.tomorrow.dip.t) : '—'} what={s.tomorrow.dip ? formatTime(s.tomorrow.dip.t) : '—'} />
+            <TableRow
+              label="Energy in the dip"
+              plan={b.tomorrow.dip ? String(Math.round(b.tomorrow.dip.energy)) : '—'}
+              what={s.tomorrow.dip ? String(Math.round(s.tomorrow.dip.energy)) : '—'}
+              delta={b.tomorrow.dip && s.tomorrow.dip ? deltaNum(s.tomorrow.dip.energy - b.tomorrow.dip.energy) : undefined}
+              color={b.tomorrow.dip && s.tomorrow.dip ? tone(s.tomorrow.dip.energy - b.tomorrow.dip.energy, 'up', 0.5) : undefined}
+            />
+          </Fold>
+          <ModelNotes a={a} result={result} />
+        </Section>
       </ScrollView>
     </View>
   );
@@ -408,22 +364,24 @@ function Simulator({ a, data }: { a: Analysis; data: SleepDataset }) {
 
 function Kpi({ label, value, delta, color }: { label: string; value: string; delta: string; color: string }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={font.label}>{label.toUpperCase()}</Text>
-      <Text style={[font.h3, { marginTop: 2, fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
+    <View style={{ flex: 1 }}>
+      <Caption>{label}</Caption>
+      <Text style={[font.h3, { marginTop: space.xxs, fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
         {value}
       </Text>
-      <View style={[styles.pill, { borderColor: color }]}>
-        <Text style={{ color, fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-          {delta}
-        </Text>
-      </View>
+      <Text style={[font.tiny, { color, fontWeight: '700', fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
+        {delta}
+      </Text>
     </View>
   );
 }
 
 function Group({ title }: { title: string }) {
-  return <Text style={[font.label, { marginTop: space.sm, marginBottom: 2, color: colors.accent }]}>{title.toUpperCase()}</Text>;
+  return (
+    <View style={{ marginTop: space.md, marginBottom: space.xxs }}>
+      <Caption>{title}</Caption>
+    </View>
+  );
 }
 
 function TableRow({ label, plan, what, delta, color = colors.textFaint }: { label: string; plan: string; what: string; delta?: string; color?: string }) {
@@ -432,13 +390,13 @@ function TableRow({ label, plan, what, delta, color = colors.textFaint }: { labe
       <Text style={[font.small, { flex: 1.5, color: colors.text }]} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={[font.small, styles.cell]} numberOfLines={1}>
+      <Text style={[font.small, styles.cellText]} numberOfLines={1}>
         {plan}
       </Text>
-      <Text style={[font.small, styles.cell, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
+      <Text style={[font.small, styles.cellText, { color: colors.text, fontWeight: '700' }]} numberOfLines={1}>
         {what}
       </Text>
-      <View style={styles.deltaCell}>{delta ? <Text style={{ color, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{delta}</Text> : null}</View>
+      <View style={styles.deltaCell}>{delta ? <Text style={[font.tiny, { color, fontWeight: '700', fontVariant: ['tabular-nums'] }]}>{delta}</Text> : null}</View>
     </View>
   );
 }
@@ -451,9 +409,8 @@ function ModelNotes({ a, result }: { a: Analysis; result: SimulationResult }) {
     `Focus zone is time within ${SIM.focusBelowPeak} points of your planned day’s peak (energy ${result.focusEnergy}+). The expected score rates a synthetic night shaped like yours — cycle length, deep and REM share, awakenings — the same way real nights are scored.`,
     'It’s a model, not a promise: single nights vary a lot. Use it to compare options, not to predict to the minute.',
   ];
-  const [open, setOpen] = useState(false);
   return (
-    <Disclosure icon="flask-outline" title="How the simulator works" sub="The models behind each number, and their limits" open={open} onToggle={() => setOpen(!open)}>
+    <Fold icon="flask-outline" title="How the simulator works" sub="The models behind each number, and their limits">
       <View style={{ gap: space.sm }}>
         {notes.map((n, i) => (
           <Text key={i} style={font.small}>
@@ -461,26 +418,17 @@ function ModelNotes({ a, result }: { a: Analysis; result: SimulationResult }) {
           </Text>
         ))}
       </View>
-    </Disclosure>
+    </Fold>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: space.lg, paddingBottom: 48 },
   sticky: { backgroundColor: colors.bg, paddingBottom: space.md },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md },
-  cycleBox: {
-    flexDirection: 'row',
-    gap: space.sm,
-    marginTop: space.sm,
-    padding: space.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-  },
-  drink: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: space.sm, marginBottom: space.sm },
-  pill: { marginTop: 4, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: space.xs },
-  cell: { flex: 1, textAlign: 'right' },
+  heroDelta: { fontWeight: '700', marginBottom: space.xs, fontVariant: ['tabular-nums'] },
+  heroSide: { flex: 1, textAlign: 'right', marginBottom: space.xs },
+  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.xs, gap: space.xs },
+  cell: { flex: 1, alignItems: 'flex-end' },
+  cellText: { flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
   deltaCell: { width: 62, alignItems: 'flex-end' },
 });

@@ -1,9 +1,13 @@
-/** The top of the Today screen, shaped by the time of day (see engine/dayPhase.ts). */
+/**
+ * The top of Today. It is about one thing, and which thing depends on the time of day
+ * (engine/dayPhase.ts): last night in the morning, energy during the day, the countdown to
+ * lights-out in the evening, and the in-bed view at night.
+ */
 import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
-import { DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/engine/dayPhase';
+import { curvePosition, DayPhaseInput, fallAsleepNowOptions, nightWakeTarget, PHASE } from '@/engine/dayPhase';
 import { isOpen, justNow, tapsNightOffer } from '@/engine/inBed';
 import { rundownGlance } from '@/engine/rundown';
 import { formatDuration, formatTime, HOUR, MINUTE } from '@/engine/time';
@@ -13,61 +17,187 @@ import { useRundown } from '@/state/rundown';
 import { useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
 import { AlarmControl } from '@/ui/cards/AlarmControl';
-import { CalendarNote } from '@/ui/cards/CalendarNote';
-import { ScreenLightCard } from '@/ui/cards/ScreenLightCard';
 import { SleepModeLine } from '@/ui/cards/SleepModeLine';
-import { WindDownTimelineCard } from '@/ui/cards/WindDownTimeline';
-import { WindDownCard } from '@/ui/cards/WindDownCard';
-import { Button, Card, CardTitle, Icon, Meter, Note, Row } from '@/ui/components';
+import { EnergyChart, Hypnogram } from '@/ui/charts';
+import { Button, Card, Chip, Hero, Icon, ListCard, ListRow, Meter, Note, Row } from '@/ui/components';
+import { until } from '@/ui/format';
 import { EnterView } from '@/ui/motion';
-import { colors, font, radius, space } from '@/ui/theme';
+import { RoutineCheck } from '@/ui/RoutineCheck';
+import { colors, font, night as nightColors, radius, scoreColor, space } from '@/ui/theme';
+import { WakeCheck } from '@/ui/WakeCheck';
 import { CantSleepTip } from './CantSleepTip';
-import { CaffeineLiveCard, EnergyCard, LastNightCard, LightNowCard, MorningCheckInCard, NapCard, SleepPressureCard, until, UsualCoffeeCard } from './cards';
+import { MorningWakeRow } from './EarlyUp';
 import { InBedButton, SessionHeader, TapsNightCard } from './InBed';
 import { StillUpCard } from './StillUp';
 
 type HeroProps = { a: Analysis; now: number };
 
+// ---------------------------------------------------------------------------
+// Morning: last night
+// ---------------------------------------------------------------------------
+
+const RATINGS = ['😫', '😕', '😐', '🙂', '😄'];
+
+/** Two questions that teach eepy your sleep need, plus "is that when you got up?" when it isn't sure. */
+export function MorningCheckIn({ a }: { a: Analysis }) {
+  const log = useStore((s) => s.dayLogs[a.day]);
+  const logDay = useStore((s) => s.logDay);
+  const last = a.lastNightIsCurrent ? a.lastNight?.main : undefined;
+  const timeline = last ? a.timelines[last.id] : undefined;
+  return (
+    <Card>
+      {last && timeline ? <WakeCheck m={last} t={timeline} /> : null}
+      {last ? <RoutineCheck m={last} t={timeline} compact /> : <MorningWakeRow a={a} now={Date.now()} />}
+      <Text style={font.h3}>How did you sleep?</Text>
+      <Row gap={space.xs} style={{ marginTop: space.sm, justifyContent: 'space-between' }}>
+        {RATINGS.map((r, i) => {
+          const selected = log?.sleepRating === i + 1;
+          return (
+            <Pressable
+              key={r}
+              onPress={() => logDay(a.day, { sleepRating: i + 1 })}
+              style={({ pressed }) => [
+                { flex: 1, alignItems: 'center', paddingVertical: space.sm, borderRadius: radius.md },
+                { backgroundColor: selected ? colors.accentSoft : pressed ? colors.surfaceAlt : 'transparent' },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`Rate last night ${i + 1} of 5`}
+            >
+              <Text style={{ fontSize: 30, opacity: log?.sleepRating && !selected ? 0.4 : 1 }}>{r}</Text>
+            </Pressable>
+          );
+        })}
+      </Row>
+      <Text style={[font.h3, { marginTop: space.lg }]}>Did you wake up on your own?</Text>
+      <Row gap={space.sm} style={{ marginTop: space.sm }}>
+        <Chip label="Yes" icon="weather-sunny" selected={log?.wokeNaturally === true} onPress={() => logDay(a.day, { wokeNaturally: true })} />
+        <Chip label="No, alarm or woken" icon="alarm" selected={log?.wokeNaturally === false} onPress={() => logDay(a.day, { wokeNaturally: false })} />
+      </Row>
+      <Text style={[font.tiny, { marginTop: space.sm }]}>Mornings without an alarm are how eepy learns how much sleep you need.</Text>
+    </Card>
+  );
+}
+
+/** Morning daylight: the one habit that sets the body clock. One tap to tick it off. */
+function MorningLight({ a, now }: HeroProps) {
+  const done = useStore((s) => s.dayLogs[a.day]?.tags.includes('outdoor-light') ?? false);
+  const toggleTag = useStore((s) => s.toggleTag);
+  const item = a.plan.find((p) => p.kind === 'light');
+  const end = item?.end ?? a.wakeTime + 70 * MINUTE;
+  return (
+    <ListCard>
+      <ListRow
+        icon="white-balance-sunny"
+        iconColor={colors.energy}
+        title={done ? 'Morning light: done' : 'Get daylight'}
+        sub={done ? 'It sets your body clock for tonight.' : now > end ? 'Still worth it before noon: 10–30 min outdoors.' : `10–30 min outdoors before ${formatTime(end)}.`}
+        right={<Chip label={done ? 'Done' : 'I did'} icon={done ? 'check' : undefined} selected={done} onPress={() => toggleTag(a.day, 'outdoor-light')} />}
+      />
+    </ListCard>
+  );
+}
+
 export function MorningHero({ a, now }: HeroProps) {
   const session = useStore((s) => s.settings.session);
+  const last = a.lastNightIsCurrent ? a.lastNight?.main : undefined;
+  const score = last ? a.scores[last.id] : undefined;
   // No watch night, but you tapped "I'm in bed" and "I'm up": offer those times instead.
   const fromTaps = !!tapsNightOffer(session, { day: a.day, lastNightIsCurrent: a.lastNightIsCurrent, latencyMin: a.latencyMin });
   return (
     <>
-      {a.lastNightIsCurrent ? (
-        <LastNightCard a={a} hero />
+      {last && score ? (
+        <Hero
+          label="Last night"
+          value={formatDuration(last.totalSleepMin)}
+          caption={`Score ${score.total} · ${score.label.toLowerCase()} · you need ${formatDuration(a.need.needMin)}`}
+          onPress={() => router.push({ pathname: '/night/[id]', params: { id: last.id } })}
+          right={<Icon name="chevron-right" size={28} color={colors.textFaint} />}
+        >
+          {a.lastNightStory?.sessionId === last.id ? (
+            <Text style={[font.small, { marginTop: space.xs }]} numberOfLines={2}>
+              {a.lastNightStory.oneLiner}
+            </Text>
+          ) : null}
+          <View style={{ marginTop: space.md }}>
+            <Hypnogram segments={last.segments} start={last.start} end={last.end} height={110} />
+          </View>
+        </Hero>
       ) : fromTaps ? (
         <TapsNightCard a={a} />
       ) : (
-        <Card>
-          <CardTitle icon="bed-outline" title="Last night" />
-          <Text style={font.small}>Your report appears as soon as Nothing X hands last night to Health Connect. Slept without the watch?</Text>
+        <Hero label="Last night" value="Not here yet" caption="Your report appears as soon as Nothing X hands last night to Health Connect.">
           <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-            <Button small kind="secondary" icon="pencil-plus" label="Log it manually" onPress={() => router.push('/log-sleep')} />
+            <Button small kind="secondary" icon="pencil-plus" label="Slept without the watch? Log it" onPress={() => router.push('/log-sleep')} />
           </View>
-        </Card>
+        </Hero>
       )}
-      <MorningCheckInCard a={a} />
-      <UsualCoffeeCard />
-      <LightNowCard a={a} now={now} />
+      <MorningCheckIn a={a} />
+      <MorningLight a={a} now={now} />
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Day: energy
+// ---------------------------------------------------------------------------
+
+/** What the curve is doing right now, in a sentence. */
+export function energySentence(a: Analysis, now: number): string | undefined {
+  const pos = curvePosition(a.energy, now);
+  if (!pos) return undefined;
+  if (pos.inDip && a.energy.dip) return `Afternoon dip until ${formatTime(a.energy.dip.end)}. Routine work, a walk or a short nap.`;
+  const focus = a.energy.focusWindows.find((w) => now >= w.start && now <= w.end);
+  if (focus) return `Peak focus until ${formatTime(focus.end)}. Do the hard thing now.`;
+  const next = pos.next;
+  if (next?.kind === 'peak') return `${pos.trend === 'falling' ? 'A small lull' : 'Rising'}. Next peak around ${formatTime(next.t)}.`;
+  if (next?.kind === 'dip') return `${pos.trend === 'rising' ? 'Still climbing' : 'Easing off'}. Dip starts around ${formatTime(a.energy.dip?.start ?? next.t)}.`;
+  if (next?.kind === 'bedtime') return `Winding down toward lights-out at ${formatTime(next.t)}.`;
+  return undefined;
+}
+
+/** "Sleep debt −14 · Caffeine +3": what is moving the number, at a glance. */
+export function energyReasons(a: Analysis): string | undefined {
+  const parts = a.energyNow?.parts.filter((p) => p.points !== 0) ?? [];
+  if (!parts.length) return undefined;
+  return parts
+    .sort((x, y) => Math.abs(y.points) - Math.abs(x.points))
+    .slice(0, 3)
+    .map((p) => `${p.label} ${p.points > 0 ? '+' : '−'}${Math.abs(p.points)}`)
+    .join(' · ');
 }
 
 export function DayHero({ a, now }: HeroProps) {
+  const pos = curvePosition(a.energy, now);
+  const napBlock = a.nap.best && a.nap.verdict !== 'skip' ? { start: a.nap.best.start, end: a.nap.best.start + a.nap.best.alarmAfterMin * MINUTE } : undefined;
+  const reasons = energyReasons(a);
   return (
     <>
       <TapsNightCard a={a} />
-      <EnergyCard a={a} now={now} hero />
-      <UsualCoffeeCard />
-      <NapCard a={a} />
-      <CaffeineLiveCard a={a} />
+      <Hero
+        label="Energy now"
+        value={pos ? String(Math.round(pos.energy)) : '–'}
+        unit="/ 100"
+        color={colors.energy}
+        caption={energySentence(a, now)}
+        right={pos ? <Icon name={pos.trend === 'rising' ? 'trending-up' : pos.trend === 'falling' ? 'trending-down' : 'trending-neutral'} size={30} color={colors.energy} /> : undefined}
+      >
+        <View style={{ marginTop: space.md }}>
+          <EnergyChart points={a.energy.points} now={now} dip={a.energy.dip} focusWindows={a.energy.focusWindows} nap={napBlock} height={170} />
+        </View>
+      </Hero>
+      <ListCard>
+        <ListRow icon="help-circle-outline" title="Why this number" sub={reasons ?? 'Your sleep, your body clock and what your watch saw last night'} onPress={() => router.push('/energy')} />
+      </ListCard>
     </>
   );
 }
 
-/** Big live countdowns to wind-down and lights-out. */
-function CountdownCard({ a }: { a: Analysis }) {
+// ---------------------------------------------------------------------------
+// Evening: the countdown
+// ---------------------------------------------------------------------------
+
+export function EveningHero({ a }: HeroProps) {
   const now = useNow(1000);
   const { windDownStart, bedtime } = a.tonight;
   const winding = now >= windDownStart;
@@ -80,83 +210,45 @@ function CountdownCard({ a }: { a: Analysis }) {
   const eveningStart = windDownStart - PHASE.eveningLeadH * HOUR;
   const progress = Math.max(0, Math.min(1, (now - eveningStart) / (bedtime - eveningStart)));
   return (
-    <Card accent={colors.light}>
-      <Text style={font.label}>{winding ? 'WIND-DOWN · LIGHTS OUT IN' : 'LIGHTS OUT IN'}</Text>
-      <Text style={[font.stat, { fontSize: 46, lineHeight: 54, color: colors.text, fontVariant: ['tabular-nums'] }]}>{until(bedtime - now)}</Text>
-      <Text style={[font.small, { color: colors.text }]}>
-        at {formatTime(bedtime)}
-        {a.alarm.onBoundary ? ` · ${a.alarm.cycles} sleep cycles to your alarm` : ''}
-      </Text>
-      <Pressable
-        onPress={() => (choice ? router.navigate({ pathname: '/planner', params: { show: 'tonight' } }) : router.push('/tonight'))}
-        hitSlop={8}
-        accessibilityRole="button"
-        style={{ marginTop: 4 }}
-      >
-        <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>
-          {choice
-            ? `Using “${choice.title}” tonight · options`
-            : a.tonight.adjusted
-              ? `Adjusted for tonight (plan was ${formatTime(a.tonight.adjusted.plannedBedtime)}) · change`
-              : `Can't make ${formatTime(bedtime)}? Adjust tonight`}
-        </Text>
-      </Pressable>
-      {winding && !inBed ? <InBedButton a={a} /> : null}
-      <View style={{ marginTop: space.md }}>
-        <Meter value={progress} max={1} color={colors.light} height={6} />
-      </View>
-      <Row style={{ marginTop: space.md }} gap={space.md}>
-        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="lightbulb-night-outline" size={20} color={colors.light} />
-        </View>
-        <View style={{ flex: 1 }}>
-          {winding ? (
-            <>
-              <Text style={font.h3}>Wind-down started {formatDuration(Math.max(1, Math.round((now - windDownStart) / MINUTE)))} ago</Text>
-              <Text style={font.small}>{rundown ? rundownGlance(rundown) : 'Dim the lights, screens away, keep the room cool.'}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={[font.h3, { fontVariant: ['tabular-nums'] }]}>Wind-down in {until(windDownStart - now)}</Text>
-              <Text style={font.small}>
-                {rundown ? `From ${formatTime(windDownStart)}: your bedtime rundown — ${rundownGlance(rundown)}.` : `From ${formatTime(windDownStart)}: dim lights and put screens away as melatonin rises.`}
-              </Text>
-            </>
-          )}
-        </View>
-      </Row>
-      <AlarmControl a={a} />
-      <SleepModeLine a={a} />
-      <Pressable onPress={() => router.navigate({ pathname: '/planner', params: { show: 'tonight' } })} hitSlop={8} accessibilityRole="link" style={{ marginTop: space.md }}>
-        <Row gap={4}>
-          <Icon name="calendar-clock" size={16} color={colors.accent} />
-          <Text style={[font.small, { color: colors.accent, fontWeight: '600', flex: 1 }]}>Tonight's full plan, and the week ahead</Text>
-          <Icon name="chevron-right" size={18} color={colors.accent} />
-        </Row>
-      </Pressable>
-    </Card>
-  );
-}
-
-export function EveningHero({ a, now }: HeroProps) {
-  return (
     <>
-      <CountdownCard a={a} />
-      <WindDownTimelineCard a={a} compact />
-      {/* Links to the wind-down routine and plays the default sound (same evening window as this hero). */}
-      <WindDownCard analysis={a} />
-      <ScreenLightCard a={a} />
+      <Hero
+        label={winding ? 'Winding down · lights out in' : 'Lights out in'}
+        value={until(bedtime - now)}
+        caption={`At ${formatTime(bedtime)}${a.alarm.onBoundary ? ` · ${a.alarm.cycles} sleep cycles to your alarm` : ''}`}
+      >
+        <View style={{ marginTop: space.md }}>
+          <Meter value={progress} max={1} color={colors.sleep} />
+        </View>
+      </Hero>
+      {winding && !inBed ? <InBedButton a={a} /> : null}
+      <ListCard>
+        <ListRow
+          icon="weather-night"
+          iconColor={colors.sleep}
+          title={winding ? `Wind-down started ${formatDuration(Math.max(1, Math.round((now - windDownStart) / MINUTE)))} ago` : `Wind-down in ${until(windDownStart - now)}`}
+          sub={rundown ? rundownGlance(rundown) : winding ? 'Dim the lights, screens away, keep the room cool.' : `From ${formatTime(windDownStart)}: dim lights, screens away.`}
+          onPress={() => router.push('/winddown')}
+        />
+        <ListRow
+          icon="clock-edit-outline"
+          title={choice ? `Using “${choice.title}” tonight` : a.tonight.adjusted ? 'Adjusted for tonight' : `Can't make ${formatTime(bedtime)}?`}
+          sub={choice ? 'See the other options' : a.tonight.adjusted ? `The plan was ${formatTime(a.tonight.adjusted.plannedBedtime)} · change` : 'Move tonight’s bedtime'}
+          onPress={() => (choice ? router.navigate({ pathname: '/planner', params: { show: 'tonight' } }) : router.push('/tonight'))}
+        />
+      </ListCard>
       <Card>
-        <CardTitle icon="gauge" title="Sleep pressure" color={colors.light} />
-        <SleepPressureCard a={a} now={now} embedded />
+        <AlarmControl a={a} />
+        <SleepModeLine a={a} />
       </Card>
-      {/* Tonight's times are in the countdown above; the full plan is a tap away in the Planner. */}
-      <CalendarNote analysis={a} />
     </>
   );
 }
 
-const NIGHT_CARD = { backgroundColor: '#0A0E1C', borderColor: '#161C33' };
+// ---------------------------------------------------------------------------
+// Night
+// ---------------------------------------------------------------------------
+
+const NIGHT_PANEL = { backgroundColor: nightColors.surface };
 
 /**
  * Dimmed, minimal view after lights-out: the big "I'm in bed" (or, once tapped, the running sleep
@@ -186,61 +278,45 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
       {showSession ? (
         <SessionHeader a={a} />
       ) : (
-        <View style={{ alignItems: 'center', paddingTop: space.lg, paddingBottom: space.md }}>
-          <Icon name="moon-waning-crescent" size={44} color={colors.light} />
-          <Text style={[font.h1, { color: colors.textDim, marginTop: space.sm }]}>Time to sleep</Text>
-          <Text style={[font.small, { textAlign: 'center', marginTop: 4 }]}>
-            It's {formatTime(now)}
-            {afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm {formatTime(alarm)}
-          </Text>
+        <Hero
+          dim
+          value="Time to sleep"
+          caption={`It's ${formatTime(now)}${afterBedtime ? ` · lights out was ${formatTime(input.bedtime)}` : ''} · alarm ${formatTime(alarm)}`}
+        >
           {afterBedtime && !stillUp ? (
             <Pressable onPress={() => router.push('/tonight')} hitSlop={8} accessibilityRole="button" style={{ marginTop: space.sm }}>
-              <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Still up? Re-plan the rest of the night</Text>
+              <Text style={[font.small, { color: colors.accent, fontWeight: '700' }]}>Still up? Re-plan the rest of the night</Text>
             </Pressable>
           ) : null}
-        </View>
+        </Hero>
       )}
-      {stillUp ? <StillUpCard a={a} now={now} /> : null}
-      {/* Up late and want to log how you feel: in plain sight, not only behind the dimmed "+". */}
-      <View style={{ alignItems: 'center', marginBottom: space.md }}>
-        <Button small kind="ghost" icon="emoticon-happy-outline" label="Check in" onPress={() => router.push('/checkin')} />
-      </View>
       {showSession ? null : (
         <View style={{ marginBottom: space.lg }}>
           <InBedButton a={a} night />
         </View>
       )}
-      <Card style={NIGHT_CARD} animate={false}>
-        <Text style={[font.small, { color: colors.textDim }]}>If you fall asleep now (≈{Math.round(a.latencyMin)} min to drift off), wake at the end of a cycle:</Text>
+      {stillUp ? <StillUpCard a={a} now={now} /> : null}
+      <Card style={NIGHT_PANEL} animate={false}>
+        <Text style={[font.small, { color: nightColors.text }]}>If you fall asleep now (≈{Math.round(a.latencyMin)} min to drift off), wake at the end of a cycle:</Text>
         {fitting.length === 0 ? (
-          <Text style={[font.body, { color: colors.textDim, marginTop: space.md }]}>
-            Less than one sleep cycle is left before your alarm. Stay in the dark and rest — even dozing helps.
-          </Text>
+          <Text style={[font.body, { color: nightColors.text, marginTop: space.md }]}>Less than one sleep cycle is left before your alarm. Stay in the dark and rest — even dozing helps.</Text>
         ) : null}
-        <View style={{ marginTop: space.md, gap: space.sm }}>
+        <View style={{ marginTop: space.md, gap: space.xs }}>
           {shown.map((o) => (
             <Row
               key={o.cycles}
               gap={space.md}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: space.md,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: o.best ? '#3B3570' : 'transparent',
-                backgroundColor: o.best ? '#14132B' : 'transparent',
-                opacity: o.fitsBeforeWake ? 1 : 0.5,
-              }}
+              style={{ paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: o.best ? colors.sleepSoft : 'transparent', opacity: o.fitsBeforeWake ? 1 : 0.5 }}
             >
-              <Text style={[font.h2, { color: o.best ? colors.light : colors.textDim, width: 96, fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
+              <Text style={[font.h2, { color: o.best ? colors.sleep : nightColors.text, width: 100, fontVariant: ['tabular-nums'] }]} numberOfLines={1} adjustsFontSizeToFit>
                 {formatTime(o.wake)}
               </Text>
               <View style={{ flex: 1 }}>
-                <Text style={[font.small, { color: colors.textDim }]}>
+                <Text style={[font.small, { color: nightColors.text }]}>
                   {o.cycles} cycle{o.cycles > 1 ? 's' : ''} · {formatDuration(o.sleepMin)} sleep
                 </Text>
                 {o.best ? (
-                  <Text style={[font.tiny, { color: colors.light }]}>{Math.abs(o.wake - alarm) <= 3 * MINUTE ? 'BEST · MATCHES YOUR ALARM' : `BEST · SET YOUR ALARM FOR ${formatTime(o.wake)}`}</Text>
+                  <Text style={[font.tiny, { color: colors.sleep }]}>{Math.abs(o.wake - alarm) <= 3 * MINUTE ? 'Best · matches your alarm' : `Best · set your alarm for ${formatTime(o.wake)}`}</Text>
                 ) : !o.fitsBeforeWake ? (
                   <Text style={font.tiny}>later than your {formatTime(latest)} wake-up</Text>
                 ) : null}
@@ -249,16 +325,20 @@ export function NightView({ a, now, input }: HeroProps & { input: DayPhaseInput 
           ))}
         </View>
       </Card>
-      <Card style={NIGHT_CARD} animate={false} onPress={() => router.push('/winddown')}>
+      <Card style={NIGHT_PANEL} animate={false} onPress={() => router.push('/winddown')}>
         <Row gap={space.md}>
           <Icon name="weather-night" size={22} color={colors.textFaint} />
           <View style={{ flex: 1 }}>
-            <Text style={[font.body, { color: colors.textDim }]}>Can't sleep?</Text>
+            <Text style={[font.body, { color: nightColors.text }]}>Can't sleep?</Text>
             <CantSleepTip />
           </View>
           <Icon name="chevron-right" color={colors.textFaint} />
         </Row>
       </Card>
+      {/* Up late and want to log how you feel. */}
+      <View style={{ alignItems: 'center', marginBottom: space.md }}>
+        <Button small kind="ghost" icon="emoticon-happy-outline" label="Check in" onPress={() => router.push('/checkin')} />
+      </View>
       {afterBedtime && !showSession && now - input.bedtime > 2 * HOUR ? (
         <Note tone="info" icon="clock-outline">
           You're up {formatDuration((now - input.bedtime) / MINUTE)} past lights-out. Keep the screen short and dim.
@@ -279,3 +359,5 @@ export function NightMoreToggle({ open, onToggle }: { open: boolean; onToggle: (
     </Pressable>
   );
 }
+
+export { scoreColor };

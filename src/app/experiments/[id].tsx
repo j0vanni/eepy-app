@@ -1,52 +1,39 @@
+/**
+ * One experiment. Running: which day it is and the rule, the morning yes/no if eepy can't tell, the
+ * days so far (tap one to change its answer) and the result so far. Finished: the verdict, then the
+ * before and after. Finishing, extending, stopping and deleting are rows at the end.
+ */
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 
-import {
-  activeExperiment,
-  computeExperimentResult,
-  createExperiment,
-  EXPERIMENT_METRICS,
-  experimentQuestion,
-  experimentRule,
-  finishExperiment,
-  MetricResult,
-  reminderFor,
-  Signal,
-  templateFor,
-} from '@/engine/experiments';
+import { activeExperiment, createExperiment, EXPERIMENT_METRICS, experimentRule, finishExperiment, MetricResult, reminderFor, templateFor } from '@/engine/experiments';
 import { addDays, formatTime, localizeClockText } from '@/engine/time';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { cycleAnswer, setAnswer } from '@/ui/coach/actions';
+import { cycleAnswer } from '@/ui/coach/actions';
 import { ExperimentDots, ExperimentLegend } from '@/ui/coach/Dots';
-import { useExperimentData } from '@/ui/coach/hooks';
-import { Button, Card, CardTitle, Empty, Icon, Note, Row, Screen, Section, Stat } from '@/ui/components';
+import { useExperimentData, useExperimentResult } from '@/ui/coach/hooks';
+import { experimentDay, ExperimentQuestion } from '@/ui/coach/parts';
+import { Banner, Button, Card, Empty, Fold, Hero, Icon, ListCard, ListRow, Row, Screen, Section, Stat } from '@/ui/components';
 import { confirm } from '@/ui/confirm';
 import { dayLabel } from '@/ui/format';
 import { colors, font, space } from '@/ui/theme';
 
-const SIGNAL_COLOR: Record<Signal, string> = {
-  strong: colors.good,
-  moderate: colors.accent,
-  weak: colors.warn,
-  none: colors.textDim,
-  insufficient: colors.textFaint,
-};
-
-function MetricRow({ m, first }: { m: MetricResult; first: boolean }) {
-  const color = m.signal === 'strong' || m.signal === 'moderate' ? (m.improved ? colors.good : colors.bad) : SIGNAL_COLOR[m.signal];
+/** One measure: before → during, and what that amounts to. */
+function MetricRow({ m }: { m: MetricResult }) {
+  const clear = m.signal === 'strong' || m.signal === 'moderate';
+  const color = clear ? (m.improved ? colors.good : colors.bad) : colors.text;
   const arrow = m.diff === undefined || m.signal === 'insufficient' ? 'minus' : m.diff > 0 ? 'arrow-up' : 'arrow-down';
   return (
-    <View style={{ paddingVertical: space.sm, borderTopWidth: first ? 0 : 1, borderTopColor: colors.border }}>
+    <View style={{ paddingVertical: space.md }}>
       <Row gap={space.sm}>
-        <Icon name={arrow} size={18} color={color} />
+        <Icon name={arrow} size={18} color={clear ? color : colors.textFaint} />
         <Text style={[font.body, { flex: 1 }]}>{m.label}</Text>
-        <Text style={[font.small, { color: colors.text }]}>
+        <Text style={[font.small, { fontVariant: ['tabular-nums'] }]}>
           {m.baselineText ?? '–'} → <Text style={{ color, fontWeight: '700' }}>{m.experimentText ?? '–'}</Text>
         </Text>
       </Row>
-      <Text style={[font.small, { marginLeft: 26, marginTop: 2 }]}>{m.verdict}</Text>
+      <Text style={[font.small, { marginLeft: 26, marginTop: space.xxs }]}>{m.verdict}</Text>
     </View>
   );
 }
@@ -59,7 +46,7 @@ export default function ExperimentDetail() {
   const remove = useStore((s) => s.removeExperiment);
   const exp = experiments.find((e) => e.id === id);
   const data = useExperimentData(a);
-  const result = useMemo(() => (exp && data ? computeExperimentResult(exp, data) : undefined), [exp, data]);
+  const result = useExperimentResult(a, exp);
 
   if (!exp) {
     return (
@@ -74,7 +61,6 @@ export default function ExperimentDetail() {
   const lastDay = addDays(exp.startDate, exp.durationDays - 1);
   const isActive = exp.status === 'active';
   const rec = result?.recommendation;
-  const recTone = rec?.kind === 'keep' ? 'good' : rec?.kind === 'no-effect' ? 'warn' : 'info';
   const reminder = a && isActive && a.day >= exp.startDate && a.day <= lastDay ? reminderFor(exp, a.day, { bedtime: a.tonight.bedtime, wake: a.wakeTime }) : undefined;
 
   const finish = async () => {
@@ -100,106 +86,87 @@ export default function ExperimentDetail() {
     router.back();
   };
   const otherActive = activeExperiment(experiments.filter((e) => e.id !== exp.id));
+  const asking = !!a && !!result && isActive && !!result.needsAnswer;
+  const dates = `${dayLabel(exp.startDate, a?.day)} to ${dayLabel(lastDay, a?.day)}`;
+  const recColor = rec?.kind === 'keep' ? colors.good : rec?.kind === 'no-effect' ? colors.warn : colors.text;
 
   return (
     <Screen>
       <Stack.Screen options={{ title: localizeClockText(exp.title) }} />
-      <Card accent={isActive ? colors.accentSoft : undefined}>
-        <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
-          <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={t?.icon ?? 'flask-outline'} size={24} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[font.tiny, { textTransform: 'uppercase' }]}>
-              {isActive ? 'Running' : exp.status === 'completed' ? 'Finished' : 'Stopped'} · {exp.durationDays} nights
-            </Text>
-            <Text style={[font.h2, { marginTop: 2 }]}>{experimentRule(exp)}</Text>
-            <Text style={[font.small, { marginTop: 4 }]}>
-              {dayLabel(exp.startDate, a?.day)} → {dayLabel(lastDay, a?.day)}
-            </Text>
-          </View>
-        </Row>
-        {t ? <Text style={[font.small, { marginTop: space.md }]}>{t.why}</Text> : null}
-        {t ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: space.md }}>
-            {t.metrics.map((m) => (
-              <View key={m} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.surfaceAlt }}>
-                <Text style={[font.tiny, { color: colors.textDim }]}>{EXPERIMENT_METRICS[m].label}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </Card>
+
+      {isActive ? (
+        <Hero
+          label={`Running · ${exp.durationDays} nights`}
+          value={!a || !result ? 'Running' : result.complete ? 'All nights in' : `Day ${experimentDay(exp, result, a.day)} of ${exp.durationDays}`}
+          caption={`${experimentRule(exp)}. ${dates}.`}
+        />
+      ) : (
+        <Hero
+          label={`${exp.status === 'completed' ? 'Finished' : 'Stopped'} · ${exp.durationDays} nights`}
+          value={rec?.title ?? (exp.status === 'completed' ? 'Finished' : 'Stopped')}
+          color={recColor}
+          caption={`${experimentRule(exp)}. ${dates}.`}
+        />
+      )}
+
+      {a && result && reminder ? <Banner icon="bell-ring-outline" text={`Today${reminder.at > a.now ? `, reminder at ${formatTime(reminder.at)}` : ''}: ${reminder.text}`} /> : null}
+
+      {asking ? <ExperimentQuestion exp={exp} date={result.needsAnswer!} today={a.day} /> : null}
+      {isActive && result?.complete ? <Button label="Finish and save the result" icon="flag-checkered" kind={asking ? 'secondary' : 'primary'} onPress={finish} style={{ marginBottom: space.md }} /> : null}
+      {!isActive && !otherActive ? <Button label="Run it again" icon="play-circle-outline" onPress={runAgain} style={{ marginBottom: space.md }} /> : null}
 
       {!a || !result ? (
-        <Note tone="info">Sync some nights to see progress and results.</Note>
+        <Banner text="Sync some nights to see progress and results." />
       ) : (
         <>
-          {reminder ? (
-            <Note tone="info" icon="bell-ring-outline">
-              {`Today${reminder.at > a.now ? ` (reminder ${formatTime(reminder.at)})` : ''}: ${reminder.text}`}
-            </Note>
-          ) : null}
-
-          {isActive && result.needsAnswer ? (
-            <Card accent={colors.warn}>
-              <Text style={[font.tiny, { textTransform: 'uppercase', color: colors.warn }]}>Quick check · {dayLabel(result.needsAnswer, a.day)}</Text>
-              <Text style={[font.h3, { marginTop: 4 }]}>{experimentQuestion(exp)}</Text>
-              <Row gap={space.sm} style={{ marginTop: space.md }}>
-                <Button label="Yes" icon="check" onPress={() => setAnswer(exp, result.needsAnswer!, true)} />
-                <Button kind="secondary" label="No" icon="close" onPress={() => setAnswer(exp, result.needsAnswer!, false)} />
-              </Row>
-            </Card>
-          ) : null}
-
-          <Section title="Progress">
+          <Section title="Day by day">
             <Card>
               <ExperimentDots days={result.days} onPressDay={(d) => cycleAnswer(exp, d)} />
               <ExperimentLegend />
-              <Row style={{ marginTop: space.md }}>
-                <Stat label="Kept" value={`${result.kept}`} sub={`of ${result.elapsed} so far`} color={colors.good} />
-                <Stat label="Adherence" value={result.adherencePct !== undefined ? `${Math.round(result.adherencePct * 100)}%` : '–'} sub={result.unknown ? `${result.unknown} unanswered` : undefined} />
-                <Stat label={result.complete ? 'Status' : 'Left'} value={result.complete ? 'Done' : `${result.remaining}`} sub={result.complete ? undefined : 'nights'} />
+              <Row style={{ marginTop: space.lg }}>
+                <Stat label="Kept" value={String(result.kept)} sub={`of ${result.elapsed} so far`} />
+                <Stat label="Kept to it" value={result.adherencePct !== undefined ? `${Math.round(result.adherencePct * 100)}%` : '–'} sub={result.unknown ? `${result.unknown} unanswered` : undefined} />
+                <Stat label={result.complete ? 'Status' : 'Left'} value={result.complete ? 'Done' : String(result.remaining)} sub={result.complete ? undefined : 'nights'} />
               </Row>
-              <Text style={[font.tiny, { marginTop: space.sm }]}>Tap a day to change its answer. Days are checked from your journal, caffeine log and watch where possible.</Text>
+              <Text style={[font.tiny, { marginTop: space.md }]}>Tap a day to change its answer. eepy fills them in from your journal, caffeine log and watch where it can.</Text>
             </Card>
           </Section>
 
-          <Section title={result.complete || !isActive ? 'Result' : 'Interim result'}>
-            {rec ? (
-              <Note tone={recTone} icon={rec.kind === 'keep' ? 'check-decagram-outline' : rec.kind === 'no-effect' ? 'scale-balance' : 'timer-sand'}>
-                <Text style={{ fontWeight: '700' }}>{rec.title}. </Text>
-                {rec.detail}
-              </Note>
-            ) : null}
-            <Card>
-              <CardTitle icon="chart-bell-curve-cumulative" title="Before → during" />
-              {result.metrics.map((m, i) => (
-                <MetricRow key={m.key} m={m} first={i === 0} />
+          <Section title={result.complete || !isActive ? 'Before and after' : 'Before and after, so far'}>
+            <Card style={{ paddingVertical: space.xs }}>
+              {rec ? (
+                <View style={{ paddingVertical: space.md }}>
+                  <Text style={[font.h3, { color: recColor }]}>{rec.title}</Text>
+                  <Text style={[font.small, { marginTop: space.xxs }]}>{rec.detail}</Text>
+                </View>
+              ) : null}
+              {result.metrics.map((m) => (
+                <MetricRow key={m.key} m={m} />
               ))}
-              <Text style={[font.tiny, { marginTop: space.sm }]}>
-                {result.nightsAnalysed} night{result.nightsAnalysed === 1 ? '' : 's'} that followed the rule vs {result.baselineNights} nights in the 4 weeks before you started
-                (Welch's t-test; only nights you stuck to it count). Wrist-based sleep stages are approximate.
-              </Text>
+              <Fold bare title="How this is measured">
+                <Text style={font.small}>
+                  {result.nightsAnalysed} night{result.nightsAnalysed === 1 ? '' : 's'} that followed the rule, against {result.baselineNights} nights in the four weeks before you started (Welch's t-test; only
+                  nights you stuck to it count). Wrist-based sleep stages are approximate.
+                </Text>
+              </Fold>
             </Card>
           </Section>
         </>
       )}
 
-      <View style={{ gap: space.sm, marginTop: space.lg }}>
-        {isActive ? (
-          <>
-            <Button label={result?.complete ? 'Finish & save result' : 'Finish now'} icon="flag-checkered" onPress={finish} kind={result?.complete ? 'primary' : 'secondary'} />
-            {rec?.kind === 'extend' || result?.complete ? <Button label="Extend by 7 nights" icon="calendar-arrow-right" kind="secondary" onPress={extend} /> : null}
-            <Button label="Stop experiment" icon="stop-circle-outline" kind="danger" onPress={abandon} />
-          </>
-        ) : (
-          <>
-            {!otherActive ? <Button label="Run it again" icon="play-circle-outline" onPress={runAgain} /> : null}
-            <Button label="Delete" icon="delete-outline" kind="danger" onPress={del} />
-          </>
-        )}
-      </View>
+      <Section title="This experiment">
+        <ListCard>
+          {t ? (
+            <Fold bare icon={t.icon} title="Why try it" sub={`Measures ${t.metrics.map((m) => EXPERIMENT_METRICS[m].label.toLowerCase()).join(', ')}`}>
+              <Text style={font.small}>{t.why}</Text>
+            </Fold>
+          ) : null}
+          {isActive && !result?.complete ? <ListRow icon="flag-checkered" title="Finish now" sub="Save the result from the nights so far" onPress={finish} /> : null}
+          {isActive && (rec?.kind === 'extend' || result?.complete) ? <ListRow icon="calendar-arrow-right" title="Extend by 7 nights" onPress={extend} /> : null}
+          {isActive ? <ListRow icon="stop-circle-outline" iconColor={colors.bad} title="Stop experiment" sub="It moves to your history as stopped" onPress={abandon} /> : null}
+          {!isActive ? <ListRow icon="delete-outline" iconColor={colors.bad} title="Delete" sub="Removes it and its answers" onPress={del} /> : null}
+        </ListCard>
+      </Section>
     </Screen>
   );
 }

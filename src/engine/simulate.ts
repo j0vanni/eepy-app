@@ -316,6 +316,8 @@ function tomorrowEnergy(ctx: Omit<Ctx, 'baseline'>, sleeps: Interval[], wake: nu
     midSleepMin: a.habitualMidSleepMin,
     debtMin,
     circadian: a.circadian,
+    // Tomorrow's recovery signals and heart rate aren't known yet; the body clock is where it is today.
+    context: a.energyContext?.clockShiftMin ? { clockShiftMin: a.energyContext.clockShiftMin } : undefined,
   });
   const points = f.points.filter((p) => !p.asleep && p.t >= wake && p.t <= ctx.tomorrowBed);
   // Peak after sleep inertia has worn off.

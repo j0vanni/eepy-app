@@ -19,12 +19,13 @@ import { useStore } from '@/state/store';
 import { useAnalysis, useNow } from '@/state/useAnalysis';
 import { BrightnessSlider } from '@/ui/BrightnessSlider';
 import { screenPlanFor } from '@/ui/cards/ScreenLightCard';
-import { Button, Icon, Row } from '@/ui/components';
+import { Button, Icon, IconButton, Row } from '@/ui/components';
 import { selectionTick } from '@/ui/haptics';
-import { colors, font, radius, space } from '@/ui/theme';
+import { colors, font, iconSize, radius, space, touch } from '@/ui/theme';
 
+/** How strong the warm tint over the whole app is, by phase. */
 const TINT = { evening: 0.04, winddown: 0.07, night: 0.08 } as const;
-/** Above the tab bar (62) on the left; the check-in "+" sits on the right. */
+/** Above the tab bar (62) on the left. */
 const PILL_BOTTOM = 62 + 14;
 
 export function EveningScreen() {
@@ -73,24 +74,22 @@ export function EveningScreen() {
   const until = formatTime(manualBrightness(t).screenDimPausedUntil!);
   return (
     <>
-      {tint ? <View style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(255, 140, 40, ${tint})`, pointerEvents: 'none' }]} /> : null}
+      {tint ? <View style={[StyleSheet.absoluteFill, styles.tint, { opacity: tint }]} /> : null}
       {control && open ? (
-        <View style={[styles.panel, { bottom: insets.bottom + PILL_BOTTOM + 50 }]}>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <Text style={[font.body, { fontWeight: '700' }]}>eepy's brightness</Text>
-            <Pressable onPress={() => setOpen(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
-              <Icon name="close" size={20} color={colors.textDim} />
-            </Pressable>
+        <View style={[styles.panel, { bottom: insets.bottom + PILL_BOTTOM + touch.min + space.sm }]}>
+          <Row gap={space.sm}>
+            <Text style={[font.h3, { flex: 1 }]}>eepy's brightness</Text>
+            <IconButton icon="close" label="Close" onPress={() => setOpen(false)} />
           </Row>
-          <Text style={[font.tiny, { marginTop: 2 }]}>
-            {mode.kind === 'auto' ? 'Dimmed for the evening. Drag to set it yourself' : `Set by you until ${until}`} — only eepy's screen; your phone stays as it is.
+          <Text style={font.small}>
+            {mode.kind === 'auto' ? 'Dimmed for the evening. Drag to set it yourself.' : `Set by you until ${until}.`} Only eepy changes, not your phone.
           </Text>
           <BrightnessSlider value={mode.slider} onChange={(v) => set(v)} onCommit={(v) => set(v, true)} />
           <Row gap={space.sm} style={{ marginTop: space.xs, flexWrap: 'wrap' }}>
             {mode.kind === 'manual' && settings.screenDim ? (
               <Button
                 small
-                kind="secondary"
+                kind="ghost"
                 icon="brightness-auto"
                 label="Auto-dim"
                 onPress={() => {
@@ -116,14 +115,15 @@ export function EveningScreen() {
       {control ? (
         <Pressable
           onPress={() => setOpen(!open)}
-          hitSlop={8}
+          hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel="eepy's brightness"
           accessibilityHint="Opens a brightness slider for eepy's screen"
-          style={({ pressed }) => [styles.pill, { bottom: insets.bottom + PILL_BOTTOM }, pressed ? { opacity: 0.8 } : null]}
+          accessibilityState={{ expanded: open }}
+          style={({ pressed }) => [styles.pill, { bottom: insets.bottom + PILL_BOTTOM }, pressed ? { opacity: 0.75 } : null]}
         >
-          <Icon name="brightness-6" size={16} color={colors.text} />
-          <Text style={[font.small, { color: colors.text, fontWeight: '600' }]}>Brightness</Text>
+          <Icon name="brightness-6" size={iconSize.sm} color={colors.textDim} />
+          <Text style={[font.small, { color: colors.text, fontWeight: '700' }]}>Brightness</Text>
         </Pressable>
       ) : null}
     </>
@@ -131,31 +131,28 @@ export function EveningScreen() {
 }
 
 const styles = StyleSheet.create({
+  // A warm wash over everything; touches pass through.
+  tint: { backgroundColor: colors.warn, pointerEvents: 'none' },
   pill: {
     position: 'absolute',
-    left: 16,
+    left: space.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: 'rgba(26, 24, 56, 0.94)',
-    borderWidth: 1,
-    borderColor: '#3A3670',
+    gap: space.sm,
+    minHeight: touch.min,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
   },
+  // A sheet floating over the page and its panels: one step lighter than a panel.
   panel: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    padding: space.md,
+    left: space.lg,
+    right: space.lg,
+    padding: space.lg,
+    paddingTop: space.sm,
     borderRadius: radius.lg,
-    backgroundColor: '#15132E',
-    borderWidth: 1,
-    borderColor: '#3A3670',
+    backgroundColor: colors.surfaceAlt,
     elevation: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
   },
 });

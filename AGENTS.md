@@ -9,6 +9,9 @@ Android sleep coach (Expo SDK 58, React Native 0.88, TypeScript) that reads CMF 
 - Android build: `compileSdkVersion` 37 / `targetSdkVersion` 36 / `minSdkVersion` 26, arm64 only (`app.json` → `expo-build-properties`). The APK is built by `.github/workflows/android-apk.yml`.
 - Health Connect and exact alarms need a real build (`npx expo run:android` or the CI APK) — not Expo Go.
 
+- The interface follows `docs/DESIGN.md`: screens are built only from `src/ui/components.tsx` (the kit) and the tokens in `src/ui/theme.ts`. Read it before touching a screen.
+- The energy forecast: `engine/alertness.ts` (the model), `engine/watchSignals.ts` (what the watch and caffeine add), `engine/bodyClock.ts` (body-clock shift from steps, sleep and heart rate), `engine/calibration.ts` (fits it to check-ins and decides which model is in effect).
+
 Before declaring a change done: `npm run typecheck` and `npm test`.
 
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.

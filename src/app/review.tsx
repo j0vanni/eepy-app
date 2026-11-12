@@ -1,15 +1,22 @@
+/**
+ * Weekly review: one week in numbers. Opens with the week's average sleep against your need, the
+ * score, debt and regularity beside it, and the one thing to focus on next; then the nights, what
+ * changed, goals, the experiment and the insights. The arrows at the top move between weeks.
+ *
+ * Param `week`: any date in the week to open (default: the latest).
+ */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
 import { formatClock, formatDuration, localizeClockText } from '@/engine/time';
 import { availableWeeks, buildWeeklyReview, latestReviewWeek, reviewNightLabel, ReviewNight, weekStartOf } from '@/engine/weeklyReview';
 import { selectDataset, useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { REVIEW_SEEN_MARK } from '@/ui/cards/CoachCards';
 import { DurationBars } from '@/ui/charts';
-import { Button, Card, CardTitle, Empty, Icon, ListRow, Meter, Note, Row, Screen, Section, Stat } from '@/ui/components';
+import { REVIEW_SEEN_MARK } from '@/ui/coach/hooks';
+import { Banner, Button, Card, Empty, Hero, Icon, IconButton, KeyValue, Link, ListCard, ListRow, Row, Screen, Section, Stat } from '@/ui/components';
 import { weekdayInitial } from '@/ui/format';
 import { InsightCard } from '@/ui/InsightCard';
 import { colors, font, scoreColor, space } from '@/ui/theme';
@@ -20,13 +27,12 @@ function NightRow({ n, kind }: { n: ReviewNight; kind: 'best' | 'worst' }) {
   return (
     <ListRow
       icon={kind === 'best' ? 'trophy-outline' : 'weather-cloudy'}
-      iconColor={kind === 'best' ? colors.energy : colors.textDim}
       title={`${kind === 'best' ? 'Best' : 'Toughest'}: ${reviewNightLabel(n.date)}`}
       sub={`${n.sleepMin !== undefined ? formatDuration(n.sleepMin) : '–'} asleep`}
       right={
-        <Row gap={6}>
-          {n.score !== undefined ? <Text style={[font.h3, { color: scoreColor(n.score) }]}>{n.score}</Text> : null}
-          <Icon name="chevron-right" color={colors.textFaint} />
+        <Row gap={space.xs}>
+          {n.score !== undefined ? <Text style={[font.h3, { color: scoreColor(n.score), fontVariant: ['tabular-nums'] }]}>{n.score}</Text> : null}
+          {n.sessionId ? <Icon name="chevron-right" color={colors.textFaint} /> : null}
         </Row>
       }
       onPress={n.sessionId ? () => router.push({ pathname: '/night/[id]', params: { id: n.sessionId! } }) : undefined}
@@ -67,40 +73,42 @@ export default function ReviewScreen() {
   const newer = idx > 0 ? weeks[idx - 1] : undefined;
   const sleepDelta = review.avgSleepMin !== undefined ? review.avgSleepMin - review.needMin : undefined;
   const reg = review.regularity;
+  const focus = review.focus;
 
   return (
     <Screen>
-      <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
-        <Pressable onPress={() => older && setWeek(older)} disabled={!older} hitSlop={10} accessibilityLabel="Previous week" style={{ opacity: older ? 1 : 0.3 }}>
-          <Icon name="chevron-left" size={28} color={colors.text} />
-        </Pressable>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={font.h2}>{review.label}</Text>
+      <Row style={{ marginBottom: space.md }}>
+        <View style={{ opacity: older ? 1 : 0.3 }}>
+          <IconButton icon="chevron-left" label="Previous week" color={colors.text} onPress={() => older && setWeek(older)} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={font.h3}>{review.label}</Text>
           <Text style={font.tiny}>
-            {current === latest ? 'LATEST WEEK' : `${idx} WEEK${idx === 1 ? '' : 'S'} AGO`} · {review.nightsRecorded}/7 NIGHTS
+            {current === latest ? 'Latest week' : `${idx} week${idx === 1 ? '' : 's'} ago`} · {review.nightsRecorded} of 7 nights
           </Text>
         </View>
-        <Pressable onPress={() => newer && setWeek(newer)} disabled={!newer} hitSlop={10} accessibilityLabel="Next week" style={{ opacity: newer ? 1 : 0.3 }}>
-          <Icon name="chevron-right" size={28} color={colors.text} />
-        </Pressable>
+        <View style={{ opacity: newer ? 1 : 0.3 }}>
+          <IconButton icon="chevron-right" label="Next week" color={colors.text} onPress={() => newer && setWeek(newer)} />
+        </View>
       </Row>
 
+      {review.nightsRecorded < 4 ? <Banner text={`Only ${review.nightsRecorded} night${review.nightsRecorded === 1 ? ' was' : 's were'} recorded this week, so treat these numbers as rough.`} /> : null}
+
+      <Hero
+        label="Average sleep"
+        value={review.avgSleepMin !== undefined ? formatDuration(review.avgSleepMin) : '–'}
+        unit="a night"
+        color={sleepDelta !== undefined ? (sleepDelta >= -15 ? colors.good : sleepDelta >= -45 ? colors.warn : colors.bad) : colors.text}
+        caption={sleepDelta !== undefined ? `${signed(sleepDelta)} against the ${formatDuration(review.needMin)} you need.` : `You need ${formatDuration(review.needMin)}.`}
+      />
       <Card>
         <Row>
           <Stat
-            label="Avg sleep"
-            value={review.avgSleepMin !== undefined ? formatDuration(review.avgSleepMin) : '–'}
-            sub={sleepDelta !== undefined ? `${signed(sleepDelta)} vs need` : undefined}
-            color={sleepDelta !== undefined ? (sleepDelta >= -15 ? colors.good : sleepDelta >= -45 ? colors.warn : colors.bad) : undefined}
-          />
-          <Stat
-            label="Avg score"
+            label="Score"
             value={review.avgScore !== undefined ? String(Math.round(review.avgScore)) : '–'}
             color={review.avgScore !== undefined ? scoreColor(review.avgScore) : undefined}
             sub={review.prevAvgScore !== undefined && review.avgScore !== undefined ? `${review.avgScore >= review.prevAvgScore ? '▲' : '▼'} ${Math.abs(Math.round(review.avgScore - review.prevAvgScore))} vs week before` : undefined}
           />
-        </Row>
-        <Row style={{ marginTop: space.md }}>
           <Stat
             label="Sleep debt"
             value={signed(review.debtChangeMin)}
@@ -114,14 +122,31 @@ export default function ReviewScreen() {
           />
         </Row>
         {reg.avgOnsetMin !== undefined && reg.avgWakeMin !== undefined ? (
-          <Text style={[font.tiny, { marginTop: space.md }]}>
-            Typically asleep around {formatClock(reg.avgOnsetMin)} and up around {formatClock(reg.avgWakeMin)}.
+          <Text style={[font.small, { marginTop: space.md }]}>
+            Usually asleep around {formatClock(reg.avgOnsetMin)}, up around {formatClock(reg.avgWakeMin)}.
           </Text>
         ) : null}
       </Card>
 
-      <Section title="Night by night">
+      <Section title="Focus for next week">
         <Card>
+          <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
+            <Icon name={focus.icon} size={22} />
+            <View style={{ flex: 1 }}>
+              <Text style={font.h3}>{focus.title}</Text>
+              <Text style={[font.small, { marginTop: space.xs }]}>{focus.detail}</Text>
+            </View>
+          </Row>
+          {focus.templateId ? (
+            <Button label="Set up this experiment" icon="flask-outline" onPress={() => router.push({ pathname: '/experiments', params: { template: focus.templateId! } })} style={{ marginTop: space.md }} />
+          ) : focus.experimentId ? (
+            <Button kind="secondary" label="Open experiment" icon="flask-outline" onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: focus.experimentId! } })} style={{ marginTop: space.md }} />
+          ) : null}
+        </Card>
+      </Section>
+
+      <Section title="Night by night">
+        <Card style={{ paddingBottom: space.xs }}>
           <DurationBars
             need={review.needMin}
             data={review.rows.map((r) => ({
@@ -138,46 +163,39 @@ export default function ReviewScreen() {
 
       {review.changes.length ? (
         <Section title="What changed">
-          <Card>
-            {review.changes.map((c, i) => (
-              <Row key={c.key} gap={space.sm} style={{ paddingVertical: 6, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border, alignItems: 'flex-start' }}>
-                <Icon name={c.improved ? 'trending-up' : 'trending-down'} size={18} color={c.improved ? colors.good : colors.warn} />
-                <Text style={[font.body, { flex: 1 }]}>{c.text}</Text>
-              </Row>
+          <ListCard>
+            {review.changes.map((c) => (
+              <ListRow key={c.key} icon={c.improved ? 'trending-up' : 'trending-down'} iconColor={c.improved ? colors.good : colors.warn} title={c.text} />
             ))}
-          </Card>
+          </ListCard>
         </Section>
       ) : null}
 
       {review.goals.length ? (
-        <Section title="Goals" action={<Button small kind="ghost" label="Edit" onPress={() => router.push('/goals')} />}>
-          <Card>
+        <Section title="Goals" action={<Link label="Edit" onPress={() => router.push('/goals')} />}>
+          <ListCard>
             {review.goals.map((g) => (
-              <View key={g.id} style={{ marginBottom: space.sm }}>
-                <Row>
-                  <Text style={[font.body, { flex: 1 }]}>{g.title}</Text>
-                  <Text style={font.small}>{g.known ? `${g.met}/${g.known} days` : 'no data'}</Text>
-                </Row>
-                <View style={{ marginTop: 4 }}>
-                  <Meter value={g.known ? (g.met / g.known) * 100 : 0} color={g.known && g.met / g.known >= 0.7 ? colors.good : colors.warn} height={6} />
-                </View>
-              </View>
+              <KeyValue key={g.id} label={g.title} value={g.known ? `${g.met} of ${g.known} days` : 'No data'} color={!g.known ? colors.textDim : g.met / g.known >= 0.7 ? colors.good : colors.warn} />
             ))}
-          </Card>
+          </ListCard>
         </Section>
       ) : null}
 
       {review.experiment ? (
         <Section title="Experiment">
-          <Card onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: review.experiment!.id } })}>
-            <CardTitle icon="flask-outline" title={localizeClockText(review.experiment.title)} right={<Icon name="chevron-right" color={colors.textFaint} />} />
-            <Text style={font.small}>{review.experiment.text}</Text>
-          </Card>
+          <ListCard>
+            <ListRow
+              icon="flask-outline"
+              title={localizeClockText(review.experiment.title)}
+              sub={review.experiment.text}
+              onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: review.experiment!.id } })}
+            />
+          </ListCard>
         </Section>
       ) : null}
 
       {review.insights.length ? (
-        <Section title="Top insights">
+        <Section title="What affected your sleep">
           {review.insights.map((i) => (
             <InsightCard key={i.id} insight={i} />
           ))}
@@ -186,37 +204,12 @@ export default function ReviewScreen() {
 
       {review.breathing ? (
         <Section title="Breathing">
-          <Card accent={colors.warn}>
-            <CardTitle icon="lungs" title={review.breathing.title} color={colors.warn} />
-            <Text style={font.small}>{review.breathing.detail}</Text>
-            <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
-              <Button small kind="secondary" label="Take the STOP-Bang check" onPress={() => router.push({ pathname: '/quiz/[id]', params: { id: 'stopbang' } })} />
-            </View>
-          </Card>
+          <ListCard>
+            <ListRow icon="lungs" iconColor={colors.warn} title={review.breathing.title} sub={review.breathing.detail} />
+            <ListRow icon="clipboard-check-outline" title="Take the breathing check" sub="Eight questions (STOP-Bang)" onPress={() => router.push({ pathname: '/quiz/[id]', params: { id: 'stopbang' } })} />
+          </ListCard>
         </Section>
       ) : null}
-
-      <Section title="Focus for next week">
-        <Card accent={colors.accent}>
-          <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
-            <Icon name={review.focus.icon} size={26} color={colors.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={font.h3}>{review.focus.title}</Text>
-              <Text style={[font.small, { marginTop: 4 }]}>{review.focus.detail}</Text>
-            </View>
-          </Row>
-          {review.focus.templateId ? (
-            <View style={{ marginTop: space.md }}>
-              <Button label="Set up this experiment" icon="flask-outline" onPress={() => router.push({ pathname: '/experiments', params: { template: review.focus.templateId! } })} />
-            </View>
-          ) : review.focus.experimentId ? (
-            <View style={{ marginTop: space.md }}>
-              <Button kind="secondary" label="Open experiment" icon="flask-outline" onPress={() => router.push({ pathname: '/experiments/[id]', params: { id: review.focus.experimentId! } })} />
-            </View>
-          ) : null}
-        </Card>
-      </Section>
-      {review.nightsRecorded < 4 ? <Note tone="info">Only {review.nightsRecorded} nights were recorded this week, so treat these numbers as rough.</Note> : null}
     </Screen>
   );
 }

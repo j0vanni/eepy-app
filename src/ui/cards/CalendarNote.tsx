@@ -1,7 +1,12 @@
-// OWNER: calendar & workouts workstream. Today-screen note: tomorrow's first event and its effect on
-// the alarm/bedtime, plus tonight's events that cut into the wind-down. Renders nothing when off.
+/**
+ * Your calendar and tonight's plan: tomorrow's first event and what it does to the alarm and
+ * lights-out, plus tonight's events that cut into the wind-down.
+ *
+ *   CalendarNote        Today: one quiet block that opens the Plan tab. Nothing when the calendar is off.
+ *   PlanCalendarLines   Plan → Tonight in detail: the same lines as rows, or the row that turns the calendar on.
+ */
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { EveningConflict, eveningConflicts, shortTitle } from '@/engine/calendarEvents';
@@ -9,8 +14,8 @@ import type { TonightPlan } from '@/engine/schedule';
 import { formatDuration, formatTime } from '@/engine/time';
 import { CalendarEvent, useEventsTonight, useFirstEventTomorrowDetails } from '@/state/calendar';
 import { useStore } from '@/state/store';
-import { Card, CardTitle, Icon, ListRow, Row } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { Icon, styles as kit, ListRow } from '@/ui/components';
+import { colors, font, iconSize, space } from '@/ui/theme';
 
 /** One-line summary of how tomorrow's first event shapes the plan. */
 export function firstEventSummary(tonight: TonightPlan, first: CalendarEvent | undefined): { text: string; tone: 'info' | 'warn' | 'good' } {
@@ -44,18 +49,10 @@ export function useEveningConflicts(a: Analysis | undefined): EveningConflict[] 
   return a ? eveningConflicts(events, a.tonight, a.now) : [];
 }
 
-function Line({ icon, color, title, body, compact }: { icon: string; color: string; title: string; body?: string; compact?: boolean }) {
-  return (
-    <Row gap={space.sm} style={{ alignItems: 'flex-start', marginTop: compact ? 6 : space.sm }}>
-      <Icon name={icon} color={color} size={compact ? 17 : 18} />
-      <View style={{ flex: 1 }}>
-        <Text style={compact ? [font.small, { color: colors.text }] : font.body}>{title}</Text>
-        {body ? <Text style={[font.small, { marginTop: 2 }]}>{body}</Text> : null}
-      </View>
-    </Row>
-  );
-}
+const TONE = { info: colors.textDim, warn: colors.warn, good: colors.good };
+const conflictIcon = (c: EveningConflict) => (c.kind === 'past-bedtime' ? 'weather-night' : 'timer-sand');
 
+/** Today: tomorrow's first event in one line; an evening clash adds a line each. Opens the Plan tab. */
 export function CalendarNote({ analysis }: { analysis: Analysis }) {
   const settings = useStore((s) => s.settings.calendar);
   const first = useFirstEventTomorrowDetails(settings);
@@ -63,40 +60,53 @@ export function CalendarNote({ analysis }: { analysis: Analysis }) {
   if (!settings.enabled) return null;
 
   const summary = firstEventSummary(analysis.tonight, first);
-  const toneColor = { info: colors.info, warn: colors.warn, good: colors.good }[summary.tone];
   return (
-    <Card onPress={() => router.push('/planner')} accent={conflicts.length || summary.tone === 'warn' ? colors.warn : undefined}>
-      <CardTitle icon="calendar-clock" title="Your calendar" right={<Icon name="chevron-right" color={colors.textFaint} />} />
-      <Line icon="weather-sunset-up" color={toneColor} title={summary.text} />
-      {conflicts.map((c) => (
-        <Line key={c.event.id} icon={c.kind === 'past-bedtime' ? 'weather-night' : 'timer-sand'} color={colors.warn} title={c.headline} body={c.advice} />
-      ))}
-    </Card>
+    <Pressable
+      onPress={() => router.push('/planner')}
+      accessibilityRole="button"
+      style={({ pressed }) => [kit.banner, { alignItems: 'flex-start' }, pressed ? { opacity: 0.75 } : null]}
+    >
+      <View style={{ marginTop: 1 }}>
+        <Icon name="calendar-clock" size={iconSize.md - 2} color={conflicts.length ? colors.warn : TONE[summary.tone]} />
+      </View>
+      <View style={{ flex: 1, gap: space.xs }}>
+        <Text style={[font.small, { color: colors.text }]}>{summary.text}</Text>
+        {conflicts.map((c) => (
+          <Text key={c.event.id} style={font.small}>
+            <Text style={{ color: colors.warn }}>{c.headline}</Text>
+            {c.advice ? ` ${c.advice}` : ''}
+          </Text>
+        ))}
+      </View>
+      <Icon name="chevron-right" color={colors.textFaint} />
+    </Pressable>
   );
 }
 
-/** Calendar lines for the Planner's Tonight card, or an entry to turn the calendar on. */
+/** Calendar rows for the Plan tab's "Tonight in detail", or the row that turns the calendar on. */
 export function PlanCalendarLines({ analysis }: { analysis: Analysis }) {
   const settings = useStore((s) => s.settings.calendar);
   const first = useFirstEventTomorrowDetails(settings);
   const conflicts = useEveningConflicts(analysis);
   if (!settings.enabled) {
     return (
-      <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-        <ListRow icon="calendar-sync" title="Plan around your calendar" sub="Let tomorrow’s first event set your alarm and bedtime" onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'you' } })} />
-      </View>
+      <ListRow
+        icon="calendar-sync"
+        title="Plan around your calendar"
+        sub="Let tomorrow’s first event set your alarm and bedtime"
+        onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'you' } })}
+      />
     );
   }
-  const cal = analysis.tonight.calendar;
-  // When the event set the plan, the rationale above already explains it.
-  const explained = !!cal?.drove && (first === undefined || first.start === cal.eventStart);
   const summary = firstEventSummary(analysis.tonight, first);
-  const toneColor = { info: colors.info, warn: colors.warn, good: colors.good }[summary.tone];
   return (
-    <View style={{ marginTop: space.sm }}>
-      {explained ? null : <Line compact icon="calendar-clock" color={toneColor} title={summary.text} />}
+    <View>
+      <ListRow icon="calendar-clock" iconColor={TONE[summary.tone]} title="Your calendar" sub={summary.text} />
       {conflicts.map((c) => (
-        <Line compact key={c.event.id} icon={c.kind === 'past-bedtime' ? 'weather-night' : 'timer-sand'} color={colors.warn} title={c.headline} body={c.advice} />
+        <View key={c.event.id}>
+          <View style={kit.listSep} />
+          <ListRow icon={conflictIcon(c)} iconColor={colors.warn} title={c.headline} sub={c.advice} />
+        </View>
       ))}
     </View>
   );

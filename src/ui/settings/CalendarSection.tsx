@@ -1,6 +1,6 @@
-// OWNER: calendar & workouts workstream. "Calendar" settings: access, which calendars, prep time.
+// Settings → You & schedule → Calendar: access, prep time before the first event, which calendars.
 import { useEffect, useState } from 'react';
-import { Linking, Platform, Text, View } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { formatClock, formatDuration, formatTime, MINUTE } from '../../engine/time';
 import {
@@ -16,9 +16,10 @@ import {
   usingDemoCalendar,
 } from '../../state/calendar';
 import { useStore } from '../../state/store';
-import { Button, Card, Icon, ListRow, Note, Section, Stepper } from '../components';
+import { Button, Fold, Icon, ListCard, ListRow, Note, Row, Section, Stepper } from '../components';
 import { notify } from '../confirm';
-import { colors, font, space } from '../theme';
+import { colors, iconSize, space } from '../theme';
+import { Para } from './parts';
 import { Toggle } from './Toggle';
 
 export const PREP_MIN = 15;
@@ -99,16 +100,43 @@ export function CalendarSection() {
 
   const prepRounded = Math.round(cal.prepMin / 15) * 15;
   const upBy = first ? Math.floor((first.start - cal.prepMin * MINUTE) / (5 * MINUTE)) * 5 * MINUTE : undefined;
+  const lostAccess = cal.enabled && (access === 'denied' || access === 'blocked');
 
   return (
-    <Section title="Calendar">
-      <Card>
-        <Toggle
-          label="Use my calendar"
-          sub={busy ? 'Asking for access…' : 'Tomorrow’s first event sets your alarm and bedtime; late events tonight get flagged'}
-          value={cal.enabled}
-          onChange={toggle}
-        />
+    <>
+      <Section title="Calendar">
+        {lostAccess ? (
+          <>
+            <Note tone="warn">Calendar permission was turned off, so eepy can’t see your events.</Note>
+            <Row gap={space.sm} style={{ flexWrap: 'wrap', marginBottom: space.md }}>
+              {access === 'denied' ? <Button small kind="secondary" icon="calendar-check" label="Allow calendar" onPress={() => toggle(true)} /> : null}
+              {Platform.OS !== 'web' ? <Button small kind="secondary" icon="cog-outline" label="Open Android settings" onPress={() => Linking.openSettings()} /> : null}
+            </Row>
+          </>
+        ) : null}
+        <ListCard>
+          <Toggle label="Use my calendar" sub={busy ? 'Asking for access…' : 'Tomorrow’s first event sets your alarm and bedtime'} value={cal.enabled} onChange={toggle} />
+          {cal.enabled ? (
+            <Stepper
+              label="Time before my first event"
+              sub="Getting ready, breakfast, commute"
+              value={prepLabel(prepRounded)}
+              onDec={() => setCal({ prepMin: Math.max(PREP_MIN, prepRounded - 15) })}
+              onInc={() => setCal({ prepMin: Math.min(PREP_MAX, prepRounded + 15) })}
+            />
+          ) : null}
+          {cal.enabled ? (
+            first && upBy !== undefined ? (
+              <ListRow title={`Tomorrow: “${first.title || 'Event'}” at ${formatTime(first.start)}`} sub={`eepy makes sure you’re up by ${formatTime(upBy)}`} />
+            ) : (
+              <ListRow title="No timed events tomorrow" sub="Your usual wake-up applies" />
+            )
+          ) : null}
+          <Fold bare title="What eepy reads">
+            <Para first>Only event times and titles, on this phone. All-day events and invitations you declined are ignored.</Para>
+            <Para>Tomorrow’s first event sets your alarm and bedtime. Late events tonight get flagged.</Para>
+          </Fold>
+        </ListCard>
         {!supported ? (
           <Note tone="info" icon="cellphone">
             Calendar access works in the Android app. In the browser, load the demo data to try it with sample events.
@@ -116,59 +144,30 @@ export function CalendarSection() {
         ) : null}
         {demo ? (
           <Note tone="info" icon="flask-outline">
-            Demo: {cal.enabled ? 'showing' : 'turn this on to try it with'} sample events (dinner tonight, a {formatClock(7 * 60 + 30)} stand-up tomorrow). On your phone eepy reads your real
-            calendars.
+            Demo: {cal.enabled ? 'showing' : 'turn this on to try it with'} sample events (dinner tonight, a {formatClock(7 * 60 + 30)} stand-up tomorrow). On your phone eepy reads your real calendars.
           </Note>
         ) : null}
-        {cal.enabled && (access === 'denied' || access === 'blocked') ? (
-          <View>
-            <Note tone="warn">Calendar permission was turned off, so eepy can’t see your events. Allow it again to keep planning around them.</Note>
-            <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap', marginBottom: space.sm }}>
-              {access === 'denied' ? <Button small icon="calendar-check" label="Allow calendar" onPress={() => toggle(true)} /> : null}
-              {Platform.OS !== 'web' ? <Button small kind="secondary" icon="cog-outline" label="Open Android settings" onPress={() => Linking.openSettings()} /> : null}
-            </View>
-          </View>
-        ) : null}
+      </Section>
 
-        {cal.enabled ? (
-          <>
-            <Stepper
-              label="Time I need before my first event"
-              sub="Getting ready, breakfast, commute"
-              value={prepLabel(prepRounded)}
-              onDec={() => setCal({ prepMin: Math.max(PREP_MIN, prepRounded - 15) })}
-              onInc={() => setCal({ prepMin: Math.min(PREP_MAX, prepRounded + 15) })}
-            />
-            <Text style={[font.small, { marginTop: space.xs }]}>
-              {first && upBy !== undefined
-                ? `Tomorrow: “${first.title || 'Event'}” at ${formatTime(first.start)} — eepy makes sure you’re up by ${formatTime(upBy)}.`
-                : 'No timed events tomorrow in these calendars — your usual wake-up applies.'}
-            </Text>
-
-            {calendars && calendars.length > 0 ? (
-              <View style={{ marginTop: space.md }}>
-                <Text style={font.body}>Calendars to read</Text>
-                {calendars.map((c) => (
-                  <ListRow
-                    key={c.id}
-                    icon="calendar-blank"
-                    iconColor={c.color ?? colors.accent}
-                    title={c.title}
-                    sub={c.account}
-                    onPress={() => toggleCalendar(c.id)}
-                    right={<Icon name={isOn(c.id) ? 'checkbox-marked' : 'checkbox-blank-outline'} color={isOn(c.id) ? colors.accent : colors.textFaint} size={22} />}
-                  />
-                ))}
-              </View>
-            ) : calendars && access === 'granted' ? (
-              <Text style={[font.small, { marginTop: space.md }]}>No calendars found on this phone. Add an account in your calendar app first.</Text>
-            ) : null}
-            <Text style={[font.tiny, { marginTop: space.sm }]}>
-              eepy only reads event times and titles, on this phone. All-day events and invitations you declined are ignored.
-            </Text>
-          </>
-        ) : null}
-      </Card>
-    </Section>
+      {cal.enabled && calendars && calendars.length > 0 ? (
+        <Section title="Calendars to read">
+          <ListCard>
+            {calendars.map((c) => (
+              <ListRow
+                key={c.id}
+                icon="calendar-blank"
+                iconColor={c.color ?? colors.textDim}
+                title={c.title}
+                sub={c.account}
+                onPress={() => toggleCalendar(c.id)}
+                right={<Icon name={isOn(c.id) ? 'checkbox-marked' : 'checkbox-blank-outline'} color={isOn(c.id) ? colors.accent : colors.textFaint} size={iconSize.lg} />}
+              />
+            ))}
+          </ListCard>
+        </Section>
+      ) : cal.enabled && calendars && access === 'granted' ? (
+        <Note tone="info">No calendars found on this phone. Add an account in your calendar app first.</Note>
+      ) : null}
+    </>
   );
 }

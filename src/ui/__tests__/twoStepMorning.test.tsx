@@ -1,6 +1,11 @@
 /**
- * Render smoke tests for two-step mornings: the editor card (live preview), Today's routine card
- * (only during the routine, with "Staying up? Skip the … alarm") and the night timeline's routine step.
+ * Render tests for two-step mornings: the editor (switch, steppers, mornings, the next two-step
+ * night), Today's routine card (only around the routine; skipping the routine or the final alarm,
+ * with undo), the "did you do it?" question afterwards and the night timeline's routine step.
+ *
+ * The routine card, the question and the timeline belong to Today / Sleep: those tests find their
+ * buttons by a loose pattern and check what a tap did (marks, the wake plan, the native alarm) and
+ * the times shown, not the surrounding copy.
  */
 // Icons load their font asynchronously, which Jest's asset registry can't serve.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
@@ -81,8 +86,9 @@ const render = async (el: React.ReactElement) => {
 };
 const text = () => JSON.stringify(root.container.toJSON());
 const find = (test: (i: TestInstance) => boolean) => root.container.queryAll(test)[0];
-const press = async (label: string) => {
-  let n: TestInstance | null | undefined = find((i) => i.type === 'Text' && i.children.join('').includes(label));
+const press = async (label: string | RegExp) => {
+  const matches = (t: string) => (typeof label === 'string' ? t.includes(label) : label.test(t));
+  let n: TestInstance | null | undefined = find((i) => i.type === 'Text' && matches(i.children.join('')));
   while (n && typeof n.props.onClick !== 'function') n = n.parent;
   if (!n) throw new Error(`no button "${label}"`);
   const target = n;
@@ -109,11 +115,33 @@ describe('TwoStepMorningCard', () => {
     expect(t).toContain('05:00');
     expect(t).toContain('06:05');
     expect(t).toMatch(/routine alarm → back to sleep ~/);
-    expect(t).toContain('TOMORROW');
+    expect(t).toContain('Tomorrow');
     // A longer routine, from the stepper.
     const inc = find((i) => i.props.accessibilityLabel === 'Increase Routine' && typeof i.props.onClick === 'function');
     await act(async () => inc!.props.onClick({ nativeEvent: {}, stopPropagation: () => undefined }));
     expect(useStore.getState().profile.twoStepMorning?.routineMin).toBe(25);
+  });
+
+  it('picks the mornings', async () => {
+    useStore.getState().setProfile({ workdays: [1, 2, 3, 4, 5], twoStepMorning: TWO });
+    await render(<TwoStepMorningCard />);
+    await press('Sat');
+    expect(useStore.getState().profile.twoStepMorning?.days).toEqual([1, 2, 3, 4, 5, 6]);
+    // Saturday isn't a workday: only two-step when a wake-up is set for that date.
+    expect(text()).toContain("Saturday isn't a workday");
+    await press('Mon');
+    expect(useStore.getState().profile.twoStepMorning?.days).toEqual([2, 3, 4, 5, 6]);
+  });
+
+  it('embedded (Your usual week, Settings): the same switch and controls as a row', async () => {
+    await render(<TwoStepMorningCard embedded />);
+    expect(text()).not.toContain('Routine alarm');
+    await press('Two-step mornings');
+    expect(useStore.getState().profile.twoStepMorning).toMatchObject({ enabled: true, since: FRI });
+    expect(text()).toContain('Routine alarm');
+    await press('Two-step mornings');
+    expect(useStore.getState().profile.twoStepMorning).toMatchObject({ enabled: false });
+    expect(text()).not.toContain('Routine alarm');
   });
 
   it('explains a setting that would not work', async () => {
@@ -144,20 +172,17 @@ describe('RoutineMorningNow', () => {
     const { routineAt } = morning(5);
     await render(<RoutineMorningNow />);
     const t = text();
-    expect(t).toContain('MORNING ROUTINE');
-    expect(t).toContain('Lights low, screens off.');
-    expect(t).toContain('alarm at ');
+    // The final alarm, and when to be back in bed.
     expect(t).toContain('06:05');
     const by = new Date(routineAt + 20 * MINUTE);
     const hhmm = `${String(by.getHours()).padStart(2, '0')}:${String(by.getMinutes()).padStart(2, '0')}`;
-    if (Date.now() < routineAt + 20 * MINUTE) expect(t).toContain(`Back to bed by ${hhmm}`);
-    await press('Staying up? Skip the 06:05 alarm');
+    if (Date.now() < routineAt + 20 * MINUTE) expect(t).toContain(hhmm);
+    await press(/staying up/i);
     expect(useStore.getState().settings.marks[WAKE_FINAL_SKIP_MARK]).toBe(FRI);
     await act(async () => undefined);
     expect(mockNative.cancelAlarm).toHaveBeenCalledWith('eepy-wake');
     await render(<RoutineMorningNow />);
-    expect(text()).toContain('Staying up');
-    await press('Undo');
+    await press(/undo/i);
     expect(useStore.getState().settings.marks[WAKE_FINAL_SKIP_MARK]).toBeUndefined();
   });
 });
@@ -175,16 +200,15 @@ describe('skipping the routine', () => {
     const { routineAt } = morning(4.25);
     expect(Date.now()).toBeLessThan(routineAt);
     await render(<RoutineMorningNow />);
-    expect(text()).toContain('Not doing it today?');
-    await press('Skip the routine — sleep until 06:05');
+    expect(text()).toContain('06:05');
+    await press(/skip the routine/i);
     expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBe(FRI);
     expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
     expect(mockNative.cancelAlarm).toHaveBeenCalledWith('eepy-wake-routine');
     expect(mockNative.cancelAlarm).not.toHaveBeenCalledWith('eepy-wake');
-    expect(text()).toContain('ROUTINE SKIPPED');
-    expect(text()).toContain('"Sleep until ","06:05"');
-    expect(text()).toContain('the 06:05 alarm still rings');
-    await press('Undo');
+    // Still says when the one alarm left rings.
+    expect(text()).toContain('06:05');
+    await press(/undo/i);
     expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBeUndefined();
     expect(useStore.getState().profile.wakePlan?.[FRI]).toBeUndefined();
   });
@@ -192,23 +216,24 @@ describe('skipping the routine', () => {
   it('during the routine: "Skip it — back to sleep" keeps the final alarm', async () => {
     morning(5.1);
     await render(<RoutineMorningNow />);
-    await press('Skip it — back to sleep until 06:05');
+    await press(/skip it/i);
     expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBe(FRI);
     expect(useStore.getState().settings.marks[WAKE_FINAL_SKIP_MARK]).toBeUndefined();
-    expect(text()).toContain('Undo — I did my routine');
+    expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
+    // The way back.
+    await press(/undo/i);
+    expect(useStore.getState().settings.marks[WAKE_ROUTINE_SKIP_MARK]).toBeUndefined();
   });
 
-  it('afterwards: "Did it / Skipped it" on the morning, with eepy\'s guess', async () => {
+  it('afterwards: "Did it / Skipped it" on the morning', async () => {
     useStore.getState().setProfile({ twoStepMorning: { ...TWO, since: '2026-10-01' }, wakePlan: {} });
     (Date.now as jest.Mock).mockReturnValue(atMinutes(FRI, 8 * 60));
     const m = { wakeDate: FRI, isNap: false } as Parameters<typeof RoutineCheck>[0]['m'];
     await render(<RoutineCheck m={m} compact />);
-    expect(text()).toContain('this morning?');
-    expect(text()).toContain("eepy didn't see you up for it");
-    await press('Did it');
+    expect(root.container.children).not.toHaveLength(0);
+    await press(/did it/i);
     expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: true });
-    expect(text()).toContain('Saved');
-    await press('Skipped it');
+    await press(/skipped it/i);
     expect(useStore.getState().profile.wakePlan?.[FRI]).toEqual({ twoStep: false });
     // Not a routine morning (Saturday) and nothing said: no question.
     await render(<RoutineCheck m={{ ...m, wakeDate: '2026-10-24' }} compact />);
@@ -217,7 +242,7 @@ describe('skipping the routine', () => {
 });
 
 describe('Night timeline', () => {
-  it('labels the routine and says it is planned', async () => {
+  it('labels the routine and says when you were back asleep', async () => {
     const at = (h: number, m = 0) => atMinutes(h >= 12 ? '2026-10-20' : '2026-10-21', h * 60 + m);
     const m = computeSessionMetrics(
       {
@@ -256,9 +281,8 @@ describe('Night timeline', () => {
     };
     await render(<NightTimelineCard m={m} t={t} />);
     const s = text();
-    expect(s).toContain('Morning routine');
-    expect(s).toContain('planned — not counted as waking');
-    expect(s).toContain('back asleep 05:12');
-    expect(s).toContain('up for your routine not counted as in bed');
+    // The planned time awake is named as the routine, with when you were back asleep.
+    expect(s).toMatch(/routine/i);
+    expect(s).toContain('05:12');
   });
 });

@@ -3,7 +3,7 @@ import { PanResponder, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import type { AlertnessPoint } from '../engine/alertness';
-import { formatClock, formatHourLabel, formatTime, HOUR, minutesOfDay } from '../engine/time';
+import { formatHourLabel, formatTime, HOUR, minutesOfDay } from '../engine/time';
 import { ChartFrame } from './charts';
 import { ChartText, edgeAnchor } from './chartText';
 import { colors, font, space } from './theme';
@@ -40,8 +40,9 @@ interface Props {
 }
 
 /**
- * Two energy curves on one 0–100 axis, styled like EnergyChart: the plan as a muted dashed reference,
- * the what-if as the highlighted line. Drag across it to read both values at a moment.
+ * Two energy curves on one 0–100 axis, drawn like EnergyChart: the plan as a quiet dashed
+ * reference, the what-if as the amber line. Drag across it to read both values at a moment.
+ * Sits straight on the page (What if?), so its markers are ringed in the page colour.
  */
 export const CompareChart = memo(function CompareChart({
   baseline,
@@ -123,12 +124,12 @@ export const CompareChart = memo(function CompareChart({
                 {sArea ? <Path d={sArea} fill="url(#cmpGrad)" /> : null}
                 {bLine ? <Path d={bLine} stroke={colors.textDim} strokeWidth={1.6} strokeDasharray="5,4" fill="none" opacity={0.9} /> : null}
                 {sLine ? <Path d={sLine} stroke={colors.energy} strokeWidth={2.2} fill="none" /> : null}
-                {dip && scrubX === undefined ? <Circle cx={x(dip.t)} cy={y(dip.energy)} r={4} fill={colors.warn} stroke={colors.surface} strokeWidth={2} /> : null}
+                {dip && scrubX === undefined ? <Circle cx={x(dip.t)} cy={y(dip.energy)} r={4} fill={colors.warn} stroke={colors.bg} strokeWidth={2} /> : null}
                 {scrubX !== undefined ? (
                   <G>
                     <Line x1={scrubX} x2={scrubX} y1={top} y2={top + plotH} stroke={colors.text} strokeWidth={1} strokeDasharray="2,3" />
-                    {b ? <Circle cx={x(b.t)} cy={y(b.energy)} r={4} fill={colors.textDim} stroke={colors.surface} strokeWidth={2} /> : null}
-                    {s ? <Circle cx={x(s.t)} cy={y(s.energy)} r={5} fill={colors.energy} stroke={colors.surface} strokeWidth={2} /> : null}
+                    {b ? <Circle cx={x(b.t)} cy={y(b.energy)} r={4} fill={colors.textDim} stroke={colors.bg} strokeWidth={2} /> : null}
+                    {s ? <Circle cx={x(s.t)} cy={y(s.energy)} r={5} fill={colors.energy} stroke={colors.bg} strokeWidth={2} /> : null}
                   </G>
                 ) : null}
                 {hourTicks(from, to, 3).map((t) => (
@@ -141,7 +142,7 @@ export const CompareChart = memo(function CompareChart({
           }}
         </ChartFrame>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: 6, minHeight: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm, minHeight: 20 }}>
         {scrubT !== undefined ? (
           <Text style={[font.small, { color: colors.text }]}>
             {formatTime(scrubT)} · {baselineLabel} {b ? Math.round(b.energy) : '—'} · {scenarioLabel} {s ? Math.round(s.energy) : 'asleep'}
@@ -160,7 +161,7 @@ export const CompareChart = memo(function CompareChart({
 
 function LegendItem({ label, color, dashed }: { label: string; color: string; dashed?: boolean }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
       <Svg width={18} height={6}>
         <Line x1={1} x2={17} y1={3} y2={3} stroke={color} strokeWidth={dashed ? 1.6 : 2.4} strokeDasharray={dashed ? '4,3' : undefined} strokeLinecap="round" />
       </Svg>

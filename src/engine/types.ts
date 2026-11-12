@@ -94,13 +94,25 @@ export interface NightVitals {
   respRate?: number;
 }
 
+/**
+ * One calendar day of watch data per clock hour (index 0–23), condensed at sync time. Feeds the
+ * body-clock estimate (engine/bodyClock.ts) and the daytime heart-rate signal (engine/watchSignals.ts).
+ */
+export interface DayHours {
+  /** Low (25th-percentile) heart rate of each hour — close to resting; null with fewer than 2 readings. */
+  hr: (number | null)[];
+  /** Steps in each hour. */
+  steps: number[];
+}
+
 /** Per-calendar-day aggregates (steps, resting HR, ...). */
 export interface DailyStats {
   date: string;
   steps?: number;
   restingHr?: number;
-  daytimeHrAvg?: number;
   hrv?: number;
+  /** Heart rate and steps per clock hour. */
+  hours?: DayHours;
 }
 
 /** A workout recorded by the watch (Health Connect ExerciseSession). */
@@ -120,6 +132,21 @@ export interface AlertnessCheckIn {
   time: number;
   kss: number;
   source: 'ping' | 'manual';
+}
+
+/**
+ * One reaction-time test (a short psychomotor vigilance task): an objective reading of alertness to
+ * set beside the 1–9 self-rating (engine/reaction.ts).
+ */
+export interface ReactionTest {
+  id: string;
+  time: number;
+  /** Valid reaction times in ms, in order (false starts and misses left out). */
+  rts: number[];
+  /** Taps before the signal. */
+  falseStarts: number;
+  /** Signals with no tap within 3 s. */
+  misses: number;
 }
 
 export interface CaffeineDose {
@@ -244,6 +271,8 @@ export interface SleepDataset {
   /** Momentary sleepiness ratings used to personalise the energy forecast. */
   checkins?: AlertnessCheckIn[];
   workouts?: Workout[];
+  /** Reaction-time tests (objective alertness readings). */
+  reactions?: ReactionTest[];
   /** eepy's own evidence of when you were awake, and your corrections (see engine/wakeDetect.ts). */
   wakeLog?: WakeLog;
 }

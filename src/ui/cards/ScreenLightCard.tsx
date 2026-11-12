@@ -1,17 +1,18 @@
 /**
  * Phone light: what the screen should be like right now (brightness and blue-light filter), how
  * it compares with the phone's actual brightness, and shortcuts to Android's Night Light and
- * Extra dim. `full` adds the whole evening schedule and the Night Light times to set. With the
- * e-ink reader setting on, an "E-reader" block adds its frontlight target (engine/eReader.ts).
+ * Extra dim. `full` adds the rest of the evening and the Night Light times to set. `embedded` has
+ * no panel or title of its own, for use inside a Fold or a section that already says "Phone light".
+ * With the e-ink reader setting on, an "E-reader" block adds its frontlight target (engine/eReader.ts).
  */
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import type { Analysis } from '@/engine/analysis';
 import { EReader, eReaderIfOn, eReaderSchedule, eReaderTargetAt } from '@/engine/eReader';
+import { phoneDownAt } from '@/engine/rundown';
 import { judgeScreenBrightness, nightLightSchedule, ScreenPlanInput, screenLightSchedule, screenTargetAt } from '@/engine/screenLight';
 import { formatTime } from '@/engine/time';
-import { phoneDownAt } from '@/engine/rundown';
 import {
   askPhoneBrightnessPermission,
   canSetPhoneBrightness,
@@ -26,11 +27,12 @@ import {
   undimEepy,
 } from '@/integrations/screen';
 import { eepyWindowMode, manualBrightness } from '@/state/screenDim';
-import { BrightnessSlider } from '@/ui/BrightnessSlider';
 import { Settings, useStore } from '@/state/store';
 import { useNow } from '@/state/useAnalysis';
-import { AppSwitch, Button, Card, CardTitle, Icon, Note, Row } from '@/ui/components';
-import { colors, font, space } from '@/ui/theme';
+import { BrightnessSlider } from '@/ui/BrightnessSlider';
+import { AppSwitch, Button, Card, CardTitle, Divider, KeyValue, Note, Row, Timeline } from '@/ui/components';
+import { font, space } from '@/ui/theme';
+import { Caption } from '@/ui/today/nightParts';
 
 const FILTER_LABEL = { off: 'No filter needed', warm: 'Night Light on', warmest: 'Night Light warmest + Extra dim' } as const;
 
@@ -116,12 +118,13 @@ function PhoneBrightness({
     patch({ brightness: v, auto: false });
     await setPhoneBrightness(v);
   };
+  const tooBright = target !== undefined && target < 1 && phone.brightness > target + 0.02;
   return (
     <View style={{ marginTop: space.md }}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Text style={font.body}>Phone brightness</Text>
+      <Row gap={space.sm}>
+        <Text style={[font.body, { flex: 1 }]}>Phone brightness</Text>
         {phone.canSet && phone.auto !== undefined ? (
-          <Row gap={6}>
+          <>
             <Text style={font.small}>Auto</Text>
             <AppSwitch
               value={phone.auto}
@@ -132,23 +135,23 @@ function PhoneBrightness({
                 refresh();
               }}
             />
-          </Row>
+          </>
         ) : null}
       </Row>
       <BrightnessSlider value={phone.brightness} target={target} onChange={live} onCommit={commit} disabled={!phone.canSet} />
       {phone.canSet ? (
-        <Row gap={space.sm} style={{ marginTop: 4, flexWrap: 'wrap' }}>
-          {target !== undefined && target < 1 && phone.brightness > target + 0.02 ? (
-            <Button small icon="brightness-5" label={`Set to ${Math.round(target * 100)}%`} onPress={() => commit(target)} />
+        <>
+          {tooBright ? (
+            <View style={{ alignItems: 'flex-start', marginTop: space.xs }}>
+              <Button small kind="secondary" icon="brightness-5" label={`Set to ${Math.round(target * 100)}%`} onPress={() => commit(target)} />
+            </View>
           ) : null}
-          <Text style={[font.tiny, { flex: 1 }]}>Changes your phone's brightness everywhere{phone.auto ? '' : ' — auto-brightness is off while you set it by hand'}.</Text>
-        </Row>
+          <Text style={[font.tiny, { marginTop: space.sm }]}>Changes the whole phone, not just eepy.{phone.auto ? '' : ' Auto-brightness is off while you set it by hand.'}</Text>
+        </>
       ) : (
-        <View style={{ marginTop: space.sm, gap: space.sm }}>
-          <Text style={font.small}>To change your phone's brightness from here, Android needs you to allow "Modify system settings" for eepy once.</Text>
-          <View style={{ alignItems: 'flex-start' }}>
-            <Button small icon="shield-check-outline" label="Allow brightness control" onPress={async () => patch({ canSet: await askPhoneBrightnessPermission() })} />
-          </View>
+        <View style={{ alignItems: 'flex-start', marginTop: space.xs, gap: space.sm }}>
+          <Text style={font.small}>To change it from here, allow "Modify system settings" for eepy once.</Text>
+          <Button small kind="secondary" icon="shield-check-outline" label="Allow brightness control" onPress={async () => patch({ canSet: await askPhoneBrightnessPermission() })} />
         </View>
       )}
     </View>
@@ -160,8 +163,8 @@ function BrightnessCheck({ target, brightness }: { target: ReturnType<typeof scr
   const verdict = judgeScreenBrightness(brightness, target);
   if (!verdict) return null;
   return (
-    <View style={{ marginTop: space.sm }}>
-      <Note tone={verdict.tone === 'good' ? 'good' : verdict.tone === 'warn' ? 'warn' : 'bad'} icon="brightness-6">
+    <View style={{ marginTop: space.md }}>
+      <Note tone={verdict.tone} icon="brightness-6">
         {verdict.text}
       </Note>
     </View>
@@ -173,33 +176,22 @@ function EReaderBlock({ plan, now, eReader, full }: { plan: ScreenPlanInput; now
   const target = eReaderTargetAt(plan, now, eReader);
   const upcoming = eReaderSchedule(plan, eReader).filter((t) => t.until > now && t.phase !== 'day');
   return (
-    <View style={{ marginTop: space.md, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-      <Row gap={space.sm}>
-        <Icon name="book-open-variant" size={18} color={colors.light} />
-        <Text style={[font.label, { flex: 1 }]}>E-READER</Text>
-        <Text style={[font.small, { flexShrink: 1, textAlign: 'right' }]}>{target.summary}</Text>
-      </Row>
-      <Text style={[font.body, { fontWeight: '600', marginTop: space.xs }]}>{target.title}</Text>
+    <View>
+      <Divider />
+      <Caption>{`E-reader · ${target.summary}`}</Caption>
+      <Text style={[font.h3, { marginTop: space.xs }]}>{target.title}</Text>
       {full ? (
         <>
-          <Text style={[font.small, { marginTop: 2 }]}>{target.advice}</Text>
-          <View style={{ marginTop: space.sm, gap: 4 }}>
-            {upcoming.map((t) => (
-              <Row key={t.phase} gap={space.sm}>
-                <Text style={[font.small, { width: 84, color: t.phase === target.phase ? colors.text : colors.textDim, fontWeight: t.phase === target.phase ? '700' : '400' }]}>
-                  {t.phase === target.phase ? 'Now' : formatTime(t.from)}
-                </Text>
-                <Text style={[font.small, { flex: 1 }]}>{t.summary}</Text>
-              </Row>
-            ))}
-          </View>
+          <Text style={[font.small, { marginTop: space.xxs, marginBottom: space.md }]}>{target.advice}</Text>
+          <Timeline
+            items={upcoming.map((t) => ({ key: t.phase, time: t.phase === target.phase ? 'Now' : formatTime(t.from), title: t.summary, state: t.phase === target.phase ? ('now' as const) : ('later' as const) }))}
+          />
         </>
       ) : null}
     </View>
   );
 }
 
-/** `embedded` drops the card frame and title, for use inside a section that already says "Phone light". */
 export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boolean; embedded?: boolean }) {
   const now = useNow(30_000);
   const [phone, patchPhone, refreshPhone] = usePhoneScreen();
@@ -216,13 +208,9 @@ export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boo
   const status = target.maxBrightness < 1 ? `≤ ${Math.round(target.maxBrightness * 100)}% · ${FILTER_LABEL[target.filter]}` : FILTER_LABEL.off;
   const body = (
     <>
-      {embedded ? (
-        <Text style={[font.label, { marginBottom: space.xs }]}>{`NOW · ${status.toUpperCase()}`}</Text>
-      ) : (
-        <CardTitle icon={evening ? 'cellphone-cog' : 'cellphone'} title="Phone light" color={colors.light} right={<Text style={font.small}>{status}</Text>} />
-      )}
-      <Text style={font.h3}>{target.title}</Text>
-      <Text style={[font.small, { marginTop: 2 }]}>{target.advice}</Text>
+      {embedded ? <Caption>{`Now · ${status}`}</Caption> : <CardTitle icon={evening ? 'cellphone-cog' : 'cellphone'} title="Phone light" right={<Text style={font.small}>{status}</Text>} />}
+      <Text style={[font.h3, embedded ? { marginTop: space.xs } : null]}>{target.title}</Text>
+      <Text style={[font.small, { marginTop: space.xxs }]}>{target.advice}</Text>
       <BrightnessCheck target={target} brightness={phone.brightness} />
       <PhoneBrightness
         target={target.maxBrightness < 1 ? target.maxBrightness : undefined}
@@ -232,34 +220,35 @@ export function ScreenLightCard({ a, full, embedded }: { a: Analysis; full?: boo
         dimming={target.phase === 'winddown' || target.phase === 'night'}
       />
 
-      {full || !evening ? (
-        <View style={{ marginTop: space.sm, gap: 4 }}>
-          {upcoming.map((t) => (
-            <Row key={t.phase} gap={space.sm}>
-              <Text style={[font.small, { width: 84, color: t.phase === target.phase ? colors.text : colors.textDim, fontWeight: t.phase === target.phase ? '700' : '400' }]}>
-                {t.phase === target.phase ? 'Now' : formatTime(t.from)}
-              </Text>
-              <Text style={[font.small, { flex: 1 }]}>
-                {t.phase === 'night' ? 'Screen away' : `≤ ${Math.round(t.maxBrightness * 100)}% · ${FILTER_LABEL[t.filter]}`}
-              </Text>
-            </Row>
-          ))}
-        </View>
-      ) : null}
-
-      {full ? (
-        <Text style={[font.tiny, { marginTop: space.sm }]}>
-          Set Night Light to a custom schedule: on at {formatTime(nl.on)}, off at {formatTime(nl.off)} — then it happens by itself. Blue light matters, but brightness
-          matters more: a warm filter cuts the blue, dimming cuts all of it.
-        </Text>
-      ) : null}
-
       {android ? (
         <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
           <Button small kind="secondary" icon="weather-night" label="Night Light" onPress={() => openNightLightSettings()} />
           {target.filter === 'warmest' ? <Button small kind="secondary" icon="brightness-4" label="Extra dim" onPress={() => openExtraDimSettings()} /> : null}
           {target.maxBrightness < 1 ? <Button small kind="ghost" icon="brightness-5" label="Dim eepy now" onPress={() => dimEepy(target.maxBrightness)} /> : null}
         </Row>
+      ) : null}
+
+      {(full || !evening) && upcoming.length ? (
+        <View style={{ marginTop: space.lg }}>
+          <Caption style={{ marginBottom: space.sm }}>This evening</Caption>
+          <Timeline
+            items={upcoming.map((t) => ({
+              key: t.phase,
+              time: t.phase === target.phase ? 'Now' : formatTime(t.from),
+              title: t.phase === 'night' ? 'Screen away' : `≤ ${Math.round(t.maxBrightness * 100)}% · ${FILTER_LABEL[t.filter]}`,
+              state: t.phase === target.phase ? ('now' as const) : ('later' as const),
+            }))}
+          />
+        </View>
+      ) : null}
+
+      {full ? (
+        <KeyValue
+          label="Night Light schedule"
+          sub="Set it once in Android and it runs by itself. Dimming matters more than the warm filter."
+          value={`${formatTime(nl.on)} – ${formatTime(nl.off)}`}
+          onPress={android ? () => openNightLightSettings() : undefined}
+        />
       ) : null}
 
       {eReader ? <EReaderBlock plan={plan} now={now} eReader={eReader} full={full} /> : null}

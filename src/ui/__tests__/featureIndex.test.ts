@@ -26,7 +26,11 @@ function routeFiles(dir = APP, prefix = ''): string[] {
 const pathnameOf = (href: (typeof FEATURES)[number]['href']) => (typeof href === 'string' ? href.split('?')[0] : href.pathname);
 
 /** Routes reached only from a specific record (a night, an experiment), redirects, and first-run screens. */
-const NOT_SEARCHABLE = new Set(['/night/[id]', '/experiments/[id]', '/quick/[action]', '/onboarding', '/plan', '/trends']);
+const NOT_SEARCHABLE = new Set(['/night/[id]', '/experiments/[id]', '/quick/[action]', '/onboarding', '/plan', '/trends', '/learning']);
+
+/** What the Plan and Sleep tabs understand in their `show` / `view` params. */
+const PLAN_SHOW = ['tonight', 'week', 'calculator', 'shift', 'caffeine', 'light'];
+const SLEEP_VIEW = ['nights', 'trends'];
 
 describe('feature index', () => {
   const routes = routeFiles();
@@ -53,7 +57,30 @@ describe('feature index', () => {
   });
 
   it('keeps the old redirects in place', () => {
-    expect(routes).toEqual(expect.arrayContaining(['/plan', '/trends', '/coach', '/calendar', '/settings', '/settings/[section]']));
+    expect(routes).toEqual(expect.arrayContaining(['/plan', '/trends', '/learning', '/coach', '/calendar', '/settings', '/settings/[section]']));
+  });
+
+  it('matches the four tabs: Today, Sleep, Plan, More', () => {
+    const tabs = FEATURES.filter((f) => f.where === 'Tab');
+    expect(tabs.map((f) => [f.title, f.href])).toEqual([
+      ['Today', '/'],
+      ['Sleep', '/sleep'],
+      ['Plan', '/planner'],
+      ['More', '/more'],
+    ]);
+    // Nap is a screen of its own now, Energy replaced the body-clock screen, and nothing lives in a "Planner".
+    expect(FEATURES.find((f) => f.id === 'nap')).toMatchObject({ href: '/nap', where: expect.stringContaining('More › Energy') });
+    expect(FEATURES.some((f) => pathnameOf(f.href) === '/learning')).toBe(false);
+    expect(FEATURES.filter((f) => /planner|nap tab/i.test(f.where)).map((f) => f.id)).toEqual([]);
+  });
+
+  it('only asks the Plan and Sleep tabs for parts they have', () => {
+    const params = (f: (typeof FEATURES)[number]) => (typeof f.href === 'object' ? ((f.href.params ?? {}) as Record<string, unknown>) : {});
+    const badPlan = FEATURES.filter((f) => pathnameOf(f.href) === '/planner' && params(f).show !== undefined && !PLAN_SHOW.includes(String(params(f).show)));
+    const badSleep = FEATURES.filter((f) => pathnameOf(f.href) === '/sleep' && params(f).view !== undefined && !SLEEP_VIEW.includes(String(params(f).view)));
+    expect([...badPlan, ...badSleep].map((f) => f.id)).toEqual([]);
+    // The planning tools are folded rows under Plan › Tools.
+    for (const id of ['calculator', 'shift', 'caffeine-curve', 'phone-light']) expect(FEATURES.find((f) => f.id === id)?.where).toBe('Plan › Tools');
   });
 });
 
@@ -72,6 +99,18 @@ describe('searchFeatures', () => {
     expect(ids('e-ink')[0]).toBe('s-e-reader');
     expect(ids('kobo')).toContain('s-e-reader');
     expect(ids('frontlight')).toContain('s-e-reader');
+  });
+
+  it('finds the new screens and settings', () => {
+    expect(ids('energy')[0]).toBe('energy');
+    expect(ids('body clock')).toContain('energy');
+    expect(ids('reaction')[0]).toBe('reaction');
+    expect(ids('nap')[0]).toBe('nap');
+    expect(ids('re-read')[0]).toBe('s-reread');
+    expect(ids('full re-sync')).toContain('s-reread');
+    expect(ids('save backup')).toContain('s-backup');
+    expect(ids('reset learned')).toContain('s-reset-learning');
+    expect(ids('check-in reminders')[0]).toBe('s-pings');
   });
 
   it('matches word starts, plurals and any letter case', () => {

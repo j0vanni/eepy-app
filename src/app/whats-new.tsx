@@ -1,4 +1,4 @@
-// What's new / where things moved (More → What's new, Settings → About). Also shown once as a sheet after the update.
+// What's new in this release (More → What's new, Settings → About). Also shown once as a sheet after the update.
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
@@ -12,7 +12,7 @@ export default function WhatsNewScreen() {
       <Card>
         <WhatsNewContent />
       </Card>
-      <View style={{ marginTop: space.sm }}>
+      <View style={{ gap: space.sm, marginTop: space.sm }}>
         <Button
           label="Got it"
           icon="check"
@@ -20,6 +20,14 @@ export default function WhatsNewScreen() {
             markWhatsNewSeen();
             if (router.canGoBack()) router.back();
             else router.replace('/');
+          }}
+        />
+        <Button
+          kind="ghost"
+          label="Open Watch and data"
+          onPress={() => {
+            markWhatsNewSeen();
+            router.push({ pathname: '/settings/[section]', params: { section: 'data' } });
           }}
         />
       </View>

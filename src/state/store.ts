@@ -22,6 +22,7 @@ import {
   DEFAULT_PROFILE,
   NightVitals,
   Profile,
+  ReactionTest,
   SleepDataset,
   SleepSession,
   WakeLog,
@@ -185,6 +186,8 @@ export interface Settings {
 export interface AppState extends SleepDataset {
   checkins: AlertnessCheckIn[];
   workouts: Workout[];
+  /** Reaction-time tests (engine/reaction.ts). */
+  reactions: ReactionTest[];
   /** App use / "I'm up" taps / your corrections for the accurate wake-up (engine/wakeDetect.ts). */
   wakeLog: WakeLog;
   /** What eepy planned each night, kept ~30 nights — how late you go to bed vs the plan (engine/adherence.ts). */
@@ -217,6 +220,8 @@ export interface AppState extends SleepDataset {
   resetAll(): void;
   addCheckIn(c: AlertnessCheckIn): void;
   removeCheckIn(id: string): void;
+  addReaction(r: ReactionTest): void;
+  removeReaction(id: string): void;
   setCalibration(r: CalibrationResult | undefined): void;
   upsertExperiment(e: Experiment): void;
   removeExperiment(id: string): void;
@@ -285,6 +290,7 @@ const EMPTY: Omit<AppState, keyof Actions | 'settings' | 'hydrated'> = {
   profile: DEFAULT_PROFILE,
   checkins: [],
   workouts: [],
+  reactions: [],
   wakeLog: EMPTY_WAKE_LOG,
   planLog: {},
   calibration: undefined,
@@ -385,6 +391,7 @@ export const useStore = create<AppState>()(
           ...data,
           checkins: data.checkins ?? [],
           workouts: data.workouts ?? [],
+          reactions: data.reactions ?? [],
           wakeLog: { ...EMPTY_WAKE_LOG, ...data.wakeLog },
           settings: { ...s.settings, dataMode: 'live' },
         })),
@@ -393,6 +400,8 @@ export const useStore = create<AppState>()(
 
       addCheckIn: (c) => set((s) => ({ checkins: [...s.checkins.filter((x) => x.id !== c.id), c].sort((a, b) => a.time - b.time) })),
       removeCheckIn: (id) => set((s) => ({ checkins: s.checkins.filter((x) => x.id !== id) })),
+      addReaction: (r) => set((s) => ({ reactions: [...s.reactions.filter((x) => x.id !== r.id), r].sort((a, b) => a.time - b.time).slice(-500) })),
+      removeReaction: (id) => set((s) => ({ reactions: s.reactions.filter((x) => x.id !== id) })),
       setCalibration: (calibration) => set({ calibration }),
       upsertExperiment: (e) => set((s) => ({ experiments: [...s.experiments.filter((x) => x.id !== e.id), e] })),
       removeExperiment: (id) => set((s) => ({ experiments: s.experiments.filter((x) => x.id !== id) })),
@@ -425,6 +434,7 @@ export const useStore = create<AppState>()(
         profile: s.profile,
         checkins: s.checkins,
         workouts: s.workouts,
+        reactions: s.reactions,
         wakeLog: s.wakeLog,
         planLog: s.planLog,
         calibration: s.calibration,
@@ -445,6 +455,7 @@ export const useStore = create<AppState>()(
           profile,
           checkins: p.checkins ?? [],
           workouts: p.workouts ?? [],
+          reactions: p.reactions ?? [],
           wakeLog: { ...EMPTY_WAKE_LOG, ...p.wakeLog },
           planLog: p.planLog ?? {},
           experiments: p.experiments ?? [],
@@ -481,6 +492,7 @@ export function selectDataset(s: AppState): SleepDataset {
     profile: s.profile,
     checkins: s.checkins,
     workouts: s.workouts,
+    reactions: s.reactions,
     wakeLog: s.wakeLog,
   };
 }

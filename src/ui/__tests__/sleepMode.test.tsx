@@ -157,6 +157,26 @@ describe("Today's countdown line", () => {
     expect(button('Start now')).toBeDefined();
   });
 
+  it('offers Stop while it is on, and Fix until eepy is allowed', async () => {
+    const s = status({ active: true });
+    const w = (s.windows as { night: string; onAt: number; offAt: number }[])[0];
+    mockStatus.current = { ...s, windows: [{ ...w, onAt: NOW - 60_000 }], appliedNight: w.night };
+    const a = analyze(selectDataset(useStore.getState()), NOW);
+    await render(<SleepModeLine a={a} />);
+    expect(text()).toContain('Sleep mode on · off at ');
+    expect(button('Start now')).toBeUndefined();
+    await press('Stop');
+    expect(mockNative.stopSleepModeNow).toHaveBeenCalledWith(w.night);
+
+    mockStatus.current = status({ access: false, ruleId: null, active: null });
+    await act(async () => root.unmount());
+    root = createRoot();
+    await render(<SleepModeLine a={a} />);
+    expect(text()).toContain('Sleep mode needs your OK once');
+    expect(button('Fix')).toBeDefined();
+    expect(button('Start now')).toBeUndefined();
+  });
+
   it('nudges to set it up when autopilot is off, and is absent off Android', async () => {
     useStore.getState().setSleepModeSettings({ enabled: false });
     const a = analyze(selectDataset(useStore.getState()), NOW);

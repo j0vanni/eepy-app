@@ -113,7 +113,7 @@ describe('EarlyUpCard', () => {
 });
 
 describe('changing the wake-up time', () => {
-  it('"Woke up earlier? Change time" on the "Up at …" card', async () => {
+  it('"Woke earlier? Change the time" on the "Up at …" card', async () => {
     const before = analyze(selectDataset(useStore.getState()), atMinutes(TUE, 3 * 60));
     useStore.getState().setSettings({ marks: { [WAKE_AT_MARK]: before.tonight.wake } });
     const now = atMinutes(TUE, 5 * 60);
@@ -122,7 +122,7 @@ describe('changing the wake-up time', () => {
     await render(<EarlyUpCard a={a} now={now} night />);
     await press("I'm up");
     expect(text()).toContain('05:00');
-    await press('Woke up earlier? Change time');
+    await press('Woke earlier? Change the time');
     expect(text()).toContain('Woke up at');
     await press('30 min earlier');
     await press('Save');

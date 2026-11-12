@@ -1,5 +1,5 @@
 import { atMinutes, setClockFormat } from '../../engine/time';
-import { compactTime, morningKind, nightBefore, ordinal, planLine, planSentence, wakeChoiceHint } from '../planner/planText';
+import { clockParts, compactTime, morningKind, morningWord, nightBefore, ordinal, planLine, planSentence, wakeChoiceHint } from '../planner/planText';
 
 // 2026-11-05 is a Thursday.
 const night = {
@@ -52,6 +52,20 @@ describe('planner text', () => {
     expect(wakeChoiceHint('usual', { wakeMin: 480, isWorkday: false }, '08:00', '08:00')).toContain('Not a workday');
     expect(wakeChoiceHint('free', { wakeMin: 420, isWorkday: true }, '07:00', '08:00')).toBe('No alarm that morning — sleep in, up around 08:00.');
     expect(wakeChoiceHint('custom', { wakeMin: 420, isWorkday: true }, '07:00', '08:00')).toContain('set time');
+  });
+
+  it('splits a time for a big number', () => {
+    setClockFormat('12h');
+    expect(clockParts(night.bedtime)).toEqual({ value: '11:05', unit: 'PM' });
+    expect(clockParts(night.alarm)).toEqual({ value: '6:05', unit: 'AM' });
+    setClockFormat('24h');
+    expect(clockParts(night.bedtime)).toEqual({ value: '23:05' });
+  });
+
+  it('names the kind of morning', () => {
+    expect(morningWord({ isWorkday: true })).toBe('workday');
+    expect(morningWord({ isWorkday: false })).toBe('not a workday');
+    expect(morningWord({ isWorkday: true, noAlarm: true })).toBe('free day, no alarm');
   });
 
   it('writes ordinals', () => {

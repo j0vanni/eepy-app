@@ -1,5 +1,5 @@
 /**
- * Plain-language text for the Planner and the month calendar ("Thursday: lights out 11:05 PM →
+ * Plain-language text for the Plan tab and the month calendar ("Thursday: lights out 11:05 PM →
  * alarm 6:05 AM · 7h 10m sleep"). Pure: no React, so it is unit-tested.
  */
 import { addDays, formatDuration, formatTime, getClockFormat, weekdayOfKey } from '../../engine/time';
@@ -51,6 +51,18 @@ export function wakeChoiceHint(mode: 'usual' | 'custom' | 'free', usual: { wakeM
   return usual.isWorkday
     ? `Your usual workday alarm, ${usualLabel}. Change it under "Your usual week".`
     : `Not a workday: the alarm rings later, at ${usualLabel}. Change it under "Your usual week".`;
+}
+
+/** A clock time split for a big number: "11:05" + "PM" (12-hour), or "23:05" alone. */
+export function clockParts(t: number): { value: string; unit?: string } {
+  const s = formatTime(t);
+  const m = /^(.*)\s(AM|PM)$/.exec(s);
+  return m ? { value: m[1], unit: m[2] } : { value: s };
+}
+
+/** What kind of morning a night ends in, in two or three words. */
+export function morningWord(n: { noAlarm?: boolean; isWorkday: boolean }): string {
+  return n.noAlarm ? 'free day, no alarm' : n.isWorkday ? 'workday' : 'not a workday';
 }
 
 /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th, 21st. */

@@ -2,8 +2,10 @@
  * "Your 5:00 AM routine: Did it / Skipped it" — for a two-step morning where nothing was tapped at the
  * time (slept through the routine alarm, or turned it off without telling eepy). eepy's guess comes
  * from the night (wake-up detection found the routine or not); your answer is saved to that morning
- * and the night is re-read with it (state/routineSkip.ts). On the morning check-in (`compact`) and the
- * night screen.
+ * and the night is re-read with it (state/routineSkip.ts).
+ *
+ * `compact` is a question inside Today's morning panel (no panel of its own); otherwise it is a
+ * panel on the night screen.
  */
 import { Text, View } from 'react-native';
 
@@ -12,12 +14,12 @@ import { formatTime } from '@/engine/time';
 import type { NightTimeline } from '@/engine/wakeDetect';
 import { plannedRoutineFor, RoutineOutcome, routineOutcome, setRoutineOutcome } from '@/state/routineSkip';
 import { useStore } from '@/state/store';
-import { Card, CardTitle, Chip, Row } from '@/ui/components';
+import { Card, Chip, Row } from '@/ui/components';
 import { confirmHaptic } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { font, space } from '@/ui/theme';
 
 const CHOICES: { value: RoutineOutcome; label: string; icon: string }[] = [
-  { value: 'done', label: 'Did it', icon: 'face-woman-shimmer-outline' },
+  { value: 'done', label: 'Did it', icon: 'check' },
   { value: 'skipped', label: 'Skipped it', icon: 'sleep' },
 ];
 
@@ -46,26 +48,18 @@ export function RoutineCheck({ m, t, compact }: { m: SessionMetrics; t?: NightTi
   };
   const body = (
     <>
+      <Text style={[font.h3, { marginBottom: space.sm }]}>
+        {title}
+        {compact ? ' this morning?' : ': did you do it?'}
+      </Text>
       <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
         {CHOICES.map((c) => (
           <Chip key={c.value} icon={c.icon} label={c.label} selected={value === c.value} onPress={() => pick(c.value)} />
         ))}
       </Row>
-      <Text style={[font.tiny, { marginTop: 6 }]}>{hint}</Text>
+      <Text style={[font.tiny, { marginTop: space.sm }]}>{hint}</Text>
     </>
   );
-  if (compact) {
-    return (
-      <View style={{ marginBottom: space.md }}>
-        <Text style={[font.small, { color: colors.text, marginBottom: 6 }]}>{title} this morning?</Text>
-        {body}
-      </View>
-    );
-  }
-  return (
-    <Card>
-      <CardTitle icon="face-woman-shimmer-outline" title={title} sub="Two-step morning" />
-      {body}
-    </Card>
-  );
+  // In Today's morning panel the next question follows straight after.
+  return compact ? <View style={{ marginBottom: space.lg }}>{body}</View> : <Card>{body}</Card>;
 }

@@ -99,7 +99,8 @@ const player = () => <RundownPlayer a={analysisAt(clock)} />;
 describe('the guided player', () => {
   it('starts, goes step by step with Done / Skip / Back and a progress bar, and resumes', async () => {
     await render(player());
-    expect(text()).toContain('TONIGHT');
+    expect(text()).toContain("Tonight's rundown");
+    expect(text()).toContain('9 steps · 1h 00m');
     expect(text()).toContain(`Phone down ${formatTime(tonight.bedtime - 45 * MINUTE)} · read 30 min · lights out ${formatTime(tonight.bedtime)}`);
     await press('Start my rundown');
     expect(useStore.getState().settings.rundownProgress).toMatchObject({ wakeDate: tonight.wakeDate, startedAt: clock, marks: {} });
@@ -162,7 +163,7 @@ describe('the guided player', () => {
     expect(start).toHaveBeenCalledTimes(1);
     expect(useStore.getState().settings.session).toMatchObject({ inBedAt: clock, wakeDate: tonight.wakeDate });
     await render(player());
-    expect(text()).toContain('Rundown done — sleep well.');
+    expect(text()).toContain('Rundown done. Sleep well.');
   });
 
   it('a late start says what was shortened and why', async () => {
@@ -204,7 +205,15 @@ describe("Today's compact rundown", () => {
     clock = tonight.windDownStart - 30 * MINUTE;
     await render(<WindDownTimelineCard a={analysisAt(clock)} />);
     expect(text()).toContain('Your bedtime rundown');
-    expect(text()).toContain(`PHONE DOWN · ${formatTime(tonight.bedtime - 45 * MINUTE)}`);
+    // Every step still ahead, with its time; what's behind you is folded away.
+    expect(text()).toContain('Phone down');
+    expect(text()).toContain(formatTime(tonight.bedtime - 45 * MINUTE));
+    expect(text()).toContain("Tap \"I'm in bed\"");
+    expect(text()).not.toContain('Last big meal');
+    await press('6 earlier steps');
+    expect(text()).toContain('Last big meal');
+    await press('Hide earlier steps');
+    expect(text()).not.toContain('Last big meal');
     expect(text()).not.toContain('Scullin');
     await press('To-do list for tomorrow');
     expect(text()).toContain('Scullin et al., 2018');

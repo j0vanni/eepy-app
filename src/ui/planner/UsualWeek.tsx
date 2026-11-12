@@ -1,22 +1,22 @@
 /**
- * "Your usual week": which days are workdays and when you wake up on workdays and other days.
- * The weekly pattern every coming night is planned from (single mornings can still be changed
- * in the week strip or the month view).
+ * "Your usual week": which days are workdays and when you wake up on workdays and other days —
+ * the weekly pattern every coming night is planned from. Under it, as rows: a time of its own for
+ * single weekdays, two-step mornings, and planning around your calendar. (One date is changed in
+ * the week above or the month view.)
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { formatClock, normalizeMinutes } from '@/engine/time';
 import { useStore } from '@/state/store';
-import { Button, Card, CardTitle, ListRow, Row, Stepper } from '@/ui/components';
+import { TwoStepMorningCard } from '@/ui/cards/TwoStepMorningCard';
+import { Button, Card, ListCard, ListRow, Stepper } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
-import { colors, font, radius, space } from '@/ui/theme';
+import { font, space } from '@/ui/theme';
 
+import { Caption, DayPicker, WEEK_ORDER } from './parts';
 import { DAY_NAMES, DAY_SHORT } from './planText';
-
-/** Monday first, the way most people read a week. */
-const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export function UsualWeekCard() {
   const profile = useStore((s) => s.profile);
@@ -40,108 +40,80 @@ export function UsualWeekCard() {
   };
 
   return (
-    <Card>
-      <CardTitle icon="calendar-week" title="Workdays and wake-up times" sub="Tap the days you have to be up at a fixed time (work, school, kids)." />
-      <Row gap={4} style={{ marginBottom: space.xs }}>
-        {WEEK_ORDER.map((i) => {
-          const on = workdays.includes(i);
-          return (
-            <Pressable
-              key={i}
-              onPress={() => toggleDay(i)}
-              style={({ pressed }) => [styles.day, on ? styles.dayOn : null, pressed ? { opacity: 0.7 } : null]}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
-              accessibilityLabel={`${DAY_NAMES[i]}: ${on ? 'workday' : 'not a workday'}`}
-            >
-              <Text style={[styles.dayText, on ? { color: colors.onAccent } : null]}>{DAY_SHORT[i]}</Text>
-            </Pressable>
-          );
-        })}
-      </Row>
-      <Stepper
-        label="Workday wake-up"
-        sub={workdays.length ? `${workdays.length} workday${workdays.length > 1 ? 's' : ''} a week` : 'No workdays picked'}
-        value={formatClock(profile.workWakeMin)}
-        onDec={() => setProfile({ workWakeMin: normalizeMinutes(profile.workWakeMin - 15) })}
-        onInc={() => setProfile({ workWakeMin: normalizeMinutes(profile.workWakeMin + 15) })}
-      />
-      <Stepper
-        label="Wake-up on other days"
-        sub={freeAuto ? 'Automatic: 1 h after workdays' : otherDays.length ? otherDays.map((d) => DAY_SHORT[d]).join(', ') : 'Every day is a workday'}
-        value={formatClock(freeWake)}
-        onDec={() => setProfile({ freeWakeMin: normalizeMinutes(freeWake - 15) })}
-        onInc={() => setProfile({ freeWakeMin: normalizeMinutes(freeWake + 15) })}
-      />
-      {!freeAuto ? (
-        <View style={{ alignItems: 'flex-start' }}>
-          <Button small kind="ghost" label="Back to automatic" onPress={() => setProfile({ freeWakeMin: undefined })} />
+    <>
+      <Card>
+        <Caption>Workdays</Caption>
+        <Text style={[font.small, { marginTop: space.xxs, marginBottom: space.md }]}>The days you have to be up at a fixed time.</Text>
+        <DayPicker days={workdays} onToggle={toggleDay} short={DAY_SHORT} label={(d, on) => `${DAY_NAMES[d]}: ${on ? 'workday' : 'not a workday'}`} />
+        <View style={{ marginTop: space.sm }}>
+          <Stepper
+            label="Workday wake-up"
+            sub={workdays.length ? `${workdays.length} workday${workdays.length > 1 ? 's' : ''} a week` : 'No workdays picked'}
+            value={formatClock(profile.workWakeMin)}
+            onDec={() => setProfile({ workWakeMin: normalizeMinutes(profile.workWakeMin - 15) })}
+            onInc={() => setProfile({ workWakeMin: normalizeMinutes(profile.workWakeMin + 15) })}
+          />
+          <Stepper
+            label="Wake-up on other days"
+            sub={freeAuto ? 'Automatic: 1 h after workdays' : otherDays.length ? otherDays.map((d) => DAY_SHORT[d]).join(', ') : 'Every day is a workday'}
+            value={formatClock(freeWake)}
+            onDec={() => setProfile({ freeWakeMin: normalizeMinutes(freeWake - 15) })}
+            onInc={() => setProfile({ freeWakeMin: normalizeMinutes(freeWake + 15) })}
+          />
         </View>
-      ) : null}
-      <Toggle
-        label="Different times on different days"
-        sub="Up at 6:05 on Mondays but 7:30 on Tuesdays? Give each day its own time."
-        value={perDay}
-        onChange={(on) => {
-          setPerDay(on);
-          if (!on) setProfile({ dayWake: undefined });
-        }}
-      />
-      {perDay ? (
-        <View style={styles.perDay}>
-          {WEEK_ORDER.map((d) => {
-            const own = ownTimes[d];
-            const value = own ?? usualFor(d);
-            const kind = workdays.includes(d) ? 'workday' : 'day off';
-            return (
-              <View key={d}>
-                <Stepper
-                  label={DAY_NAMES[d]}
-                  sub={own === undefined ? `${kind} · usual time` : `${kind} · its own time`}
-                  value={formatClock(value)}
-                  onDec={() => setDay(d, value - 15)}
-                  onInc={() => setDay(d, value + 15)}
-                />
-                {own !== undefined ? (
-                  <Pressable onPress={() => resetDay(d)} hitSlop={8} accessibilityRole="button" style={{ marginTop: -4, marginBottom: 6 }}>
-                    <Text style={[font.small, { color: colors.accent, fontWeight: '600' }]}>Use the usual {kind} time ({formatClock(usualFor(d))})</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
-          <Text style={[font.tiny, { marginTop: space.xs }]}>Days you don't change keep the time above. One single date can still be changed in the week strip.</Text>
+        {!freeAuto ? (
+          <View style={{ alignItems: 'flex-start' }}>
+            <Button small kind="ghost" label="Back to automatic" onPress={() => setProfile({ freeWakeMin: undefined })} />
+          </View>
+        ) : null}
+        <Text style={[font.tiny, { marginTop: space.sm }]}>Other days still get an alarm, just later. For no alarm at all, tap that day in the week above and choose “Free day”.</Text>
+      </Card>
+
+      <ListCard>
+        <View>
+          <Toggle
+            label="Different times on different days"
+            sub="Give single weekdays their own wake-up time."
+            value={perDay}
+            onChange={(on) => {
+              setPerDay(on);
+              if (!on) setProfile({ dayWake: undefined });
+            }}
+          />
+          {perDay ? (
+            <View style={{ paddingBottom: space.md }}>
+              {WEEK_ORDER.map((d) => {
+                const own = ownTimes[d];
+                const value = own ?? usualFor(d);
+                const kind = workdays.includes(d) ? 'workday' : 'day off';
+                return (
+                  <View key={d}>
+                    <Stepper
+                      label={DAY_NAMES[d]}
+                      sub={own === undefined ? `${kind} · usual time` : `${kind} · its own time`}
+                      value={formatClock(value)}
+                      onDec={() => setDay(d, value - 15)}
+                      onInc={() => setDay(d, value + 15)}
+                    />
+                    {own !== undefined ? (
+                      <View style={{ alignItems: 'flex-start' }}>
+                        <Button small kind="ghost" label={`Use the usual ${kind} time (${formatClock(usualFor(d))})`} onPress={() => resetDay(d)} />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+              <Text style={[font.tiny, { marginTop: space.xs }]}>Days you don't change keep the time above.</Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
-      <Text style={[font.tiny, { marginTop: space.sm }]}>
-        On other days the alarm still rings, just later — sleeping in much more than an hour shifts your body clock. For no alarm at all, tap that day in the week strip and choose
-        "Free day".
-      </Text>
-      <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <TwoStepMorningCard embedded />
         <ListRow
-          icon="calendar-sync"
           title={calendarOn ? 'Planning around your calendar' : 'Plan around your calendar'}
           sub={calendarOn ? 'An early first event moves that morning’s alarm earlier' : 'Let tomorrow’s first event set your alarm and bedtime'}
           onPress={() => router.push({ pathname: '/settings/[section]', params: { section: 'you' } })}
         />
-      </View>
-    </Card>
+      </ListCard>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  day: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  dayOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  dayText: { color: colors.text, fontWeight: '700', fontSize: 13 },
-  perDay: { marginTop: space.xs, paddingLeft: space.md, borderLeftWidth: 2, borderLeftColor: colors.accentSoft },
-});

@@ -1,20 +1,20 @@
 /**
- * The accurate wake-up in the UI (engine/wakeDetect.ts): the one-line question on Today's morning card,
- * the step-by-step night on the night screen, and the corrections you can make (fell asleep / woke up /
- * got up). Corrections are stored per night in the wake log and always win.
+ * The accurate wake-up in the UI (engine/wakeDetect.ts): the question in Today's morning panel, the
+ * night's times in order on the night screen, and the corrections you can make (fell asleep / woke
+ * up / got up). Corrections are stored per night in the wake log and always win.
  */
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import type { SessionMetrics } from '@/engine/sessions';
 import { clockDiff, formatClock, formatDuration, formatTime, MINUTE, minutesOfDay } from '@/engine/time';
 import type { NightFix, SleepSession } from '@/engine/types';
-import { Boundary, BoundarySource, Confidence, NightTimeline, withFix } from '@/engine/wakeDetect';
+import { Boundary, BoundarySource, NightTimeline, withFix } from '@/engine/wakeDetect';
 import { originLabel } from '@/integrations/healthConnectMapper';
 import { useStore } from '@/state/store';
-import { Button, Card, CardTitle, Row, Stepper } from '@/ui/components';
+import { Button, Card, Divider, KeyValue, Row, Stepper, Timeline, TimelineItem } from '@/ui/components';
 import { confirmHaptic, selectionTick } from '@/ui/haptics';
-import { colors, font, space } from '@/ui/theme';
+import { font, space } from '@/ui/theme';
 
 /** "Your watch" / "Your phone" / "Your tracker", for "Your watch recorded sleep until …". */
 export function trackerLabel(s: SleepSession): string {
@@ -63,8 +63,6 @@ const SOURCE_LABEL: Record<BoundarySource, string> = {
   inbed: 'your tap',
 };
 
-const CONFIDENCE_COLOR: Record<Confidence, string> = { high: colors.good, medium: colors.textDim, low: colors.warn };
-
 const STEP = 5 * MINUTE;
 const clamp = (t: number, a: number, b: number) => Math.min(b, Math.max(a, t));
 
@@ -84,7 +82,7 @@ function FixEditor({ t, full, onDone }: { t: NightTimeline; full?: boolean; onDo
     const fix: NightFix = { asleep: prev?.asleep, wake: prev?.wake, up: prev?.up, at: Date.now() };
     if (asleep !== t.asleep.time) fix.asleep = asleep;
     if (wake !== t.woke.time) fix.wake = wake;
-    // Today's short editor only shows the wake-up; when you got up then follows the evidence.
+    // The short editor (eepy's question on Today) only shows the wake-up; when you got up then follows the evidence.
     if (full && up !== t.outOfBed.time) fix.up = up;
     if (fix.asleep === undefined && fix.wake === undefined && fix.up === undefined) fix.ok = true;
     confirmHaptic();
@@ -92,7 +90,7 @@ function FixEditor({ t, full, onDone }: { t: NightTimeline; full?: boolean; onDo
     onDone();
   };
   return (
-    <View style={{ marginTop: space.sm, marginBottom: full ? 0 : space.md }}>
+    <View>
       {full ? (
         <Stepper
           label="Fell asleep"
@@ -132,97 +130,96 @@ function FixEditor({ t, full, onDone }: { t: NightTimeline; full?: boolean; onDo
 
 /**
  * "Your watch recorded sleep until 9:12 AM — you were up at 7:40 AM (opened eepy, 230 steps)" with
- * Looks right / Change. `full` (night screen) also offers fell-asleep / got-up times and undo.
+ * Looks right / Change. When eepy has nothing to ask, Today shows when you slept as a row that opens
+ * the editor; the night screen (`full`) offers Change and, once you've answered, Undo.
+ *
+ * It has no panel of its own: on Today it is the first block of the morning panel (and closes with
+ * a hairline), on the night screen the last block of the Times panel.
  */
 export function WakeCheck({ m, t, full }: { m: SessionMetrics; t: NightTimeline; full?: boolean }) {
   const update = useStore((s) => s.updateWakeLog);
   const [editing, setEditing] = useState<false | 'wake' | 'all'>(false);
   const q = wakeQuestion(m, t);
-  // "Change" on eepy's question edits the wake-up; "Adjust sleep & wake times" all three.
-  if (editing) return <FixEditor t={t} full={full || editing === 'all'} onDone={() => setEditing(false)} />;
-  // Today: always a way to set when you fell asleep and woke up, not only when eepy asks.
-  const adjust = (
-    <View style={{ marginBottom: space.md, alignItems: 'flex-start' }}>
-      <Button small kind="ghost" icon="clock-edit-outline" label={t.fixed ? 'Your times · Adjust' : 'Adjust sleep & wake times'} onPress={() => setEditing('all')} />
-    </View>
-  );
-  if (t.fixed || t.confirmed) {
-    if (!full) return adjust;
-    return (
-      <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap' }}>
-        <Text style={[font.small, { flex: 1, minWidth: 160 }]}>{t.fixed ? 'Using the times you set.' : 'You confirmed these times.'}</Text>
+  let body: ReactNode;
+  if (editing) {
+    // "Change" on eepy's question edits the wake-up; everywhere else all three times.
+    body = <FixEditor t={t} full={full || editing === 'all'} onDone={() => setEditing(false)} />;
+  } else if (q) {
+    body = (
+      <>
+        <Text style={font.body}>{q.text}</Text>
+        <Row gap={space.sm} style={{ marginTop: space.md, flexWrap: 'wrap' }}>
+          <Button
+            small
+            kind="secondary"
+            icon="check"
+            label={q.yes}
+            onPress={() => {
+              confirmHaptic();
+              update((log) => withFix(log, t.id, { ok: true, at: Date.now() }));
+            }}
+          />
+          <Button small kind="ghost" icon="pencil-outline" label="Change" onPress={() => setEditing(full ? 'all' : 'wake')} />
+        </Row>
+      </>
+    );
+  } else if (!full) {
+    // Today: always a way to set when you fell asleep and woke up, not only when eepy asks.
+    body = (
+      <KeyValue
+        label="Asleep"
+        sub={t.fixed ? 'Your times' : 'Tap to change'}
+        value={`${formatTime(t.asleep.time)} – ${formatTime(t.woke.time)}`}
+        onPress={() => setEditing('all')}
+      />
+    );
+  } else if (t.fixed || t.confirmed) {
+    body = (
+      <Row gap={space.xs} style={{ flexWrap: 'wrap' }}>
+        <Text style={[font.small, { flex: 1, minWidth: 140 }]}>{t.fixed ? 'Using the times you set.' : 'You confirmed these times.'}</Text>
         <Button small kind="ghost" label="Change" onPress={() => setEditing('all')} />
         <Button small kind="ghost" label="Undo" onPress={() => update((log) => withFix(log, t.id, undefined))} />
       </Row>
     );
-  }
-  if (!q) {
-    if (!full) return adjust;
-    return (
-      <View style={{ marginTop: space.sm, alignItems: 'flex-start' }}>
+  } else {
+    body = (
+      <View style={{ alignItems: 'flex-start' }}>
         <Button small kind="ghost" icon="pencil-outline" label="Times look off? Change" onPress={() => setEditing('all')} />
       </View>
     );
   }
+  if (full) return <View>{body}</View>;
   return (
-    <View style={{ marginTop: full ? space.sm : 0, marginBottom: full ? 0 : space.md }}>
-      <Text style={[font.small, { color: colors.text }]}>{q.text}</Text>
-      <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap' }}>
-        <Button
-          small
-          kind="secondary"
-          icon="check"
-          label={q.yes}
-          onPress={() => {
-            confirmHaptic();
-            update((log) => withFix(log, t.id, { ok: true, at: Date.now() }));
-          }}
-        />
-        <Button small kind="ghost" icon="pencil-outline" label="Change" onPress={() => setEditing(full ? 'all' : 'wake')} />
-      </Row>
+    <View>
+      {body}
+      <Divider spacing={space.md} />
     </View>
   );
 }
 
-function Step({ color, label, time, detail, b }: { color: string; label: string; time: string; detail?: string; b?: Boundary }) {
-  return (
-    <View style={{ flexDirection: 'row', gap: space.sm, paddingVertical: 5 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginTop: 7 }} />
-      <View style={{ flex: 1 }}>
-        <Row gap={space.sm}>
-          <Text style={[font.body, { flex: 1 }]}>{label}</Text>
-          <Text style={[font.h3, { fontVariant: ['tabular-nums'] }]}>{time}</Text>
-        </Row>
-        {detail ? <Text style={font.small}>{detail}</Text> : null}
-        {b ? (
-          <Text style={[font.tiny, { marginTop: 1 }]}>
-            {SOURCE_LABEL[b.source]} · <Text style={{ color: CONFIDENCE_COLOR[b.confidence] }}>{b.confidence} confidence</Text>
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-}
+/** What a time is based on, under its detail: "watch · medium confidence". */
+const basis = (b: Boundary) => `${SOURCE_LABEL[b.source]} · ${b.confidence} confidence`;
+const lines = (...parts: (string | undefined)[]) => parts.filter(Boolean).join('\n') || undefined;
 
 const MAX_EPISODES = 6;
 
-/** Night screen: in bed → asleep → wake-ups → woke up → out of bed, each with its source and confidence. */
+/**
+ * Night screen → Times: in bed → asleep → wake-ups → woke up → out of bed, each with what it is
+ * based on, and under them the ways to correct them.
+ */
 export function NightTimelineCard({ m, t }: { m: SessionMetrics; t?: NightTimeline }) {
   if (!t) return null;
-  const who = trackerLabel(m.session);
+  const who = trackerLabel(m.session).toLowerCase().replace('your ', 'the ');
   const rec = t.recorded;
   const asleepBits = [
     m.latencyMin >= 1 ? `${formatDuration(m.latencyMin)} to fall asleep` : undefined,
     t.lastUseBeforeSleep !== undefined ? `last used eepy ${formatTime(t.lastUseBeforeSleep)}` : undefined,
-    t.onsetShiftMin >= 10 ? `${who.toLowerCase().replace('your ', 'the ')} said ${formatTime(rec.onset)}` : undefined,
+    t.onsetShiftMin >= 10 ? `${who} said ${formatTime(rec.onset)}` : undefined,
     ...t.onsetEvidence.filter((e) => t.onsetShiftMin < 10 || e !== t.onsetEvidence[0]),
   ].filter(Boolean);
   const late = t.askLate && t.usualWakeMin !== undefined ? clockDiff(t.usualWakeMin, minutesOfDay(t.woke.time)) : 0;
   // "I'm in bed" (engine/wakeDetect.ts rule 14): your tap, and where the recording began if elsewhere.
-  const inBedBits =
-    t.inBed.source === 'inbed'
-      ? ['you tapped In bed', Math.abs(t.inBed.time - rec.start) >= MINUTE ? `${who.toLowerCase().replace('your ', 'the ')} started at ${formatTime(rec.start)}` : undefined].filter(Boolean)
-      : [];
+  const inBedBits = t.inBed.source === 'inbed' ? ['you tapped In bed', Math.abs(t.inBed.time - rec.start) >= MINUTE ? `${who} started at ${formatTime(rec.start)}` : undefined].filter(Boolean) : [];
   const tail = (t.outOfBed.time - t.woke.time) / MINUTE;
   const outBits = [
     t.upEvidence.join(', '),
@@ -232,61 +229,61 @@ export function NightTimelineCard({ m, t }: { m: SessionMetrics; t?: NightTimeli
   ].filter(Boolean);
   const shown = t.episodes.slice(0, MAX_EPISODES);
   const routine = t.routine;
-  return (
-    <Card>
-      <CardTitle icon="timeline-clock-outline" title="Your night, step by step" />
-      <Step color={colors.textFaint} label="In bed" time={formatTime(t.inBed.time)} detail={inBedBits.join(' · ') || undefined} b={t.inBed} />
-      <Step color={colors.light} label="Fell asleep" time={formatTime(t.asleep.time)} detail={asleepBits.join(' · ') || undefined} b={t.asleep} />
-      {shown.map((e) =>
-        e.routine ? (
-          // Two-step morning: planned time up, not a wake-up in the night (engine/wakeDetect.ts rule 12).
-          <Step
-            key={e.start}
-            color={colors.energy}
-            label="Morning routine"
-            time={formatTime(e.start)}
-            detail={[
+
+  // The four times that bound the night stand out; what happened in between is quieter.
+  const items: TimelineItem[] = [
+    { key: 'in-bed', time: formatTime(t.inBed.time), title: 'In bed', sub: lines(inBedBits.join(' · '), basis(t.inBed)), state: 'next' },
+    { key: 'asleep', time: formatTime(t.asleep.time), title: 'Fell asleep', sub: lines(asleepBits.join(' · '), basis(t.asleep)), state: 'next' },
+    ...shown.map((e): TimelineItem =>
+      e.routine
+        ? {
+            // Two-step morning: planned time up, not a wake-up in the night (engine/wakeDetect.ts rule 12).
+            key: `e${e.start}`,
+            time: formatTime(e.start),
+            title: 'Morning routine',
+            sub: [
               `until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`,
               routine?.backAsleep !== undefined ? `back asleep ${formatTime(routine.backAsleep)}` : undefined,
               routine?.evidence.length ? routine.evidence.join(', ') : undefined,
               routine && routine.minutes > routine.plannedMin ? `${formatDuration(routine.minutes - routine.plannedMin)} longer than planned counts as awake` : 'planned — not counted as waking',
             ]
               .filter(Boolean)
-              .join(' · ')}
-          />
-        ) : (
-          <Step
-            key={e.start}
-            color={colors.awake}
-            label="Awake"
-            time={formatTime(e.start)}
-            detail={[
-              `until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`,
-              e.steps >= 20 ? `got up (${e.steps} steps)` : e.usedEepy ? 'used eepy' : 'in bed',
-            ].join(' · ')}
-          />
-        ),
-      )}
-      {t.episodes.length > shown.length ? <Text style={[font.tiny, { marginLeft: 16 }]}>+{t.episodes.length - shown.length} more wake-ups</Text> : null}
-      <Step
-        color={colors.energy}
-        label="Woke up"
-        time={formatTime(t.woke.time)}
-        detail={
-          routine?.stayedUp
-            ? `no sleep after your morning routine (${formatTime(routine.start)}), so this was your real wake-up`
-            : late > 0
-              ? `${formatDuration(late)} later than your usual ${formatClock(t.usualWakeMin!)}`
-              : undefined
-        }
-        b={t.woke}
-      />
-      <Step color={colors.good} label="Out of bed" time={formatTime(t.outOfBed.time)} detail={outBits.join(' · ') || undefined} b={t.outOfBed} />
-      <Text style={[font.small, { marginTop: space.sm }]}>
-        In bed {formatDuration(m.timeInBedMin)} · asleep {formatDuration(m.totalSleepMin)} · {Math.round(m.efficiency * 100)}% efficiency
-        {m.routine ? ` · ${formatDuration(m.routine.minutes)} up for your routine not counted as in bed` : ''}
-        {t.trimmedMin >= 1 ? ` · ${formatDuration(t.trimmedMin)} after you got up left out` : ''}
-      </Text>
+              .join(' · '),
+          }
+        : {
+            key: `e${e.start}`,
+            time: formatTime(e.start),
+            title: 'Awake',
+            sub: [`until ${formatTime(e.end)} · ${formatDuration(e.minutes)}`, e.steps >= 20 ? `got up (${e.steps} steps)` : e.usedEepy ? 'used eepy' : 'in bed'].join(' · '),
+          },
+    ),
+    ...(t.episodes.length > shown.length ? [{ key: 'more', time: '', title: `+${t.episodes.length - shown.length} more wake-ups` }] : []),
+    {
+      key: 'woke',
+      time: formatTime(t.woke.time),
+      title: 'Woke up',
+      sub: lines(
+        routine?.stayedUp
+          ? `no sleep after your morning routine (${formatTime(routine.start)}), so this was your real wake-up`
+          : late > 0
+            ? `${formatDuration(late)} later than your usual ${formatClock(t.usualWakeMin!)}`
+            : undefined,
+        basis(t.woke),
+      ),
+      state: 'next',
+    },
+    { key: 'up', time: formatTime(t.outOfBed.time), title: 'Out of bed', sub: lines(outBits.join(' · '), basis(t.outOfBed)), state: 'next' },
+  ];
+  // What was left out of the night's totals.
+  const left = [
+    m.routine ? `${formatDuration(m.routine.minutes)} up for your routine not counted as in bed` : undefined,
+    t.trimmedMin >= 1 ? `${formatDuration(t.trimmedMin)} after you got up left out` : undefined,
+  ].filter(Boolean);
+  return (
+    <Card>
+      <Timeline items={items} />
+      {left.length ? <Text style={font.small}>{`${left.join(' · ')}.`}</Text> : null}
+      <Divider spacing={space.md} />
       <WakeCheck m={m} t={t} full />
     </Card>
   );

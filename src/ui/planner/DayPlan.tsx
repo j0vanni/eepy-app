@@ -1,23 +1,24 @@
 /**
- * Planning one morning — shared by the Planner's day card and the month calendar: the wake-up
+ * Planning one morning — shared by the Plan tab's day panel and the month view: the wake-up
  * choice (usual / a set time / free day), the routine alarm on or off for that morning (two-step
- * mornings), the optimal night before, and its notes.
+ * mornings), the night before, and why a night is earlier, shorter or longer than usual.
  */
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { BODY_CLOCK, wakeTargetFor } from '@/engine/schedule';
-import { addDays, dateKey, formatClock, formatDuration, formatTime, normalizeMinutes, weekdayOfKey } from '@/engine/time';
+import { formatClock, formatDuration, formatTime, normalizeMinutes, weekdayOfKey } from '@/engine/time';
 import { checkTwoStep, twoStepByWeek, twoStepSetting } from '@/engine/twoStep';
 import type { DayWakePlan } from '@/engine/types';
 import type { UpcomingNight } from '@/engine/weekPlan';
 import { setWakePlanFor } from '@/state/routineSkip';
 import { useStore } from '@/state/store';
 import { useAnalysis } from '@/state/useAnalysis';
-import { Button, Note, Row, Segmented, Stat, Stepper } from '@/ui/components';
+import { Button, Row, Segmented, Stat, Stepper } from '@/ui/components';
 import { Toggle } from '@/ui/settings/Toggle';
 import { colors, font, space } from '@/ui/theme';
 
+import { Bullet, Caption } from './parts';
 import { DAY_NAMES, wakeChoiceHint } from './planText';
 
 /** How far ahead mornings can be planned. */
@@ -58,7 +59,7 @@ export function WakePlanPicker({ date }: { date: string }) {
           { label: 'Free day', value: 'free' },
         ]}
       />
-      <Text style={[font.small, { marginTop: 6 }]}>{wakeChoiceHint(mode, usual, formatClock(usual.wakeMin), formatClock(freeWakeMin))}</Text>
+      <Text style={[font.small, { marginTop: space.sm }]}>{wakeChoiceHint(mode, usual, formatClock(usual.wakeMin), formatClock(freeWakeMin))}</Text>
       {mode === 'custom' ? (
         <Stepper
           label="Up by"
@@ -74,19 +75,19 @@ export function WakePlanPicker({ date }: { date: string }) {
 }
 
 /**
- * Two-step mornings for one date: the routine alarm on or off for just that morning. Shown once
- * two-step mornings have been set up (Planner › Your usual week), on mornings with an alarm.
+ * Two-step mornings for one date: the routine alarm on or off for just that morning. Undefined
+ * when there is nothing to choose: two-step mornings were never set up, the morning has no alarm,
+ * or the times don't work (the weekly setting explains why).
  */
-export function RoutineChoice({ date }: { date: string }) {
+export function useRoutineChoice(date: string): { on: boolean; sub: string; change: (v: boolean) => void } | undefined {
   const profile = useStore((s) => s.profile);
   const setPlan = useSetWakePlan();
-  if (!profile.twoStepMorning) return null;
+  if (!profile.twoStepMorning) return undefined;
   const target = wakeTargetFor(profile, date);
-  if (target.noAlarm) return null;
+  if (target.noAlarm) return undefined;
   const setting = twoStepSetting(profile);
-  // The times have to work for the routine to be switched on at all (the weekly card explains why not).
   const check = checkTwoStep({ ...profile, twoStepMorning: { ...setting, enabled: true } });
-  if (!check.ok) return null;
+  if (!check.ok) return undefined;
   const plan = profile.wakePlan?.[date];
   const choice = plan?.twoStep;
   const byWeek = twoStepByWeek(profile, date, target);
@@ -96,7 +97,7 @@ export function RoutineChoice({ date }: { date: string }) {
     choice === undefined
       ? setting.enabled
         ? `as usual for ${DAY_NAMES[weekdayOfKey(date)]}s`
-        : 'two-step mornings are off — this turns it on for just this morning'
+        : 'two-step mornings are off, this turns it on for just this morning'
       : 'just this morning';
   const sub = on
     ? `Up ${formatClock(first)} for your ${check.config.routineMin}-min routine, back to sleep until ${formatClock(target.wakeMin)} · ${why}`
@@ -108,33 +109,66 @@ export function RoutineChoice({ date }: { date: string }) {
     else next.twoStep = v;
     setPlan(date, Object.keys(next).length ? next : undefined);
   };
-  return <Toggle label="Routine alarm this morning" sub={sub} value={on} onChange={change} />;
+  return { on, sub, change };
 }
 
-/** Why a night is earlier, shorter or longer than usual (held back by the body clock, easing into an early start, paying back debt). */
-export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: number }) {
+/** The routine-alarm switch for one morning (nothing when there is no choice to make). */
+export function RoutineChoice({ date }: { date: string }) {
+  const c = useRoutineChoice(date);
+  if (!c) return null;
+  return <Toggle label="Routine alarm this morning" sub={c.sub} value={c.on} onChange={c.change} />;
+}
+
+interface NightNote {
+  key: 'held' | 'ease' | 'debt';
+  icon: string;
+  color: string;
+  text: string;
+}
+
+/** Why a night is earlier, shorter or longer than usual: held back by the body clock, easing into an early start, paying back debt. */
+export function nightNotes(night: UpcomingNight, needMin: number, rampMinPerNight: number): NightNote[] {
+  const notes: NightNote[] = [];
   const heldShort = night.heldBack && night.sleepMin < needMin - 30;
+  if (heldShort) {
+    notes.push({
+      key: 'held',
+      icon: 'clock-alert-outline',
+      color: colors.warn,
+      text: `Your body clock isn't ready for a much earlier lights-out yet, so this night is ${formatDuration(needMin - night.sleepMin)} short. eepy moves lights-out about ${rampMinPerNight} min earlier each night. Bright light soon after waking speeds that up, and a 20-min nap before 2 PM takes the edge off.`,
+    });
+  }
+  if (night.preShiftMin > 0 && night.preShiftFor) {
+    notes.push({
+      key: 'ease',
+      icon: 'arrow-collapse-left',
+      color: colors.textDim,
+      text: `${formatDuration(night.preShiftMin)} earlier than usual, to ease into ${DAY_NAMES[weekdayOfKey(night.preShiftFor)]}'s early start. The body clock only moves earlier a little at a time.`,
+    });
+  }
+  if (night.extraForDebtMin > 0 && !heldShort) {
+    notes.push({ key: 'debt', icon: 'battery-charging-medium', color: colors.good, text: `+${night.extraForDebtMin} min in bed to pay back some sleep debt.` });
+  }
+  return notes;
+}
+
+/** The notes for a night, with "Skip the routine" on a short two-step night. Renders nothing when there is nothing to say. */
+export function NightNotes({ night, needMin }: { night: UpcomingNight; needMin: number }) {
   // The pace coming nights are planned at: what your sleep onset has actually kept up lately.
   const ramp = useAnalysis()?.advance?.rampMinPerNight ?? BODY_CLOCK.rampMinPerNight;
+  const notes = nightNotes(night, needMin, ramp);
+  if (!notes.length) return null;
   return (
-    <>
-      {heldShort ? (
-        <Note tone="warn" icon="clock-alert-outline">
-          {`Your body clock isn't ready for a much earlier lights-out yet, so this night runs ${formatDuration(needMin - night.sleepMin)} short. eepy moves lights-out about ${ramp} min earlier each night as you catch up — bright light soon after waking speeds it up, and a 20-min nap before 2 PM takes the edge off.`}
-        </Note>
-      ) : null}
-      {heldShort && night.twoStep ? <SkipRoutineForShortNight night={night} /> : null}
-      {night.preShiftMin > 0 && night.preShiftFor ? (
-        <Note icon="arrow-collapse-left">
-          {`${formatDuration(night.preShiftMin)} earlier than usual to ease into ${DAY_NAMES[weekdayOfKey(night.preShiftFor)]}'s early start — the body clock only moves earlier gradually.`}
-        </Note>
-      ) : null}
-      {night.extraForDebtMin > 0 && !heldShort ? (
-        <Note tone="good" icon="battery-charging-medium">
-          {`+${night.extraForDebtMin} min in bed to pay back some sleep debt.`}
-        </Note>
-      ) : null}
-    </>
+    <View style={{ gap: space.sm, marginTop: space.md }}>
+      {notes.map((n) => (
+        <View key={n.key}>
+          <Bullet icon={n.icon} color={n.color} strong>
+            {n.text}
+          </Bullet>
+          {n.key === 'held' && night.twoStep ? <SkipRoutineForShortNight night={night} /> : null}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -156,44 +190,39 @@ function SkipRoutineForShortNight({ night }: { night: UpcomingNight }) {
   );
 }
 
-/** The optimal night before a morning: wind-down, lights-out and alarm, expected sleep and notes. */
+/** The night before a morning: wind-down, lights-out and alarm, expected sleep and notes. */
 export function NightBeforeStats({ night, needMin, isTonight }: { night: UpcomingNight; needMin: number; isTonight: boolean }) {
   return (
-    <View style={{ marginTop: space.md }}>
-      <Text style={font.label}>BEST PLAN FOR THE NIGHT BEFORE</Text>
-      <Row style={{ marginTop: 4 }}>
+    <View style={{ marginTop: space.lg }}>
+      <Caption>{isTonight ? 'Tonight' : 'The night before'}</Caption>
+      <Row style={{ marginTop: space.sm }}>
         <Stat label="Wind down" value={formatTime(night.windDownStart)} />
-        <Stat label="Lights out" value={formatTime(night.bedtime)} color={colors.accent} />
+        <Stat label="Lights out" value={formatTime(night.bedtime)} color={colors.sleep} />
         <Stat
-          label={night.noAlarm ? 'Wake (free)' : night.twoStep ? 'Routine alarm' : 'Alarm'}
+          label={night.noAlarm ? 'Wake up' : night.twoStep ? 'Routine alarm' : 'Alarm'}
           value={night.alarm ? formatTime(night.alarm) : formatTime(night.wake)}
           sub={night.noAlarm ? 'no alarm' : night.twoStep ? `then up ${formatTime(night.wake)}` : night.cycles ? `${night.cycles} sleep cycles` : undefined}
         />
       </Row>
       <Text style={[font.small, { marginTop: space.sm }]}>
-        Expected sleep {formatDuration(night.sleepMin)} (you need {formatDuration(needMin)}).
+        {formatDuration(night.sleepMin)} of sleep · you need {formatDuration(needMin)}
       </Text>
-      <View style={{ marginTop: space.sm }}>
-        <NightNotes night={night} needMin={needMin} />
-      </View>
+      <NightNotes night={night} needMin={needMin} />
       {isTonight ? <AdjustTonightButton /> : null}
     </View>
   );
 }
 
+/** Opens "Adjust tonight". `primary` is the Plan tab's one main action; elsewhere it is a small secondary button. */
 export function AdjustTonightButton({ primary }: { primary?: boolean }) {
   const a = useAnalysis();
   // Only tonight's own times count (an earlier night's override — e.g. from "I'm in bed" — is ignored by the plan).
   const adjusted = useStore((s) => !!s.settings.tonight && (!a || s.settings.tonight.wakeDate === a.tonight.wakeDate));
+  const label = adjusted ? 'Change tonight’s times' : 'Adjust tonight';
+  if (primary) return <Button icon="clock-edit-outline" label={label} onPress={() => router.push('/tonight')} />;
   return (
-    <View style={{ marginTop: space.sm, alignItems: primary ? 'stretch' : 'flex-start' }}>
-      <Button
-        small={!primary}
-        kind={primary ? 'primary' : 'secondary'}
-        icon="clock-edit-outline"
-        label={adjusted ? 'Change tonight’s times' : 'Can’t make it? Adjust tonight'}
-        onPress={() => router.push('/tonight')}
-      />
+    <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
+      <Button small kind="secondary" icon="clock-edit-outline" label={label} onPress={() => router.push('/tonight')} />
     </View>
   );
 }

@@ -1,13 +1,33 @@
 /**
- * Render tests for the Planner (week strip, day card, usual week, tonight), the feature search
- * and the one-time "What's new" sheet, on the demo data.
+ * Render tests for the Plan tab (tonight's hero and details, the week strip, the day panel, the
+ * usual week, the tools opened by the `show` param), on the demo data — and for the ways into it
+ * from other areas: the feature search, the caffeine settings page and the "What's new" sheet.
+ * Those last ones find buttons by what a tap does (where it navigates, what it stores), not by
+ * the other area's words.
  */
 // Icons load their font asynchronously, which Jest's asset registry can't serve.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
 jest.mock('expo-notifications', () => ({}));
 const mockPush = jest.fn();
+const mockSetParams = jest.fn();
+let mockParams: { show?: string; date?: string } = {};
 jest.mock('expo-router', () => ({
-  router: { push: (...a: unknown[]) => mockPush(...a), navigate: (...a: unknown[]) => mockPush(...a), back: jest.fn(), canGoBack: () => false, replace: jest.fn() },
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    navigate: (...a: unknown[]) => mockPush(...a),
+    setParams: (...a: unknown[]) => mockSetParams(...a),
+    back: jest.fn(),
+    canGoBack: () => false,
+    replace: jest.fn(),
+  },
+  useLocalSearchParams: () => mockParams,
+}));
+// The phone-light tool reads the screen brightness through a native module.
+jest.mock('../../integrations/screen', () => ({
+  getScreenBrightness: () => Promise.resolve(undefined),
+  dimEepy: () => Promise.resolve(),
+  undimEepy: () => Promise.resolve(),
+  screenControlsSupported: () => false,
 }));
 
 import { act } from 'react';
@@ -15,11 +35,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createRoot, Root, TestInstance } from 'test-renderer';
 
 import { analyze } from '../../engine/analysis';
-import { atMinutes } from '../../engine/time';
+import { atMinutes, formatTime } from '../../engine/time';
+import { analyzeOptionsFor } from '../../state/analysisOptions';
 import { selectDataset, useStore } from '../../state/store';
 import { FeatureSearch } from '../FeatureSearch';
+import PlanScreen from '../../app/(tabs)/planner';
 import { DayCard } from '../planner/DayCard';
-import { TonightPanel } from '../planner/TonightPanel';
+import { AdjustTonightButton } from '../planner/DayPlan';
+import { TonightDetails, TonightHero } from '../planner/TonightPanel';
 import { UsualWeekCard } from '../planner/UsualWeek';
 import { WeekStrip } from '../planner/WeekStrip';
 import { AboutSection } from '../settings/AboutSection';
@@ -35,9 +58,11 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   jest.clearAllMocks();
+  mockParams = {};
   jest.spyOn(Date, 'now').mockReturnValue(NOW);
   useStore.getState().loadDemo(NOW);
   useStore.getState().setProfile({ onboarded: true, wakePlan: {}, workdays: [1, 2, 3, 4, 5], workWakeMin: 7 * 60, twoStepMorning: undefined });
+  useStore.getState().setSettings({ tonight: undefined });
   root = createRoot();
 });
 afterEach(async () => {
@@ -62,7 +87,24 @@ const press = async (label: string) => {
   await act(async () => target.props.onClick({ nativeEvent: {}, target: 1, currentTarget: 1, stopPropagation: () => undefined, preventDefault: () => undefined }));
 };
 
-describe('Planner week strip', () => {
+const EVENT = { nativeEvent: {}, target: 1, currentTarget: 1, stopPropagation: () => undefined, preventDefault: () => undefined };
+/**
+ * Taps the things that can be tapped, one at a time, until `done()` holds; `before` sets the screen
+ * up again before each tap (a tap may close what was open). False when nothing did it.
+ */
+const tapUntil = async (done: () => boolean, before?: () => Promise<void>): Promise<boolean> => {
+  for (let i = 0; i < 60; i++) {
+    if (before) await before();
+    const all = root.container.queryAll((n) => typeof n.props.onClick === 'function');
+    if (i >= all.length) return false;
+    await act(async () => all[i].props.onClick(EVENT));
+    if (done()) return true;
+  }
+  return false;
+};
+const wentTo = (show: string) => () => mockPush.mock.calls.some(([href]) => href?.pathname === '/planner' && href.params?.show === show);
+
+describe('Week strip', () => {
   it('shows seven mornings, tonight first, each with its plan in words', async () => {
     const a = analysis();
     const onSelect = jest.fn();
@@ -84,13 +126,13 @@ describe('Planner week strip', () => {
   });
 });
 
-describe('Planner day card', () => {
+describe('Day panel', () => {
   it('plans a free day and a set time for one morning', async () => {
     const a = analysis();
     const night = a.upcoming[3];
     await render(<DayCard night={night} needMin={a.need.needMin} isTonight={false} />);
     expect(text()).toContain('Lights out');
-    expect(text()).toContain('WAKE-UP THAT MORNING');
+    expect(text()).toContain('Wake-up that morning');
     await press('Free day');
     expect(useStore.getState().profile.wakePlan?.[night.wakeDate]).toEqual({ free: true });
     expect(text()).toContain('No alarm that morning');
@@ -142,11 +184,12 @@ describe('Planner day card', () => {
     expect(text()).not.toContain('Skip the routine that morning');
   });
 
-  it("offers Adjust tonight on tonight's card", async () => {
+  it("offers Adjust tonight on tonight's panel only", async () => {
     const a = analysis();
+    await render(<DayCard night={a.upcoming[2]} needMin={a.need.needMin} isTonight={false} />);
+    expect(text()).not.toContain('Adjust tonight');
     await render(<DayCard night={a.upcoming[0]} needMin={a.need.needMin} isTonight />);
-    expect(text()).toContain('TONIGHT’S PLAN');
-    await press('Can’t make it? Adjust tonight');
+    await press('Adjust tonight');
     expect(mockPush).toHaveBeenCalledWith('/tonight');
   });
 });
@@ -164,35 +207,153 @@ describe('Your usual week', () => {
 });
 
 describe('Tonight', () => {
-  it('shows lights-out big with one clear "Can\'t make it?" button', async () => {
+  it('shows lights-out as the big number, with wind-down and the alarm under it', async () => {
     const a = analysis();
-    await render(<TonightPanel a={a} />);
-    expect(text()).toContain('Lights out');
-    expect(text()).toContain('Can’t make it? Adjust tonight');
+    await render(<TonightHero a={a} />);
+    const t = text();
+    expect(t).toContain('Lights out tonight');
+    expect(t).toContain(`"${formatTime(a.tonight.bedtime)}"`);
+    expect(t).toContain(`"${formatTime(a.tonight.windDownStart)}"`);
+    expect(t).toContain(`"${formatTime(a.alarm.alarm)}"`);
+    expect(t).toContain('Tuesday · workday');
+  });
+
+  it('shows the routine alarm and the final wake-up on a two-step morning', async () => {
+    useStore.getState().setProfile({ workWakeMin: 6 * 60, twoStepMorning: { enabled: true, firstWakeMin: 5 * 60, routineMin: 20, days: [2, 4] } });
+    const a = analysis();
+    expect(a.tonight.twoStep).toBeDefined();
+    await render(<TonightHero a={a} />);
+    const t = text();
+    expect(t).toContain('ROUTINE ALARM');
+    expect(t).toContain(`"${formatTime(a.alarm.alarm)}"`);
+    expect(t).toContain(`"${formatTime(a.tonight.wake)}"`);
+  });
+
+  it('says when tonight was changed, and what the plan was', async () => {
+    const before = analysis();
+    useStore.getState().setSettings({ tonight: { wakeDate: before.tonight.wakeDate, bedtime: before.tonight.bedtime + 60 * 60_000 } });
+    // With the app's own options, so tonight's override counts.
+    const st = useStore.getState();
+    const a = analyze(selectDataset(st), NOW, analyzeOptionsFor(st, { now: NOW }));
+    expect(a.tonight.bedtime).toBe(before.tonight.bedtime + 60 * 60_000);
+    await render(
+      <>
+        <TonightHero a={a} />
+        <AdjustTonightButton primary />
+      </>,
+    );
+    expect(text()).toContain(`Changed for tonight only. The plan was lights out ${formatTime(before.tonight.bedtime)}`);
+    expect(text()).toContain('Change tonight’s times');
+  });
+
+  it('says which of the options is in use', async () => {
+    const before = analysis();
+    useStore.getState().setSettings({ tonight: { wakeDate: before.tonight.wakeDate, choice: { id: 'catch-up', title: 'Full catch-up' } } });
+    await render(<TonightHero a={analysis()} />);
+    expect(text()).toContain('Using “Full catch-up” tonight.');
+  });
+
+  it('has one main action, "Adjust tonight"', async () => {
+    await render(<AdjustTonightButton primary />);
+    await press('Adjust tonight');
+    expect(mockPush).toHaveBeenCalledWith('/tonight');
+  });
+
+  it('folds why these times away, and leads to the wind-down and the alarm settings', async () => {
+    const a = analysis();
+    await render(<TonightDetails a={a} />);
+    expect(text()).not.toContain('Time in bed');
     await press('Why these times?');
     expect(text()).toContain('Time in bed');
+    await press('Wind-down');
+    expect(mockPush).toHaveBeenCalledWith('/winddown');
+    await press('Alarm settings');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/settings/[section]', params: { section: 'alarms' } });
+  });
+});
+
+describe('Plan tab', () => {
+  const screen = (
+    <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 412, height: 900 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+      <PlanScreen />
+    </SafeAreaProvider>
+  );
+  const settle = () => act(async () => new Promise<void>((r) => setTimeout(r, 200)));
+
+  it('opens with tonight, then the week, the usual week and the tools folded', async () => {
+    await render(screen);
+    const t = text();
+    for (const part of ['Lights out tonight', 'Adjust tonight', 'Tonight in detail', 'The week ahead', 'Your usual week', 'Tools']) expect(t).toContain(part);
+    // Tonight comes first; the tools are closed.
+    expect(t.indexOf('Lights out tonight')).toBeLessThan(t.indexOf('The week ahead'));
+    expect(t.indexOf('The week ahead')).toBeLessThan(t.indexOf('Your usual week'));
+    expect(t).toContain('Bedtime calculator');
+    expect(t).not.toContain('I need to wake at');
+    await press('Bedtime calculator');
+    expect(text()).toContain('I need to wake at');
+    await press('Month view');
+    expect(mockPush).toHaveBeenCalledWith('/calendar');
+  });
+
+  it('opens a day from the week strip', async () => {
+    const a = analysis();
+    await render(screen);
+    expect(text()).toContain('Tap a day');
+    const tiles = root.container.queryAll((i) => typeof i.props.accessibilityLabel === 'string' && i.props.accessibilityLabel.includes('lights out') && typeof i.props.onClick === 'function');
+    await act(async () => tiles[3].props.onClick({ nativeEvent: {}, preventDefault: () => undefined }));
+    expect(text()).toContain('Wake-up that morning');
+    expect(text()).not.toContain('Tap a day');
+    await press('Free day');
+    expect(useStore.getState().profile.wakePlan?.[a.upcoming[3].wakeDate]).toEqual({ free: true });
+  });
+
+  it('honours the show param: opens that tool and clears the param', async () => {
+    mockParams = { show: 'caffeine' };
+    await render(screen);
+    expect(text()).toContain('Active now');
+    expect(text()).not.toContain('I need to wake at');
+    await settle();
+    expect(mockSetParams).toHaveBeenCalledWith({ show: undefined, date: undefined });
+  });
+
+  it('honours the date param: selects that morning', async () => {
+    const a = analysis();
+    mockParams = { date: a.upcoming[2].wakeDate };
+    await render(screen);
+    expect(text()).toContain('Wake-up that morning');
+    await settle();
+    expect(mockSetParams).toHaveBeenCalled();
+  });
+
+  it('without data: says so and still lets you set the usual week', async () => {
+    useStore.setState({ sessions: [] });
+    await render(screen);
+    expect(text()).toContain('Your plan appears after the first night');
+    expect(text()).toContain('Workday wake-up');
+    expect(text()).not.toContain('Lights out tonight');
   });
 });
 
 describe('Feature search', () => {
-  it('lists matches with where they live, and opens one', async () => {
+  it('finds the usual week and opens the Plan tab there', async () => {
     const onSearching = jest.fn();
     await render(<FeatureSearch onSearchingChange={onSearching} />);
-    const input = root.container.queryAll((i) => i.type === 'TextInput')[0] ?? root.container.queryAll((i) => i.props.placeholder === 'Find a feature or setting…')[0];
-    await act(async () => (input.props.onChangeText ? input.props.onChangeText('wake time') : input.props.onChange({ nativeEvent: { text: 'wake time' }, target: { value: 'wake time' } })));
+    const type = async (q: string) => {
+      const input = root.container.queryAll((i) => i.type === 'TextInput')[0] ?? root.container.queryAll((i) => typeof i.props.placeholder === 'string')[0];
+      await act(async () => (input.props.onChangeText ? input.props.onChangeText(q) : input.props.onChange({ nativeEvent: { text: q }, target: { value: q } })));
+    };
+    await type('wake time');
     expect(onSearching).toHaveBeenLastCalledWith(true);
-    expect(text()).toContain('Planner › Your usual week');
-    await press('Workdays & wake-up times');
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/planner', params: { show: 'week' } });
+    expect(await tapUntil(wentTo('week'), () => type('wake time'))).toBe(true);
   });
 });
 
 describe('Settings pages', () => {
-  it('renders the caffeine and about pages', async () => {
+  it('the caffeine page leads to the caffeine tool on the Plan tab; the about page renders', async () => {
     await render(<CaffeineSection />);
-    expect(text()).toContain('Caffeine half-life');
+    expect(await tapUntil(wentTo('caffeine'))).toBe(true);
     await render(<AboutSection />);
-    expect(text()).toContain('not a medical device');
+    expect(root.container.queryAll((i) => i.type === 'Text').length).toBeGreaterThan(0);
   });
 });
 
@@ -204,9 +365,10 @@ describe("What's new", () => {
         <WhatsNewSheet />
       </SafeAreaProvider>,
     );
-    expect(text()).toContain('WHERE THINGS MOVED');
-    await press('Got it');
-    expect(useStore.getState().settings.marks[WHATS_NEW_MARK]).toBe(WHATS_NEW_ID);
-    expect(text()).not.toContain('WHERE THINGS MOVED');
+    const words = () => root.container.queryAll((i) => i.type === 'Text').length;
+    expect(words()).toBeGreaterThan(0);
+    // Closing it (any of its ways out) records that it was seen.
+    expect(await tapUntil(() => useStore.getState().settings.marks[WHATS_NEW_MARK] === WHATS_NEW_ID)).toBe(true);
+    expect(words()).toBe(0);
   });
 });
